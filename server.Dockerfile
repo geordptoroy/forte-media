@@ -19,8 +19,8 @@ COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 COPY tsconfig.json ./
 
-# Build
-RUN pnpm run build
+# Build (Apenas backend usando esbuild)
+RUN esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
 
 # Expor porta
 EXPOSE 3000
