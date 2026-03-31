@@ -47,7 +47,7 @@ export const Monitoring: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        monitoring?.map(item => (
+        monitoring?.map((item: any) => (
           <Card key={item.id}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-4">

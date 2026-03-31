@@ -1,0 +1,26 @@
+nohup: ignoring input
+
+> forte-media-backend@1.0.0 dev
+> ts-node-dev --respawn --transpile-only src/server.ts
+
+[INFO] 07:24:47 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.9.3)
+🚀 FORTE MEDIA Backend rodando na porta 3000
+📊 Modo Mock: ATIVADO
+[SyncWorker] Modo mock ativo — worker desativado.
+[INFO] 07:38:18 Restarting: /home/ubuntu/forte-media/backend/src/app.ts has been modified
+🚀 FORTE MEDIA Backend rodando na porta 3000
+📊 Modo Mock: ATIVADO
+[SyncWorker] Modo mock ativo — worker desativado.
+[INFO] 07:43:01 Restarting: /home/ubuntu/forte-media/backend/src/app.ts has been modified
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1937:16)
+    at listenInCluster (node:net:1994:12)
+    at Server.listen (node:net:2099:7)
+    at Function.listen (/home/ubuntu/forte-media/backend/node_modules/express/lib/application.js:635:24)
+    at Object.<anonymous> (/home/ubuntu/forte-media/backend/src/server.ts:7:5)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1562:14)
+    at Module._compile (/home/ubuntu/forte-media/backend/node_modules/source-map-support/source-map-support.js:568:25)
+    at Module.m._compile (/tmp/ts-node-dev-hook-38138587322116413.js:69:33)
+    at node:internal/modules/cjs/loader:1699:10
+    at require.extensions..jsx.require.extensions..js (/tmp/ts-node-dev-hook-38138587322116413.js:114:20)
+[ERROR] 07:43:01 Error: listen EADDRINUSE: address already in use :::3000

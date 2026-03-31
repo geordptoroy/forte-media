@@ -11,7 +11,24 @@ import syncRoutes from './routes/sync';
 
 const app = express();
 
-app.use(cors({ origin: '*' }));
+const allowedOrigins = [
+  'http://localhost',
+  'https://localhost',
+  'http://localhost:5173',
+  'http://localhost:8080',
+  process.env.FRONTEND_URL || '',
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Health check

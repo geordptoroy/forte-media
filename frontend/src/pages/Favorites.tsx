@@ -34,7 +34,7 @@ export const Favorites: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        favorites?.map(fav => (
+        favorites?.map((fav: any) => (
           <Card key={fav.id}>
             <CardContent className="p-4">
               <div className="flex items-start gap-4">

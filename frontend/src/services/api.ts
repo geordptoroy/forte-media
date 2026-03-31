@@ -4,8 +4,8 @@ import {
   MOCK_RECENT_ADS, getMockAdHistory, MOCK_FAVORITES, MOCK_MONITORING, MOCK_AUTH_RESPONSE,
 } from './mockData';
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const USE_MOCK = (import.meta.env as any).VITE_USE_MOCK === 'true';
+const API_URL = (import.meta.env as any).VITE_API_URL || '/api';
 
 const http = axios.create({ baseURL: API_URL });
 

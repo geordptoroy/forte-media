@@ -26,7 +26,7 @@ export const Dashboard: React.FC = () => {
               {topLoading ? (
                 [1, 2, 3, 4, 5].map(i => <div key={i} className="skeleton h-8 rounded" />)
               ) : (
-                topAds?.map((item, i) => (
+                topAds?.map((item: any, i: number) => (
                   <div key={i} className="flex items-center justify-between p-2 bg-[#0d0d0d] rounded-lg">
                     <span className="text-white text-sm truncate">{item.name}</span>
                     <span className="text-[#2C3E66] font-bold text-sm">{item.count}</span>
