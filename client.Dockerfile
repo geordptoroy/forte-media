@@ -14,6 +14,7 @@ RUN pnpm install --frozen-lockfile
 # Copiar código fonte
 COPY client ./client
 COPY shared ./shared
+COPY patches ./patches
 COPY tsconfig.json ./
 COPY vite.config.ts ./
 
