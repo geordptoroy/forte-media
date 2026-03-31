@@ -59,7 +59,35 @@ A aplicação foi projetada para alternar facilmente entre o modo de desenvolvim
     Defina `USE_MOCK=true` no `.env` do backend e `VITE_USE_MOCK=true` no `.env` do frontend. Neste modo, qualquer e-mail/senha funciona no login e os dados são simulados.
 
 -   **Modo Produção (API Real):**
-    Defina `USE_MOCK=false` no `.env` do backend e `VITE_USE_MOCK=false` no `.env` do frontend. Você precisará preencher as variáveis `META_API_KEY`, `META_APP_ID`, `META_APP_SECRET` no `.env` do backend com suas credenciais reais da Meta API. O banco de dados PostgreSQL também precisará ser configurado para um ambiente de produção.
+    Defina `USE_MOCK=false` no `.env` do backend e `VITE_USE_MOCK=false` no `.env` do frontend. Siga o guia abaixo para configurar suas credenciais reais.
+
+### 🔑 Configurando a Meta API (Real)
+
+Para usar dados reais da Biblioteca de Anúncios da Meta, siga estes passos:
+
+1.  **Crie um App no Meta for Developers:**
+    - Acesse [Meta for Developers](https://developers.facebook.com/).
+    - Crie um novo App do tipo "Business" ou "Outro".
+    - Em "Adicionar produtos ao seu app", selecione **Ad Library API**.
+
+2.  **Obtenha as Credenciais:**
+    - **App ID** e **App Secret**: Encontrados em *Configurações > Básico*.
+    - **Access Token**: Use o [Graph API Explorer](https://developers.facebook.com/tools/explorer/) para gerar um token com a permissão `ads_read`. Recomenda-se converter para um **Token de Longa Duração** (60 dias).
+
+3.  **Preencha o arquivo `.env`:**
+    ```env
+    USE_MOCK=false
+    VITE_USE_MOCK=false
+    META_API_KEY=seu_access_token_aqui
+    META_APP_ID=seu_app_id_aqui
+    META_APP_SECRET=seu_app_secret_aqui
+    ```
+
+4.  **Reinicie o Docker:**
+    ```bash
+    docker-compose down
+    docker-compose up --build
+    ```
 
 ## 🚀 Deploy em Produção
 
