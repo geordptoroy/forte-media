@@ -20,7 +20,7 @@ COPY drizzle ./drizzle
 COPY drizzle.config.ts tsconfig.json ./
 
 # Build do backend usando esbuild diretamente
-RUN esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+RUN pnpm exec esbuild server/_core/index.ts --platform=node --bundle --format=esm --outdir=dist
 
 # Stage 2: Production
 FROM node:22-alpine
