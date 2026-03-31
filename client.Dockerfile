@@ -5,8 +5,9 @@ WORKDIR /app
 # Instalar pnpm
 RUN npm install -g pnpm
 
-# Copiar package files
+# Copiar package files e patches
 COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
 
 # Instalar dependências
 RUN pnpm install --frozen-lockfile
@@ -14,7 +15,6 @@ RUN pnpm install --frozen-lockfile
 # Copiar código fonte
 COPY client ./client
 COPY shared ./shared
-COPY patches ./patches
 COPY tsconfig.json ./
 COPY vite.config.ts ./
 

@@ -5,8 +5,9 @@ WORKDIR /app
 # Instalar pnpm
 RUN npm install -g pnpm
 
-# Copiar package files
+# Copiar package files e patches
 COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
 
 # Instalar dependências
 RUN pnpm install --frozen-lockfile
@@ -15,7 +16,6 @@ RUN pnpm install --frozen-lockfile
 COPY server ./server
 COPY shared ./shared
 COPY drizzle ./drizzle
-COPY patches ./patches
 COPY drizzle.config.ts ./
 COPY tsconfig.json ./
 
