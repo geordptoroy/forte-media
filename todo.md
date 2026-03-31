@@ -132,4 +132,15 @@
 - [x] Criar testes para notificações (16 testes)
 - [x] Total: 53 testes passando
 
+## Fase 11: Integração tRPC Completa e Funcionalidades Reais
+- [x] Corrigir DashboardLayout.tsx com menu de navegação real (removido scaffold genérico)
+- [x] Refatorar AdCard.tsx com mutations tRPC reais (addFavorite, addMonitored) e ícones Lucide
+- [x] Refatorar Favorites.tsx: substituir useState local por trpc.ads.getFavorites.useQuery() e trpc.ads.removeFavorite.useMutation()
+- [x] Refatorar Monitoring.tsx: substituir useState local por trpc.monitoring.getMonitored.useQuery(), addMonitored e removeMonitored mutations
+- [x] Refatorar ScaledAds.tsx: substituir dados mock por trpc.meta.searchScaledAds.useQuery() com paginação local
+- [x] Refatorar AdvancedSearch.tsx: substituir console.log simulado por trpc.meta.searchAds.useQuery() real com filtros
+- [x] Refatorar Reports.tsx: implementar exportação real de CSV e JSON com dados do banco (favoritos, monitorados, campanhas)
+- [x] Corrigir CompetitiveIntelligence.tsx: toggleFavorite agora persiste no banco via trpc.ads.addFavorite.useMutation()
+- [x] Build do cliente validado sem erros (✓ 1770 modules transformed)
+
 ## Status Final: 100% COMPLETO

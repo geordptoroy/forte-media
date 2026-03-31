@@ -10,21 +10,19 @@ import {
   Trash2,
   DollarSign,
   Eye,
-  Users,
   Calendar,
-  Filter,
   Search,
   Loader2,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 export default function Favorites() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
 
   // Redirect if not authenticated
   if (!isAuthenticated) {
@@ -32,27 +30,41 @@ export default function Favorites() {
     return null;
   }
 
-  // Queries
-  const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
-
-  // Em produção, isso seria uma query real do backend
-  // Por enquanto, retornamos um array vazio para indicar que não há favoritos salvos
-  const [favorites, setFavorites] = useState<any[]>([]);
-
-  const handleRemoveFavorite = (id: string) => {
-    setFavorites(favorites.filter((fav) => fav.id !== id));
-    toast.success("Anúncio removido dos favoritos");
-  };
-
-  const filteredFavorites = favorites.filter((ad) => {
-    const matchesSearch =
-      ad.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ad.body.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterType === "all" || ad.type === filterType;
-    return matchesSearch && matchesFilter;
+  // Query tRPC real para buscar favoritos do banco de dados
+  const favoritesQuery = trpc.ads.getFavorites.useQuery(undefined, {
+    refetchOnWindowFocus: false,
   });
 
-  if (credentialsStatus.isLoading) {
+  const removeFavoriteMutation = trpc.ads.removeFavorite.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success("Anúncio removido dos favoritos");
+        favoritesQuery.refetch();
+      } else {
+        toast.error(data.error || "Erro ao remover favorito");
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao remover favorito");
+    },
+  });
+
+  const handleRemoveFavorite = (id: number) => {
+    removeFavoriteMutation.mutate({ favoriteId: id });
+  };
+
+  const favorites = favoritesQuery.data?.favorites || [];
+
+  const filteredFavorites = favorites.filter((ad) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      (ad.pageName || "").toLowerCase().includes(query) ||
+      (ad.adBody || "").toLowerCase().includes(query)
+    );
+  });
+
+  if (favoritesQuery.isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" strokeWidth={2} />
@@ -81,49 +93,54 @@ export default function Favorites() {
               </p>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => favoritesQuery.refetch()}
+            disabled={favoritesQuery.isFetching}
+            className="border-border"
+          >
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${favoritesQuery.isFetching ? "animate-spin" : ""}`}
+              strokeWidth={2}
+            />
+            Atualizar
+          </Button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="container max-w-6xl mx-auto px-6 py-8">
-        {!credentialsStatus.data?.isValid && (
-          <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 p-6 mb-8">
+      <div className="container max-w-6xl mx-auto px-6 py-8 space-y-6">
+        {/* Error state */}
+        {favoritesQuery.isError && (
+          <Card className="border-border/50 p-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" strokeWidth={2} />
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" strokeWidth={2} />
               <div>
-                <p className="font-medium text-yellow-900 dark:text-yellow-100">
-                  Credenciais não configuradas
+                <p className="text-sm font-medium text-foreground">
+                  Erro ao carregar favoritos
                 </p>
-                <p className="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
-                  Configure suas credenciais Meta em Configurações para sincronizar favoritos
+                <p className="text-xs text-muted-foreground mt-1">
+                  {favoritesQuery.error?.message || "Tente novamente mais tarde"}
                 </p>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Search and Filter */}
-        <Card className="border-border/50 p-6 mb-8">
-          <div className="flex gap-4 mb-4">
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Buscar nos favoritos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" strokeWidth={2} />
-            </div>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-border bg-background text-foreground"
-            >
-              <option value="all">Todos</option>
-              <option value="product">Produtos</option>
-              <option value="service">Serviços</option>
-              <option value="brand">Marca</option>
-            </select>
+        {/* Search */}
+        <Card className="border-border/50 p-4">
+          <div className="relative">
+            <Input
+              placeholder="Buscar nos favoritos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+              strokeWidth={2}
+            />
           </div>
         </Card>
 
@@ -135,7 +152,7 @@ export default function Favorites() {
               Nenhum favorito ainda
             </h3>
             <p className="text-muted-foreground mb-6">
-              Adicione anúncios aos favoritos em Inteligência Competitiva para acompanhá-los aqui
+              Adicione anúncios aos favoritos em Inteligência Competitiva ou Anúncios Escalados para acompanhá-los aqui
             </p>
             <Button
               onClick={() => setLocation("/competitive-intelligence")}
@@ -149,7 +166,6 @@ export default function Favorites() {
             <h2 className="text-lg font-semibold text-foreground">
               {filteredFavorites.length} Favorito{filteredFavorites.length !== 1 ? "s" : ""}
             </h2>
-
             <div className="grid gap-4">
               {filteredFavorites.map((ad) => (
                 <Card
@@ -159,19 +175,20 @@ export default function Favorites() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-foreground mb-2">
-                        {ad.name}
+                        {ad.pageName || "Anúncio"}
                       </h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {ad.body}
-                      </p>
-
+                      {ad.adBody && (
+                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                          {ad.adBody}
+                        </p>
+                      )}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-4 h-4 text-primary" strokeWidth={2} />
                           <div>
                             <p className="text-xs text-muted-foreground">Gasto</p>
                             <p className="text-sm font-medium text-foreground">
-                              {ad.spend}
+                              {ad.spend ? `$${ad.spend}` : "N/A"}
                             </p>
                           </div>
                         </div>
@@ -180,34 +197,36 @@ export default function Favorites() {
                           <div>
                             <p className="text-xs text-muted-foreground">Impressões</p>
                             <p className="text-sm font-medium text-foreground">
-                              {ad.impressions}
+                              {ad.impressions
+                                ? Number(ad.impressions).toLocaleString("pt-BR")
+                                : "N/A"}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-primary" strokeWidth={2} />
+                          <Heart className="w-4 h-4 text-primary" strokeWidth={2} />
                           <div>
-                            <p className="text-xs text-muted-foreground">Público</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {ad.targetAudience}
+                            <p className="text-xs text-muted-foreground">ID do Anúncio</p>
+                            <p className="text-sm font-medium text-foreground font-mono text-xs truncate max-w-[100px]">
+                              {ad.adId}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-primary" strokeWidth={2} />
                           <div>
-                            <p className="text-xs text-muted-foreground">Período</p>
+                            <p className="text-xs text-muted-foreground">Salvo em</p>
                             <p className="text-sm font-medium text-foreground">
-                              {ad.startDate}
+                              {new Date(ad.createdAt).toLocaleDateString("pt-BR")}
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
-
                     <button
                       onClick={() => handleRemoveFavorite(ad.id)}
-                      className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                      disabled={removeFavoriteMutation.isPending}
+                      className="p-2 hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
                     >
                       <Trash2 className="w-5 h-5 text-destructive" strokeWidth={2} />
                     </button>

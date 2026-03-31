@@ -28,6 +28,17 @@ export default function CompetitiveIntelligence() {
   const [ads, setAds] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
+  const addFavoriteMutation = trpc.ads.addFavorite.useMutation({
+    onSuccess: (data) => {
+      if (!data.success) {
+        toast.error(data.error || "Erro ao salvar favorito");
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erro ao salvar favorito");
+    },
+  });
+
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
   
   // Queries com enabled condicional
@@ -90,7 +101,7 @@ export default function CompetitiveIntelligence() {
     }
   };
 
-  const toggleFavorite = (adId: string) => {
+  const toggleFavorite = (adId: string, ad?: any) => {
     const newFavorites = new Set(favorites);
     if (newFavorites.has(adId)) {
       newFavorites.delete(adId);
@@ -98,6 +109,19 @@ export default function CompetitiveIntelligence() {
     } else {
       newFavorites.add(adId);
       toast.success("Adicionado aos favoritos");
+      // Persistir no banco de dados via tRPC
+      if (ad) {
+        addFavoriteMutation.mutate({
+          adId: adId,
+          pageId: ad.page_id || adId,
+          pageName: ad.page_name || ad.name,
+          adBody: ad.body || ad.ad_creative_body,
+          adSnapshotUrl: ad.ad_snapshot_url,
+          spend: typeof ad.spend === 'number' ? ad.spend : undefined,
+          impressions: typeof ad.impressions === 'number' ? ad.impressions : undefined,
+          currency: ad.currency,
+        });
+      }
     }
     setFavorites(newFavorites);
   };
@@ -275,7 +299,7 @@ export default function CompetitiveIntelligence() {
                     </div>
 
                     <button
-                      onClick={() => toggleFavorite(ad.id || idx.toString())}
+                      onClick={() => toggleFavorite(ad.id || idx.toString(), ad)}
                       className="p-2 hover:bg-muted rounded-lg transition-colors"
                     >
                       <Heart

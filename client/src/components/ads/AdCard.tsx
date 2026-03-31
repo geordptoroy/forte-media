@@ -7,6 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { trpc } from '@/lib/trpc';
+import { toast } from 'sonner';
+import { Heart, Eye } from 'lucide-react';
 
 interface AdCardProps {
   ad: any;
@@ -14,13 +17,64 @@ interface AdCardProps {
 
 export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
   const [open, setOpen] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isMonitored, setIsMonitored] = useState(false);
+
+  const addFavoriteMutation = trpc.ads.addFavorite.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        setIsFavorited(true);
+        toast.success('Adicionado aos favoritos');
+      } else {
+        toast.error(data.error || 'Erro ao adicionar favorito');
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Erro ao adicionar favorito');
+    },
+  });
+
+  const addMonitoredMutation = trpc.monitoring.addMonitored.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        setIsMonitored(true);
+        toast.success('Monitoramento ativado');
+      } else {
+        toast.error(data.error || 'Erro ao ativar monitoramento');
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Erro ao ativar monitoramento');
+    },
+  });
 
   const handleFavorite = async () => {
-    console.log('Adicionado aos favoritos:', ad.id);
+    if (isFavorited) {
+      toast.info('Anúncio já está nos favoritos');
+      return;
+    }
+    addFavoriteMutation.mutate({
+      adId: ad.id || String(ad.ad_archive_id || ad.page_id || Math.random()),
+      pageId: ad.page_id || ad.id || 'unknown',
+      pageName: ad.page_name,
+      adBody: ad.body || ad.ad_creative_body,
+      adSnapshotUrl: ad.creative_url || ad.ad_snapshot_url,
+      spend: typeof ad.spend === 'number' ? ad.spend : undefined,
+      impressions: typeof ad.impressions === 'number' ? ad.impressions : undefined,
+      currency: ad.currency,
+    });
   };
 
   const handleMonitor = async () => {
-    console.log('Monitoramento ativado:', ad.id);
+    if (isMonitored) {
+      toast.info('Anúncio já está em monitoramento');
+      return;
+    }
+    addMonitoredMutation.mutate({
+      adId: ad.id || String(ad.ad_archive_id || ad.page_id || Math.random()),
+      pageId: ad.page_id || ad.id || 'unknown',
+      pageName: ad.page_name,
+    });
   };
 
   return (
@@ -71,7 +125,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
           <div className="flex gap-2">
             <Button
               size="sm"
-              variant="default"
+              variant="outline"
               onClick={() => setOpen(true)}
               className="flex-1"
             >
@@ -79,19 +133,23 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
             </Button>
             <Button
               size="sm"
-              variant="ghost"
+              variant={isFavorited ? 'default' : 'ghost'}
               onClick={handleFavorite}
+              disabled={addFavoriteMutation.isPending}
               title="Favoritar"
+              className="px-2"
             >
-              ★
+              <Heart className={`w-4 h-4 ${isFavorited ? 'fill-white' : ''}`} strokeWidth={2} />
             </Button>
             <Button
               size="sm"
-              variant="ghost"
+              variant={isMonitored ? 'default' : 'ghost'}
               onClick={handleMonitor}
+              disabled={addMonitoredMutation.isPending}
               title="Monitorar"
+              className="px-2"
             >
-              ◎
+              <Eye className={`w-4 h-4 ${isMonitored ? 'fill-white' : ''}`} strokeWidth={2} />
             </Button>
           </div>
         </CardContent>
@@ -151,17 +209,21 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
             <div className="flex gap-2">
               <Button
                 onClick={handleFavorite}
-                variant="secondary"
+                variant={isFavorited ? 'default' : 'secondary'}
                 className="flex-1"
+                disabled={addFavoriteMutation.isPending || isFavorited}
               >
-                ★ Favoritar
+                <Heart className={`w-4 h-4 mr-2 ${isFavorited ? 'fill-white' : ''}`} strokeWidth={2} />
+                {isFavorited ? 'Favoritado' : 'Favoritar'}
               </Button>
               <Button
                 onClick={handleMonitor}
-                variant="default"
+                variant={isMonitored ? 'default' : 'outline'}
                 className="flex-1"
+                disabled={addMonitoredMutation.isPending || isMonitored}
               >
-                ◎ Monitorar
+                <Eye className={`w-4 h-4 mr-2 ${isMonitored ? 'fill-white' : ''}`} strokeWidth={2} />
+                {isMonitored ? 'Monitorando' : 'Monitorar'}
               </Button>
             </div>
           </div>
