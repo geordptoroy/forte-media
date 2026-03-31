@@ -1,28 +1,46 @@
-FROM node:22-alpine
+# Stage 1: Build
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Instalar pnpm
-RUN npm install -g pnpm
+# Instalar pnpm e esbuild
+RUN npm install -g pnpm esbuild
 
-# Copiar package files e patches
+# Copiar arquivos de dependências e patches
 COPY package.json pnpm-lock.yaml ./
 COPY patches ./patches
 
 # Instalar dependências
 RUN pnpm install --frozen-lockfile
 
-# Copiar código fonte
+# Copiar código fonte e configurações
 COPY server ./server
 COPY shared ./shared
 COPY drizzle ./drizzle
-COPY drizzle.config.ts ./
-COPY tsconfig.json ./
+COPY drizzle.config.ts tsconfig.json ./
 
-# Build (Apenas backend usando esbuild)
-RUN pnpm exec esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+# Build do backend usando esbuild diretamente
+RUN esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
 
-# Expor porta
+# Stage 2: Production
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Instalar pnpm para rodar migrations se necessário
+RUN npm install -g pnpm
+
+# Copiar apenas o necessário do estágio de build
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+
+# Variáveis de ambiente padrão
+ENV NODE_ENV=production
+ENV PORT=3000
+
 EXPOSE 3000
 
 # Health check
