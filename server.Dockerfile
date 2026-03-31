@@ -17,10 +17,10 @@ RUN pnpm install --frozen-lockfile
 COPY server ./server
 COPY shared ./shared
 COPY drizzle ./drizzle
-COPY drizzle.config.ts tsconfig.json ./
+COPY drizzle.config.ts tsconfig.json vite.config.ts ./
 
-# Build do backend usando esbuild diretamente
-RUN pnpm exec esbuild server/_core/index.ts --platform=node --bundle --format=esm --outdir=dist
+# Build do backend usando o script do package.json
+RUN pnpm build:server
 
 # Stage 2: Production
 FROM node:22-alpine
