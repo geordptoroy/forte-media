@@ -33,16 +33,16 @@ export default function AdvancedSearch() {
 
   const searchAdsQuery = trpc.meta.searchAds.useQuery(
     {
-      searchTerms: filters.keywords ? filters.keywords.split(',').map((k) => k.trim()).filter(Boolean) : [''],
+      searchTerms: filters.keywords.split(",").map((k) => k.trim()).filter(Boolean),
       countries: [filters.country || 'BR'],
       adType: filters.ad_type as any,
       limit: 50,
     },
-    { enabled: false }
+    { enabled: credentialsStatus.data?.hasCredentials && filters.keywords.trim().length > 0 }
   );
 
   const handleSearch = async () => {
-    if (!credentialsStatus.data?.isValid) {
+    if (!credentialsStatus.data?.hasCredentials) {
       toast.error('Configure suas credenciais Meta primeiro');
       setLocation('/settings');
       return;
@@ -97,7 +97,7 @@ export default function AdvancedSearch() {
           
           <Button
             onClick={handleSearch}
-            disabled={isSearching || !credentialsStatus.data?.isValid}
+            disabled={isSearching || !credentialsStatus.data?.hasCredentials || !filters.keywords.trim()}
             className="btn-premium px-8"
           >
             {isSearching ? (
@@ -112,7 +112,7 @@ export default function AdvancedSearch() {
         </div>
 
         {/* Credentials Warning */}
-        {!credentialsStatus.data?.isValid && !credentialsStatus.isLoading && (
+        {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
           <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
             <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
             <div className="flex-1">

@@ -56,7 +56,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
       return;
     }
     addFavoriteMutation.mutate({
-      adId: ad.id || String(ad.ad_archive_id || ad.page_id || Math.random()),
+      adId: ad.id || ad.ad_archive_id || ad.page_id || `ad-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       pageId: ad.page_id || ad.id || 'unknown',
       pageName: ad.page_name,
       adBody: ad.body || ad.ad_creative_body,
@@ -74,7 +74,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
       return;
     }
     addMonitoredMutation.mutate({
-      adId: ad.id || String(ad.ad_archive_id || ad.page_id || Math.random()),
+      adId: ad.id || ad.ad_archive_id || ad.page_id || `ad-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       pageId: ad.page_id || ad.id || 'unknown',
       pageName: ad.page_name,
     });
@@ -89,11 +89,12 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
         {/* Media Preview */}
         <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
           <img
-            src={ad.creative_url || ad.ad_snapshot_url || `https://picsum.photos/seed/${ad.id || ad.ad_archive_id}/400/300`}
-            alt={ad.page_name}
+            src={ad.creative_url || ad.ad_snapshot_url}
+            alt={ad.page_name || "Ad Creative"}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${ad.id || ad.ad_archive_id}/400/300`;
+              // Fallback para imagem placeholder local se a URL do criativo falhar
+              (e.target as HTMLImageElement).src = "/placeholder-ad.png"; 
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
@@ -184,9 +185,12 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
             <div className="w-full md:w-1/2 bg-white/[0.02] flex items-center justify-center p-6 border-r border-white/5">
               <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl">
                 <img
-                  src={ad.creative_url || ad.ad_snapshot_url || `https://picsum.photos/seed/${ad.id || ad.ad_archive_id}/400/300`}
-                  alt={ad.page_name}
+                  src={ad.creative_url || ad.ad_snapshot_url}
+                  alt={ad.page_name || "Ad Creative"}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "/placeholder-ad.png";
+                  }}
                 />
               </div>
             </div>

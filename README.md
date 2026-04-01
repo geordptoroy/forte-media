@@ -17,20 +17,28 @@ Antes de começar, certifique-se de ter instalado em sua máquina:
 
 ---
 
-## 🚀 Como Iniciar (Quick Start)
+## 🚀 Como Iniciar (Comando Único)
 
-A maneira mais fácil de rodar o projeto é usando os scripts de inicialização automatizados que configuram certificados, ambiente e contêineres.
+A plataforma está totalmente automatizada. Para iniciar tudo (Base de Dados, Backend, Frontend, SSL e Migrations), basta um comando:
 
-### No Windows (PowerShell)
+### Windows (PowerShell)
 ```powershell
 .\docker-start.ps1
 ```
 
-### No Linux ou macOS (Terminal)
+### Linux / macOS (Makefile)
 ```bash
-chmod +x docker-start.sh
-./docker-start.sh
+make up
 ```
+*Ou simplesmente:* `docker compose up -d --build`
+
+### O que acontece automaticamente:
+1.  **SSL:** Certificados autoassinados são gerados dentro do container Nginx.
+2.  **Base de Dados:** O MySQL é configurado e o script aguarda a prontidão TCP.
+3.  **Migrations:** O backend executa `db:push` automaticamente antes de iniciar o servidor.
+4.  **Ambiente:** O ficheiro `.env` é criado automaticamente se não existir.
+
+Aceda em: **https://localhost**
 
 ---
 

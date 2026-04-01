@@ -28,19 +28,19 @@ export default function Performance() {
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
   const listCampaignsQuery = trpc.meta.listCampaigns.useQuery(
     { adAccountId: "" },
-    { enabled: false }
+    { enabled: credentialsStatus.data?.hasCredentials }
   );
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
     { 
       campaignId: selectedCampaign || "",
-      dateStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      dateStop: new Date().toISOString().split('T')[0]
+      dateStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split(\'T\')[0],
+      dateStop: new Date().toISOString().split(\'T\')[0]
     },
-    { enabled: false }
+    { enabled: !!selectedCampaign && credentialsStatus.data?.hasCredentials }
   );
 
   const handleLoadCampaigns = async () => {
-    if (!credentialsStatus.data?.isValid) {
+    if (!credentialsStatus.data?.hasCredentials) {
       toast.error("Configure suas credenciais Meta primeiro");
       setLocation("/settings");
       return;
@@ -87,7 +87,7 @@ export default function Performance() {
           
           <Button
             onClick={handleLoadCampaigns}
-            disabled={isLoading || !credentialsStatus.data?.isValid}
+            disabled={isLoading || !credentialsStatus.data?.hasCredentials}
             className="btn-premium px-8"
           >
             {isLoading ? (
@@ -102,7 +102,7 @@ export default function Performance() {
         </div>
 
         {/* Status Check */}
-        {!credentialsStatus.data?.isValid && !credentialsStatus.isLoading && (
+        {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
           <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
             <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
             <div className="flex-1">
@@ -146,7 +146,11 @@ export default function Performance() {
               </div>
             ) : (
               <Card className="card-premium bg-white/[0.01] border-white/5 p-10 text-center border-dashed">
-                <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">Nenhuma campanha sincronizada</p>
+                <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">
+                  {credentialsStatus.data?.hasCredentials
+                    ? "Nenhuma campanha sincronizada"
+                    : "Conecte sua conta Meta para sincronizar campanhas"}
+                </p>
               </Card>
             )}
           </div>
@@ -163,7 +167,7 @@ export default function Performance() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Investimento Total</p>
                     <p className="text-4xl font-bold text-white tracking-tighter">${campaignMetrics.spend || "0.00"}</p>
                     <div className="mt-4 flex items-center gap-2 text-green-500 text-[10px] font-bold uppercase">
-                      <ArrowUpRight className="w-3 h-3" /> 12% vs período anterior
+                      {campaignMetrics.spendTrend || "N/A"}
                     </div>
                   </Card>
 
@@ -174,7 +178,7 @@ export default function Performance() {
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">ROAS da Campanha</p>
                     <p className="text-4xl font-bold text-white tracking-tighter">{campaignMetrics.roas || "0.00"}x</p>
                     <div className="mt-4 flex items-center gap-2 text-gray-500 text-[10px] font-bold uppercase">
-                      Estável nas últimas 24h
+                      {campaignMetrics.roasTrend || "N/A"}
                     </div>
                   </Card>
                 </div>
@@ -194,17 +198,17 @@ export default function Performance() {
                   ))}
                 </div>
 
-                <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-white">Análise de Tendência</h3>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase">
-                      <Calendar className="w-3 h-3" /> Últimos 30 dias
+                  <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-white">Análise de Tendência</h3>
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase">
+                        <Calendar className="w-3 h-3" /> Últimos 30 dias
+                      </div>
                     </div>
-                  </div>
-                  <div className="h-64 w-full bg-white/[0.01] rounded-2xl border border-white/5 flex items-center justify-center">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-800">Visualização Gráfica Indisponível</p>
-                  </div>
-                </Card>
+                    <div className="h-64 w-full bg-white/[0.01] rounded-2xl border border-white/5 flex items-center justify-center">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-800">Gráficos de performance em desenvolvimento. Em breve!</p>
+                    </div>
+                  </Card>
               </>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-20 bg-white/[0.01] rounded-[2rem] border border-white/5 border-dashed">

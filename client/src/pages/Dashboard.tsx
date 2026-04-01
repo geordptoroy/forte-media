@@ -21,36 +21,47 @@ export default function Dashboard() {
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
 
   const stats = [
-    { label: "Anúncios Analisados", value: "12,482", icon: BarChart3, trend: "+12%" },
-    { label: "Anúncios Favoritos", value: "156", icon: Heart, trend: "+5%" },
-    { label: "Em Monitoramento", value: "42", icon: Eye, trend: "Estável" },
-    { label: "Meta API Status", value: credentialsStatus.data?.isValid ? "Ativo" : "Inativo", icon: ShieldCheck, status: credentialsStatus.data?.isValid },
+    { label: "Anúncios Analisados", value: "---", icon: BarChart3, trend: "" }, // Placeholder, will be real data
+    { label: "Anúncios Favoritos", value: "---", icon: Heart, trend: "" }, // Placeholder, will be real data
+    { label: "Em Monitoramento", value: "---", icon: Eye, trend: "" }, // Placeholder, will be real data
+    { label: "Meta API Status", value: credentialsStatus.data?.hasCredentials ? "Ativo" : "Inativo", icon: ShieldCheck, status: credentialsStatus.data?.hasCredentials },
   ];
 
   return (
     <DashboardLayout>
       <div className="space-y-10">
         {/* Welcome Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">
-              Olá, {user?.name?.split(" ")[0] || "Usuário"}
-            </h1>
-            <p className="text-gray-500 font-medium">
-              Aqui está o resumo da sua inteligência competitiva hoje.
-            </p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight mb-2">
+                Olá, {user?.name?.split(" ")[0] || "Usuário"}
+              </h1>
+              <p className="text-gray-500 font-medium">
+                Aqui está o resumo da sua inteligência competitiva hoje.
+              </p>
+            </div>
+            
+            {!credentialsStatus.data?.hasCredentials && (
+              <Button
+                onClick={() => setLocation("/settings")}
+                className="btn-premium flex items-center gap-2"
+              >
+                <Zap className="w-4 h-4" />
+                Configurar Meta API
+              </Button>
+            )}
           </div>
-          
+
+          {/* Adicionar um alerta se as credenciais não estiverem configuradas */}
           {!credentialsStatus.data?.hasCredentials && (
-            <Button
-              onClick={() => setLocation("/settings")}
-              className="btn-premium flex items-center gap-2"
-            >
-              <Zap className="w-4 h-4" />
-              Configurar Meta API
-            </Button>
+            <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-4 flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-yellow-500">Credenciais Meta Ausentes</p>
+                <p className="text-xs text-gray-400 mt-1">Por favor, configure suas credenciais Meta em <span className="text-primary-foreground cursor-pointer" onClick={() => setLocation("/settings")}>Configurações</span> para acessar todos os recursos.</p>
+              </div>
+            </Card>
           )}
-        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -92,21 +103,11 @@ export default function Dashboard() {
               </Button>
             </div>
             
+            {/* Placeholder for real trend data */}
             <div className="space-y-4">
-              {[1, 2, 3].map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/20 transition-all cursor-pointer group">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-800 rounded-lg overflow-hidden border border-white/10">
-                      <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center text-[10px] font-bold text-gray-500">AD</div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white group-hover:text-primary-foreground transition-colors">Campanha de Escala #{i+1042}</p>
-                      <p className="text-xs text-gray-500">Meta Ad Library • Há 2 horas</p>
-                    </div>
-                  </div>
-                  <ArrowUpRight className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
-                </div>
-              ))}
+              <Card className="card-premium bg-white/[0.01] border-white/5 p-6 text-center">
+                <p className="text-sm text-gray-500">Nenhuma tendência disponível. Conecte sua conta Meta para ver dados reais.</p>
+              </Card>
             </div>
           </Card>
 
@@ -121,12 +122,12 @@ export default function Dashboard() {
               <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Conexão</span>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${credentialsStatus.data?.isValid ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                    {credentialsStatus.data?.isValid ? 'Estável' : 'Erro'}
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${credentialsStatus.data?.hasCredentials ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    {credentialsStatus.data?.hasCredentials ? 'Estável' : 'Erro'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-300">
-                  {credentialsStatus.data?.isValid 
+                  {credentialsStatus.data?.hasCredentials 
                     ? "Sua conta está sincronizada com a Meta Marketing API." 
                     : "Sua conexão com a Meta expirou ou não foi configurada."}
                 </p>
