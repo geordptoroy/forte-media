@@ -33,8 +33,8 @@ export default function Performance() {
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
     { 
       campaignId: selectedCampaign || "",
-      dateStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split(\'T\')[0],
-      dateStop: new Date().toISOString().split(\'T\')[0]
+      dateStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      dateStop: new Date().toISOString().split('T')[0]
     },
     { enabled: !!selectedCampaign && credentialsStatus.data?.hasCredentials }
   );

@@ -60,9 +60,9 @@ services:
       PORT: 3000
     ports:
       - "3000:3000"
-    volumes:
-      - ./scripts/docker-entrypoint.sh:/app/scripts/docker-entrypoint.sh:ro
-    entrypoint: ["/bin/sh", "/app/scripts/docker-entrypoint.sh"]
+    # volumes:
+    #   - ./scripts/docker-entrypoint.sh:/app/scripts/docker-entrypoint.sh:ro
+    # entrypoint: ["/bin/sh", "/app/scripts/docker-entrypoint.sh"]
     healthcheck:
       test: ["CMD", "node", "scripts/healthcheck.js"]
       interval: 30s
@@ -113,8 +113,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs
-      - ./scripts/init-ssl.sh:/usr/local/bin/init-ssl.sh:ro
-    entrypoint: ["/bin/sh", "/usr/local/bin/init-ssl.sh"]
+      - ./scripts/init-ssl.sh:/scripts/init-ssl.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/init-ssl.sh"]
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
       timeout: 10s
