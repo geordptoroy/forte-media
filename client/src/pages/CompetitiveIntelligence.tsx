@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   TrendingUp,
   Search,
@@ -51,7 +52,7 @@ export default function CompetitiveIntelligence() {
   );
 
   const handleSearch = async () => {
-    if (!credentialsStatus.data?.isValid) {
+    if (!credentialsStatus.data?.hasCredentials) {
       toast.error("Configure suas credenciais Meta primeiro");
       setLocation("/settings");
       return;
@@ -76,7 +77,7 @@ export default function CompetitiveIntelligence() {
   };
 
   const handleSearchScaled = async () => {
-    if (!credentialsStatus.data?.isValid) {
+    if (!credentialsStatus.data?.hasCredentials) {
       toast.error("Configure suas credenciais Meta primeiro");
       setLocation("/settings");
       return;
@@ -136,7 +137,7 @@ export default function CompetitiveIntelligence() {
             <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Filtros de Busca</h2>
           </div>
 
-          {!credentialsStatus.data?.isValid && (
+          {!credentialsStatus.data?.hasCredentials && (
             <div className="mb-8 p-4 rounded-2xl bg-yellow-500/5 border border-yellow-500/20 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
@@ -184,7 +185,7 @@ export default function CompetitiveIntelligence() {
           <div className="flex flex-wrap gap-4 mt-8">
             <Button
               onClick={handleSearch}
-              disabled={isLoading || !credentialsStatus.data?.isValid}
+              disabled={isLoading || !credentialsStatus.data?.hasCredentials}
               className="btn-premium px-8 min-w-[140px]"
             >
               {isLoading ? (
@@ -199,7 +200,7 @@ export default function CompetitiveIntelligence() {
             
             <Button
               onClick={handleSearchScaled}
-              disabled={isLoading || !credentialsStatus.data?.isValid}
+              disabled={isLoading || !credentialsStatus.data?.hasCredentials}
               variant="outline"
               className="border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-widest px-6"
             >
