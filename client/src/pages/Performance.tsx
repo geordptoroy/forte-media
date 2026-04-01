@@ -26,15 +26,21 @@ export default function Performance() {
   const [campaignMetrics, setCampaignMetrics] = useState<any>(null);
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
+  
+  // Definir datas de forma segura para evitar erros de sintaxe no compilador
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
+
   const listCampaignsQuery = trpc.meta.listCampaigns.useQuery(
     { adAccountId: "" },
     { enabled: credentialsStatus.data?.hasCredentials }
   );
+  
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
     { 
       campaignId: selectedCampaign || "",
-      dateStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      dateStop: new Date().toISOString().split('T')[0]
+      dateStart: thirtyDaysAgo,
+      dateStop: today
     },
     { enabled: !!selectedCampaign && credentialsStatus.data?.hasCredentials }
   );
@@ -138,8 +144,8 @@ export default function Performance() {
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
-                      <span className="flex items-center gap-1"><Target className="w-3 h-3" /> {campaign.objective || "Vendas"}</span>
-                      <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {campaign.budget || "0.00"}</span>
+                      <span className="flex items-center gap-1"><Target className="w-3" /> {campaign.objective || "Vendas"}</span>
+                      <span className="flex items-center gap-1"><DollarSign className="w-3" /> {campaign.budget || "0.00"}</span>
                     </div>
                   </Card>
                 ))}
@@ -198,17 +204,17 @@ export default function Performance() {
                   ))}
                 </div>
 
-                  <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
-                    <div className="flex items-center justify-between mb-8">
-                      <h3 className="text-sm font-bold uppercase tracking-widest text-white">Análise de Tendência</h3>
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase">
-                        <Calendar className="w-3 h-3" /> Últimos 30 dias
-                      </div>
+                <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-sm font-bold uppercase tracking-widest text-white">Análise de Tendência</h3>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase">
+                      <Calendar className="w-3 h-3" /> Últimos 30 dias
                     </div>
-                    <div className="h-64 w-full bg-white/[0.01] rounded-2xl border border-white/5 flex items-center justify-center">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-800">Gráficos de performance em desenvolvimento. Em breve!</p>
-                    </div>
-                  </Card>
+                  </div>
+                  <div className="h-64 w-full bg-white/[0.01] rounded-2xl border border-white/5 flex items-center justify-center">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-800">Gráficos de performance em desenvolvimento. Em breve!</p>
+                  </div>
+                </Card>
               </>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-20 bg-white/[0.01] rounded-[2rem] border border-white/5 border-dashed">

@@ -37,9 +37,9 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 
-# Copiar scripts e garantir permissões
-COPY scripts ./scripts
-RUN chmod +x scripts/*.sh
+# Copiar scripts e garantir permissões de execução
+COPY scripts /app/scripts
+RUN chmod +x /app/scripts/*.sh
 
 # Variáveis de ambiente padrão
 ENV NODE_ENV=production
@@ -49,7 +49,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
-  CMD node scripts/healthcheck.js
+  CMD node /app/scripts/healthcheck.js
 
-# Iniciar servidor via entrypoint automatizado
-ENTRYPOINT ["/bin/sh", "scripts/docker-entrypoint.sh"]
+# Iniciar servidor via entrypoint automatizado (caminho absoluto)
+ENTRYPOINT ["/bin/sh", "/app/scripts/docker-entrypoint.sh"]
