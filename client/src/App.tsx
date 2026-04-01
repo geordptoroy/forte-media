@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -17,33 +17,66 @@ import Reports from "./pages/Reports";
 import ScaledAds from "./pages/ScaledAds";
 import Favorites from "./pages/Favorites";
 import Monitoring from "./pages/Monitoring";
+import { useEffect } from "react";
+
+// Componente para proteger rotas privadas
+function PrivateRoute({ path, component: Component }: { path: string; component: React.ComponentType<any> }) {
+  const { isAuthenticated, loading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [isAuthenticated, loading, setLocation]);
+
+  if (loading) return <LoadingScreen />;
+  if (!isAuthenticated) return null;
+
+  return <Route path={path} component={Component} />;
+}
+
+// Componente para rotas públicas (Login/Register) que redirecionam se já logado
+function PublicRoute({ path, component: Component }: { path: string; component: React.ComponentType<any> }) {
+  const { isAuthenticated, loading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      setLocation("/dashboard");
+    }
+  }, [isAuthenticated, loading, setLocation]);
+
+  if (loading) return <LoadingScreen />;
+  return <Route path={path} component={Component} />;
+}
+
+function LoadingScreen() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-black">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-white"></div>
+    </div>
+  );
+}
 
 function Router() {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
     <Switch>
-      <Route path="/" component={isAuthenticated ? Dashboard : Home} />
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/competitive-intelligence" component={CompetitiveIntelligence} />
-      <Route path="/search" component={AdvancedSearch} />
-      <Route path="/performance" component={Performance} />
-      <Route path="/reports" component={Reports} />
-      <Route path="/ads" component={ScaledAds} />
-      <Route path="/favorites" component={Favorites} />
-      <Route path="/monitoring" component={Monitoring} />
-      <Route path="/404" component={NotFound} />
+      <Route path="/" component={Home} />
+      <PublicRoute path="/login" component={Login} />
+      <PublicRoute path="/register" component={Register} />
+      
+      {/* Rotas Protegidas */}
+      <PrivateRoute path="/dashboard" component={Dashboard} />
+      <PrivateRoute path="/settings" component={Settings} />
+      <PrivateRoute path="/competitive-intelligence" component={CompetitiveIntelligence} />
+      <PrivateRoute path="/search" component={AdvancedSearch} />
+      <PrivateRoute path="/performance" component={Performance} />
+      <PrivateRoute path="/reports" component={Reports} />
+      <PrivateRoute path="/ads" component={ScaledAds} />
+      <PrivateRoute path="/favorites" component={Favorites} />
+      <PrivateRoute path="/monitoring" component={Monitoring} />
+      
       <Route component={NotFound} />
     </Switch>
   );
@@ -52,9 +85,9 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster position="top-right" />
+          <Toaster position="top-right" theme="dark" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

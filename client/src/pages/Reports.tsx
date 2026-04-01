@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -9,19 +9,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { trpc } from '@/lib/trpc';
-import { useAuth } from '@/_core/hooks/useAuth';
-import { useLocation } from 'wouter';
 import { toast } from 'sonner';
-import { FileText, Download, BarChart3, Heart, Eye, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Download, BarChart3, Heart, Eye, Loader2, Calendar, FileJson, FileSpreadsheet } from 'lucide-react';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function Reports() {
-  const { isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
   const [period, setPeriod] = useState('30d');
   const [format, setFormat] = useState('csv');
   const [loading, setLoading] = useState(false);
 
-  // Queries para obter dados reais
   const favoritesQuery = trpc.ads.getFavorites.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
@@ -36,7 +32,6 @@ export default function Reports() {
   const monitored = monitoredQuery.data?.monitored || [];
   const campaigns = campaignsQuery.data?.campaigns || [];
 
-  // Filtrar por período
   const filterByPeriod = (items: any[], dateField: string) => {
     const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -49,64 +44,22 @@ export default function Reports() {
   const handleExportCSV = () => {
     setLoading(true);
     try {
-      const rows: string[][] = [];
+      const rows: string[][] = [['Tipo', 'ID', 'Nome/Página', 'Gasto', 'Impressões', 'Data']];
+      recentFavorites.forEach((fav) => rows.push(['Favorito', fav.adId, fav.pageName || '', fav.spend || '', String(fav.impressions || ''), new Date(fav.createdAt).toLocaleDateString('pt-BR')]));
+      recentMonitored.forEach((mon) => rows.push(['Monitorado', mon.adId, mon.pageName || '', mon.lastKnownSpend || '', String(mon.lastKnownImpressions || ''), new Date(mon.createdAt).toLocaleDateString('pt-BR')]));
+      campaigns.forEach((camp) => rows.push(['Campanha', camp.campaignId, camp.campaignName, String(camp.totalSpend || ''), String(camp.totalImpressions || ''), camp.startDate ? new Date(camp.startDate).toLocaleDateString('pt-BR') : '']));
 
-      // Cabeçalho
-      rows.push(['Tipo', 'ID', 'Nome/Página', 'Gasto', 'Impressões', 'Data']);
-
-      // Favoritos
-      recentFavorites.forEach((fav) => {
-        rows.push([
-          'Favorito',
-          fav.adId,
-          fav.pageName || '',
-          fav.spend || '',
-          String(fav.impressions || ''),
-          new Date(fav.createdAt).toLocaleDateString('pt-BR'),
-        ]);
-      });
-
-      // Monitorados
-      recentMonitored.forEach((mon) => {
-        rows.push([
-          'Monitorado',
-          mon.adId,
-          mon.pageName || '',
-          mon.lastKnownSpend || '',
-          String(mon.lastKnownImpressions || ''),
-          new Date(mon.createdAt).toLocaleDateString('pt-BR'),
-        ]);
-      });
-
-      // Campanhas
-      campaigns.forEach((camp) => {
-        rows.push([
-          'Campanha',
-          camp.campaignId,
-          camp.campaignName,
-          String(camp.totalSpend || ''),
-          String(camp.totalImpressions || ''),
-          camp.startDate ? new Date(camp.startDate).toLocaleDateString('pt-BR') : '',
-        ]);
-      });
-
-      // Gerar CSV
-      const csvContent = rows
-        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        .join('\n');
-
+      const csvContent = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
       const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `forte-media-relatorio-${period}-${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `forte-media-report-${period}-${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-
-      toast.success('Relatório CSV exportado com sucesso');
+      toast.success('Relatório CSV exportado');
     } catch (error) {
       toast.error('Erro ao gerar relatório');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -115,28 +68,15 @@ export default function Reports() {
   const handleExportJSON = () => {
     setLoading(true);
     try {
-      const report = {
-        periodo: period,
-        geradoEm: new Date().toISOString(),
-        resumo: {
-          totalFavoritos: recentFavorites.length,
-          totalMonitorados: recentMonitored.length,
-          totalCampanhas: campaigns.length,
-        },
-        favoritos: recentFavorites,
-        monitorados: recentMonitored,
-        campanhas: campaigns,
-      };
-
+      const report = { period, generatedAt: new Date().toISOString(), favorites: recentFavorites, monitored: recentMonitored, campaigns };
       const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `forte-media-relatorio-${period}-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `forte-media-report-${period}.json`;
       link.click();
       URL.revokeObjectURL(url);
-
-      toast.success('Relatório JSON exportado com sucesso');
+      toast.success('Relatório JSON exportado');
     } catch (error) {
       toast.error('Erro ao gerar relatório');
     } finally {
@@ -145,174 +85,125 @@ export default function Reports() {
   };
 
   const handleExport = () => {
-    if (format === 'csv') {
-      handleExportCSV();
-    } else {
-      handleExportJSON();
-    }
+    if (format === 'csv') handleExportCSV();
+    else handleExportJSON();
   };
 
   const isDataLoading = favoritesQuery.isLoading || monitoredQuery.isLoading || campaignsQuery.isLoading;
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-border/50 p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Favoritos</p>
-              <p className="text-3xl font-bold text-foreground">
-                {favoritesQuery.isLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" strokeWidth={2} />
+    <DashboardLayout>
+      <div className="space-y-10">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Relatórios</h1>
+          <p className="text-gray-500 font-medium">Exporte dados estratégicos e análises consolidadas da sua operação.</p>
+        </div>
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { label: "Favoritos", value: favorites.length, recent: recentFavorites.length, icon: Heart, color: "text-red-500" },
+            { label: "Monitorados", value: monitored.length, recent: recentMonitored.length, icon: Eye, color: "text-blue-500" },
+            { label: "Campanhas", value: campaigns.length, recent: campaigns.length, icon: BarChart3, color: "text-green-500" },
+          ].map((stat, i) => (
+            <Card key={i} className="card-premium bg-white/[0.02] border-white/5 p-8">
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 bg-white/5 rounded-xl border border-white/10 ${stat.color}`}>
+                  <stat.icon className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Total Geral</span>
+              </div>
+              <p className="text-4xl font-bold text-white tracking-tighter mb-1">
+                {isDataLoading ? "---" : stat.value}
+              </p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                {stat.recent} Adicionados recentemente
+              </p>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          {/* Export Configuration */}
+          <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
+            <div className="flex items-center gap-2 mb-8">
+              <FileText className="w-4 h-4 text-gray-500" />
+              <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Configuração de Exportação</h2>
+            </div>
+
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1 flex items-center gap-2">
+                    <Calendar className="w-3 h-3" /> Intervalo de Dados
+                  </label>
+                  <Select value={period} onValueChange={setPeriod}>
+                    <SelectTrigger className="input-premium h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10">
+                      <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                      <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                      <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1 flex items-center gap-2">
+                    {format === 'csv' ? <FileSpreadsheet className="w-3 h-3" /> : <FileJson className="w-3 h-3" />} 
+                    Formato do Arquivo
+                  </label>
+                  <Select value={format} onValueChange={setFormat}>
+                    <SelectTrigger className="input-premium h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black border-white/10">
+                      <SelectItem value="csv">CSV (Excel / Planilhas)</SelectItem>
+                      <SelectItem value="json">JSON (Desenvolvedores)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleExport}
+                disabled={loading || isDataLoading}
+                className="btn-premium w-full h-14 text-sm font-bold uppercase tracking-[0.2em]"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  favorites.length
+                  <span className="flex items-center gap-3">
+                    <Download className="w-5 h-5" />
+                    Gerar e Baixar Relatório
+                  </span>
                 )}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {recentFavorites.length} no período selecionado
-              </p>
+              </Button>
             </div>
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Heart className="w-5 h-5 text-primary" strokeWidth={2} />
+          </Card>
+
+          {/* Data Structure Info */}
+          <Card className="card-premium bg-white/[0.01] border-white/5 p-8 flex flex-col justify-center">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-white mb-6">Estrutura do Relatório</h3>
+            <div className="space-y-6">
+              {[
+                { title: "Métricas de Favoritos", desc: "Inclui IDs, nomes de páginas, gastos estimados e datas de arquivamento." },
+                { title: "Dados de Monitoramento", desc: "Status de atividade em tempo real, últimas verificações e oscilações de gasto." },
+                { title: "Performance de Campanhas", desc: "Consolidado de impressões, cliques, CTR e ROAS por conta de anúncio." },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-4">
+                  <div className="w-1 h-10 bg-white/10 rounded-full shrink-0 mt-1"></div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-1">{item.title}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </Card>
-        <Card className="border-border/50 p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Monitorados</p>
-              <p className="text-3xl font-bold text-foreground">
-                {monitoredQuery.isLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" strokeWidth={2} />
-                ) : (
-                  monitored.length
-                )}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {recentMonitored.length} no período selecionado
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Eye className="w-5 h-5 text-primary" strokeWidth={2} />
-            </div>
-          </div>
-        </Card>
-        <Card className="border-border/50 p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Campanhas</p>
-              <p className="text-3xl font-bold text-foreground">
-                {campaignsQuery.isLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" strokeWidth={2} />
-                ) : (
-                  campaigns.length
-                )}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total sincronizadas
-              </p>
-            </div>
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary" strokeWidth={2} />
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
-
-      {/* Export Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" strokeWidth={2} />
-            Gerar Relatório
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Período</label>
-              <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                  <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Formato</label>
-              <Select value={format} onValueChange={setFormat}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="csv">CSV (Excel)</SelectItem>
-                  <SelectItem value="json">JSON</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <Button
-            onClick={handleExport}
-            disabled={loading || isDataLoading}
-            className="w-full bg-primary hover:bg-primary/90 text-white"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" strokeWidth={2} />
-                Gerando...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4 mr-2" strokeWidth={2} />
-                Exportar Relatório
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Metrics Included */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados Incluídos no Relatório</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
-            <div className="space-y-2">
-              <p className="font-medium text-foreground">Favoritos</p>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>ID e nome do anúncio</li>
-                <li>Gasto estimado</li>
-                <li>Impressões</li>
-                <li>Data de adição</li>
-              </ul>
-            </div>
-            <div className="space-y-2">
-              <p className="font-medium text-foreground">Monitoramentos</p>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>ID e página do anúncio</li>
-                <li>Gasto atual</li>
-                <li>Impressões atuais</li>
-                <li>Status de atividade</li>
-              </ul>
-            </div>
-            <div className="space-y-2">
-              <p className="font-medium text-foreground">Campanhas</p>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>Nome e ID da campanha</li>
-                <li>Gasto total</li>
-                <li>Impressões e cliques</li>
-                <li>ROAS e CTR</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    </DashboardLayout>
   );
 }

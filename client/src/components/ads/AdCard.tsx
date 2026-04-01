@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
-import { Heart, Eye } from 'lucide-react';
+import { Heart, Eye, TrendingUp, DollarSign, Activity, Calendar, ExternalLink, Shield } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AdCardProps {
   ad: any;
@@ -48,7 +49,8 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
     },
   });
 
-  const handleFavorite = async () => {
+  const handleFavorite = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isFavorited) {
       toast.info('Anúncio já está nos favoritos');
       return;
@@ -65,7 +67,8 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
     });
   };
 
-  const handleMonitor = async () => {
+  const handleMonitor = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isMonitored) {
       toast.info('Anúncio já está em monitoramento');
       return;
@@ -79,152 +82,170 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
 
   return (
     <>
-      <Card className="hover:border-primary/50 transition-all duration-200 group">
-        <div className="relative">
+      <Card 
+        onClick={() => setOpen(true)}
+        className="card-premium bg-white/[0.02] border-white/5 overflow-hidden group hover:border-white/20 transition-all cursor-pointer flex flex-col h-full"
+      >
+        {/* Media Preview */}
+        <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
           <img
-            src={ad.creative_url || `https://picsum.photos/seed/${ad.id}/400/300`}
+            src={ad.creative_url || ad.ad_snapshot_url || `https://picsum.photos/seed/${ad.id || ad.ad_archive_id}/400/300`}
             alt={ad.page_name}
-            className="w-full h-40 object-cover rounded-t-lg"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${ad.id}/400/300`;
+              (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${ad.id || ad.ad_archive_id}/400/300`;
             }}
           />
-          <div className="absolute top-2 right-2 flex gap-1">
-            <span className="text-xs px-2 py-0.5 rounded-full border font-bold bg-primary/20 text-primary">
-              Score {ad.score || 0}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+          
+          {/* Badges */}
+          <div className="absolute top-3 left-3 flex gap-2">
+            <span className="text-[8px] font-bold px-2 py-1 rounded bg-black/60 backdrop-blur-md text-white border border-white/10 uppercase tracking-widest">
+              {ad.media_type || 'Creative'}
+            </span>
+            {ad.score && (
+              <span className="text-[8px] font-bold px-2 py-1 rounded bg-primary-foreground text-black uppercase tracking-widest">
+                Score {ad.score}
+              </span>
+            )}
+          </div>
+
+          {/* Quick Actions Overlay */}
+          <div className="absolute top-3 right-3 flex flex-col gap-2 translate-x-12 group-hover:translate-x-0 transition-transform duration-300">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={handleFavorite}
+              className={cn(
+                "w-8 h-8 rounded-full backdrop-blur-xl border border-white/10",
+                isFavorited ? "bg-red-500 text-white border-red-500" : "bg-black/40 text-white hover:bg-white/20"
+              )}
+            >
+              <Heart className={cn("w-3.5 h-3.5", isFavorited && "fill-current")} />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={handleMonitor}
+              className={cn(
+                "w-8 h-8 rounded-full backdrop-blur-xl border border-white/10",
+                isMonitored ? "bg-blue-500 text-white border-blue-500" : "bg-black/40 text-white hover:bg-white/20"
+              )}
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 flex flex-col flex-1">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="font-bold text-sm text-white truncate pr-2 group-hover:text-primary-foreground transition-colors">
+              {ad.page_name || 'Meta Advertiser'}
+            </h3>
+            <span className="flex items-center gap-1 text-[8px] font-bold text-green-500 uppercase tracking-widest shrink-0">
+              <Activity className="w-2.5 h-2.5" /> Ativo
             </span>
           </div>
-          {ad.media_type && (
-            <div className="absolute top-2 left-2">
-              <span className="text-xs px-2 py-0.5 rounded bg-black/60 text-muted-foreground capitalize">
-                {ad.media_type}
-              </span>
+
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="space-y-1">
+              <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest flex items-center gap-1">
+                <DollarSign className="w-2.5 h-2.5" /> Gasto
+              </p>
+              <p className="text-xs font-bold text-gray-300">${ad.spend || '0.00'}</p>
             </div>
-          )}
+            <div className="space-y-1">
+              <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest flex items-center gap-1">
+                <TrendingUp className="w-2.5 h-2.5" /> Alcance
+              </p>
+              <p className="text-xs font-bold text-gray-300">{ad.impressions || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
+            <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest flex items-center gap-1">
+              <Calendar className="w-2.5 h-2.5" /> {ad.days_active || '1'}d no ar
+            </p>
+            <Button 
+              variant="ghost" 
+              className="h-6 px-2 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:text-white group-hover:bg-white/5"
+            >
+              Detalhes <ExternalLink className="w-2.5 h-2.5 ml-1" />
+            </Button>
+          </div>
         </div>
-        <CardContent className="p-4">
-          <h3 className="font-semibold text-sm truncate mb-2">{ad.page_name}</h3>
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-3">
-            <div>
-              <span className="block text-xs opacity-60">Gasto</span>
-              <span>${ad.spend || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="block text-xs opacity-60">Impressões</span>
-              <span>{ad.impressions || 'N/A'}</span>
-            </div>
-            <div>
-              <span className="block text-xs opacity-60">Dias no ar</span>
-              <span>{ad.days_active || 'N/A'}d</span>
-            </div>
-            <div>
-              <span className="block text-xs opacity-60">Status</span>
-              <span className="text-green-500">Ativo</span>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setOpen(true)}
-              className="flex-1"
-            >
-              Ver detalhes
-            </Button>
-            <Button
-              size="sm"
-              variant={isFavorited ? 'default' : 'ghost'}
-              onClick={handleFavorite}
-              disabled={addFavoriteMutation.isPending}
-              title="Favoritar"
-              className="px-2"
-            >
-              <Heart className={`w-4 h-4 ${isFavorited ? 'fill-white' : ''}`} strokeWidth={2} />
-            </Button>
-            <Button
-              size="sm"
-              variant={isMonitored ? 'default' : 'ghost'}
-              onClick={handleMonitor}
-              disabled={addMonitoredMutation.isPending}
-              title="Monitorar"
-              className="px-2"
-            >
-              <Eye className={`w-4 h-4 ${isMonitored ? 'fill-white' : ''}`} strokeWidth={2} />
-            </Button>
-          </div>
-        </CardContent>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detalhes — {ad.page_name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <img
-              src={ad.creative_url || `https://picsum.photos/seed/${ad.id}/400/300`}
-              alt={ad.page_name}
-              className="w-full rounded-lg object-cover max-h-64"
-            />
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="bg-muted p-3 rounded-lg">
-                <span className="text-muted-foreground block text-xs mb-1">
-                  Score
-                </span>
-                <span className="font-bold text-lg text-primary">
-                  {ad.score || 0}
-                </span>
-              </div>
-              <div className="bg-muted p-3 rounded-lg">
-                <span className="text-muted-foreground block text-xs mb-1">
-                  Gasto
-                </span>
-                <span className="font-bold text-lg">${ad.spend || 'N/A'}</span>
-              </div>
-              <div className="bg-muted p-3 rounded-lg">
-                <span className="text-muted-foreground block text-xs mb-1">
-                  Impressões
-                </span>
-                <span className="font-bold text-lg">
-                  {ad.impressions || 'N/A'}
-                </span>
-              </div>
-              <div className="bg-muted p-3 rounded-lg">
-                <span className="text-muted-foreground block text-xs mb-1">
-                  Dias no ar
-                </span>
-                <span className="font-bold text-lg">
-                  {ad.days_active || 'N/A'}d
-                </span>
+        <DialogContent className="bg-black border-white/10 max-w-2xl p-0 overflow-hidden">
+          <div className="flex flex-col md:flex-row h-full">
+            {/* Left: Preview */}
+            <div className="w-full md:w-1/2 bg-white/[0.02] flex items-center justify-center p-6 border-r border-white/5">
+              <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl">
+                <img
+                  src={ad.creative_url || ad.ad_snapshot_url || `https://picsum.photos/seed/${ad.id || ad.ad_archive_id}/400/300`}
+                  alt={ad.page_name}
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              <p className="mb-2">
-                <strong>Anúncio:</strong> {ad.page_name}
-              </p>
-              <p>
-                <strong>Tipo:</strong> {ad.media_type || 'N/A'}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleFavorite}
-                variant={isFavorited ? 'default' : 'secondary'}
-                className="flex-1"
-                disabled={addFavoriteMutation.isPending || isFavorited}
-              >
-                <Heart className={`w-4 h-4 mr-2 ${isFavorited ? 'fill-white' : ''}`} strokeWidth={2} />
-                {isFavorited ? 'Favoritado' : 'Favoritar'}
-              </Button>
-              <Button
-                onClick={handleMonitor}
-                variant={isMonitored ? 'default' : 'outline'}
-                className="flex-1"
-                disabled={addMonitoredMutation.isPending || isMonitored}
-              >
-                <Eye className={`w-4 h-4 mr-2 ${isMonitored ? 'fill-white' : ''}`} strokeWidth={2} />
-                {isMonitored ? 'Monitorando' : 'Monitorar'}
-              </Button>
+
+            {/* Right: Info */}
+            <div className="w-full md:w-1/2 p-8 flex flex-col">
+              <DialogHeader className="mb-8">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-3.5 h-3.5 text-primary-foreground" />
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">Inteligência Criativa</span>
+                </div>
+                <DialogTitle className="text-2xl font-bold text-white tracking-tight leading-tight">
+                  {ad.page_name}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-6 flex-1">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/5">
+                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-1">Gasto Estimado</p>
+                    <p className="text-lg font-bold text-white">${ad.spend || '0.00'}</p>
+                  </div>
+                  <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/5">
+                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-1">Score Escala</p>
+                    <p className="text-lg font-bold text-primary-foreground">{ad.score || '---'}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Copy do Criativo</p>
+                  <div className="p-4 bg-white/[0.02] rounded-2xl border border-white/5 italic text-sm text-gray-400 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
+                    "{ad.body || ad.ad_creative_body || 'Nenhum texto detectado para este criativo.'}"
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-white/5 flex gap-3">
+                <Button
+                  onClick={handleFavorite}
+                  className={cn(
+                    "flex-1 h-12 font-bold uppercase tracking-widest text-[10px]",
+                    isFavorited ? "bg-red-500 hover:bg-red-600 text-white" : "btn-premium"
+                  )}
+                >
+                  <Heart className={cn("w-3.5 h-3.5 mr-2", isFavorited && "fill-current")} />
+                  {isFavorited ? 'Salvo' : 'Salvar'}
+                </Button>
+                <Button
+                  onClick={handleMonitor}
+                  variant="outline"
+                  className={cn(
+                    "flex-1 h-12 font-bold uppercase tracking-widest text-[10px] border-white/10 hover:bg-white/5",
+                    isMonitored && "text-blue-400 border-blue-500/20 bg-blue-500/5"
+                  )}
+                >
+                  <Eye className="w-3.5 h-3.5 mr-2" />
+                  {isMonitored ? 'Monitorando' : 'Monitorar'}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

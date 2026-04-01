@@ -4,13 +4,12 @@ import { AdFilters } from '@/components/ads/AdFilters';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { trpc } from '@/lib/trpc';
-import { useAuth } from '@/_core/hooks/useAuth';
 import { useLocation } from 'wouter';
 import { toast } from 'sonner';
-import { Loader2, AlertCircle, Zap, Settings } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Settings, TrendingUp, Search } from 'lucide-react';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function ScaledAds() {
-  const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -52,14 +51,12 @@ export default function ScaledAds() {
       const result = await searchScaledAdsQuery.refetch();
       if (result.data?.success && result.data?.ads) {
         let filtered = result.data.ads;
-        // Filtrar por busca de texto se houver
         if (filters.search) {
           const q = filters.search.toLowerCase();
           filtered = filtered.filter((ad: any) =>
             (ad.page_name || '').toLowerCase().includes(q)
           );
         }
-        // Filtrar por tipo de mídia
         if (filters.media_type) {
           filtered = filtered.filter((ad: any) => ad.media_type === filters.media_type);
         }
@@ -80,145 +77,137 @@ export default function ScaledAds() {
     }
   };
 
-  // Paginação local
   const PAGE_SIZE = 12;
   const totalPages = Math.max(1, Math.ceil(ads.length / PAGE_SIZE));
   const paginatedAds = ads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  if (credentialsStatus.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" strokeWidth={2} />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Credentials Warning */}
-      {!credentialsStatus.data?.isValid && (
-        <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 p-4">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" strokeWidth={2} />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                Credenciais Meta não configuradas
-              </p>
-              <p className="text-xs text-yellow-800 dark:text-yellow-200 mt-1">
-                Configure suas credenciais para acessar dados reais de anúncios escalados
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setLocation('/settings')}
-              className="border-yellow-400 text-yellow-900 dark:text-yellow-100 hover:bg-yellow-100 dark:hover:bg-yellow-900"
-            >
-              <Settings className="w-4 h-4 mr-1" strokeWidth={2} />
-              Configurar
-            </Button>
+    <DashboardLayout>
+      <div className="space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight mb-2">Anúncios Scaled</h1>
+            <p className="text-gray-500 font-medium">Identifique criativos que estão recebendo alto investimento agora.</p>
           </div>
-        </Card>
-      )}
-
-      {/* Filters + Search Button */}
-      <div className="space-y-3">
-        <AdFilters
-          filters={filters}
-          onChange={handleFilterChange}
-          onReset={handleReset}
-        />
-        <div className="flex justify-end">
+          
           <Button
             onClick={handleSearch}
             disabled={isSearching || !credentialsStatus.data?.isValid}
-            className="bg-primary hover:bg-primary/90 text-white"
+            className="btn-premium px-8"
           >
             {isSearching ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" strokeWidth={2} />
-                Buscando...
-              </>
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <>
-                <Zap className="w-4 h-4 mr-2" strokeWidth={2} />
-                Buscar Anúncios Escalados
-              </>
+              <span className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-yellow-500" />
+                Sincronizar Escala
+              </span>
             )}
           </Button>
         </div>
-      </div>
 
-      {/* Results */}
-      {isSearching ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="bg-muted h-64 rounded-lg animate-pulse" />
-          ))}
-        </div>
-      ) : hasSearched && ads.length === 0 ? (
-        <Card className="border-border/50 p-12 text-center">
-          <Zap className="w-12 h-12 text-muted-foreground mx-auto mb-4" strokeWidth={1.5} />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            Nenhum anúncio escalado encontrado
-          </h3>
-          <p className="text-muted-foreground">
-            Tente ajustar os filtros ou verifique suas credenciais Meta
-          </p>
-        </Card>
-      ) : !hasSearched ? (
-        <Card className="border-border/50 p-12 text-center">
-          <Zap className="w-12 h-12 text-muted-foreground mx-auto mb-4" strokeWidth={1.5} />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            Anúncios Escalados
-          </h3>
-          <p className="text-muted-foreground mb-6">
-            Descubra anúncios com alto investimento que estão a escalar no mercado
-          </p>
-          <Button
-            onClick={handleSearch}
-            disabled={!credentialsStatus.data?.isValid}
-            className="bg-primary hover:bg-primary/90 text-white"
-          >
-            <Zap className="w-4 h-4 mr-2" strokeWidth={2} />
-            Iniciar Busca
-          </Button>
-        </Card>
-      ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {ads.length} anúncio{ads.length !== 1 ? 's' : ''} encontrado{ads.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {paginatedAds.map((ad) => (
-              <AdCard key={ad.id || ad.ad_archive_id} ad={ad} />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-8">
+        {/* Credentials Warning */}
+        {!credentialsStatus.data?.isValid && !credentialsStatus.isLoading && (
+          <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
+            <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-yellow-500 uppercase tracking-wider">Acesso à API Requerido</p>
+              <p className="text-xs text-gray-400 mt-1">
+                A detecção de escala exige uma conexão ativa com a Meta Marketing API para analisar volumes de investimento.
+              </p>
               <Button
-                variant="secondary"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
+                variant="link"
+                onClick={() => setLocation('/settings')}
+                className="text-white hover:text-gray-300 text-xs font-bold uppercase tracking-widest p-0 h-auto mt-4"
               >
-                Anterior
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Página {page} de {totalPages}
-              </span>
-              <Button
-                variant="secondary"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Próxima
+                Configurar agora <Settings className="w-3 h-3 ml-1" />
               </Button>
             </div>
+          </Card>
+        )}
+
+        {/* Filters Area */}
+        <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
+          <div className="flex items-center gap-2 mb-8">
+            <TrendingUp className="w-4 h-4 text-gray-500" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Parâmetros de Escala</h2>
+          </div>
+          
+          <AdFilters
+            filters={filters}
+            onChange={handleFilterChange}
+            onReset={handleReset}
+          />
+        </Card>
+
+        {/* Results Grid */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-gray-500">
+              {ads.length > 0 ? `${ads.length} Anúncios em Escala` : "Tendências de Investimento"}
+            </h2>
+          </div>
+
+          {isSearching ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <div key={i} className="bg-white/5 h-80 rounded-2xl animate-pulse border border-white/5" />
+              ))}
+            </div>
+          ) : ads.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {paginatedAds.map((ad) => (
+                  <AdCard key={ad.id || ad.ad_archive_id} ad={ad} />
+                ))}
+              </div>
+              
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 mt-12 pt-8 border-t border-white/5">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white"
+                  >
+                    Anterior
+                  </Button>
+                  <div className="px-4 py-2 bg-white/5 rounded-lg border border-white/10">
+                    <span className="text-xs font-bold text-white">
+                      {page} / {totalPages}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white"
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <Card className="card-premium bg-white/[0.01] border-white/5 p-20 text-center">
+              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
+                <Zap className="w-8 h-8 text-gray-700" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Descubra o que está escalando</h3>
+              <p className="text-gray-500 max-w-sm mx-auto mb-8">
+                Clique no botão de sincronização para buscar anúncios com alto volume de investimento nas últimas 24 horas.
+              </p>
+              <Button
+                onClick={handleSearch}
+                disabled={!credentialsStatus.data?.isValid}
+                className="btn-premium px-8"
+              >
+                Ver Tendências Atuais
+              </Button>
+            </Card>
           )}
-        </>
-      )}
-    </div>
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

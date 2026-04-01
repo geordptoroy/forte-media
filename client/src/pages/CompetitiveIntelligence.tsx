@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,19 +11,19 @@ import {
   DollarSign,
   Users,
   Calendar,
-  ChevronLeft,
   Loader2,
   AlertCircle,
+  Filter,
+  Globe
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+import DashboardLayout from "@/components/DashboardLayout";
 
 export default function CompetitiveIntelligence() {
-  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [country, setCountry] = useState("BR");
-  const [isLoading, setIsLoading] = useState(false);
   const [ads, setAds] = useState<any[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
@@ -41,15 +40,14 @@ export default function CompetitiveIntelligence() {
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
   
-  // Queries com enabled condicional
   const searchAdsQuery = trpc.meta.searchAds.useQuery(
     { searchTerms: [searchQuery], countries: [country] },
-    { enabled: false } // Controlado manualmente
+    { enabled: false }
   );
   
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
     { countries: [country], minSpend: 1000 },
-    { enabled: false } // Controlado manualmente
+    { enabled: false }
   );
 
   const handleSearch = async () => {
@@ -73,9 +71,7 @@ export default function CompetitiveIntelligence() {
         toast.info("Nenhum anúncio encontrado");
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Erro ao buscar anúncios"
-      );
+      toast.error(error instanceof Error ? error.message : "Erro ao buscar anúncios");
     }
   };
 
@@ -95,9 +91,7 @@ export default function CompetitiveIntelligence() {
         toast.info("Nenhum anúncio escalado encontrado");
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Erro ao buscar anúncios escalados"
-      );
+      toast.error(error instanceof Error ? error.message : "Erro ao buscar anúncios escalados");
     }
   };
 
@@ -109,7 +103,6 @@ export default function CompetitiveIntelligence() {
     } else {
       newFavorites.add(adId);
       toast.success("Adicionado aos favoritos");
-      // Persistir no banco de dados via tRPC
       if (ad) {
         addFavoriteMutation.mutate({
           adId: adId,
@@ -126,211 +119,193 @@ export default function CompetitiveIntelligence() {
     setFavorites(newFavorites);
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="container max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setLocation("/dashboard")}
-              className="p-1 hover:bg-muted rounded-lg transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" strokeWidth={2} />
-            </button>
-            <div>
-              <h1 className="text-xl font-semibold text-foreground">
-                Inteligência Competitiva
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Analise anúncios competitivos em tempo real
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+  const isLoading = searchAdsQuery.isFetching || searchScaledAdsQuery.isFetching;
 
-      {/* Content */}
-      <div className="container max-w-6xl mx-auto px-6 py-8 space-y-6">
-        {/* Search Card */}
-        <Card className="border-border/50 p-8">
-          <h2 className="text-lg font-semibold text-foreground mb-6">
-            Buscar Anúncios Competitivos
-          </h2>
+  return (
+    <DashboardLayout>
+      <div className="space-y-10">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Inteligência Competitiva</h1>
+          <p className="text-gray-500 font-medium">Analise estratégias de concorrentes e descubra anúncios de alta performance.</p>
+        </div>
+
+        {/* Search Controls */}
+        <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
+          <div className="flex items-center gap-2 mb-8">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Filtros de Busca</h2>
+          </div>
 
           {!credentialsStatus.data?.isValid && (
-            <div className="mb-6 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" strokeWidth={2} />
+            <div className="mb-8 p-4 rounded-2xl bg-yellow-500/5 border border-yellow-500/20 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
-                  Credenciais não configuradas
-                </p>
-                <p className="text-xs text-yellow-800 dark:text-yellow-200 mt-1">
-                  Configure suas credenciais Meta em Configurações para começar
-                </p>
+                <p className="text-sm font-bold text-yellow-500 uppercase tracking-wider">Credenciais Ausentes</p>
+                <p className="text-xs text-gray-400 mt-1">Conecte sua conta Meta em Configurações para habilitar a busca em tempo real.</p>
               </div>
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Termo de Busca
-                </label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1">Termo ou Palavra-chave</label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <Input
-                  placeholder="Ex: iPhone, Nike, Viagem..."
+                  placeholder="Ex: Marketing Digital, SaaS, E-commerce..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleSearch()}
                   disabled={isLoading}
+                  className="input-premium pl-12"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  País
-                </label>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1">Região</label>
+              <div className="relative">
+                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <select
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   disabled={isLoading}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground"
+                  className="input-premium w-full pl-12 appearance-none cursor-pointer"
                 >
                   <option value="BR">Brasil</option>
                   <option value="US">Estados Unidos</option>
-                  <option value="MX">México</option>
-                  <option value="AR">Argentina</option>
                   <option value="PT">Portugal</option>
+                  <option value="MX">México</option>
                 </select>
               </div>
             </div>
+          </div>
 
-            <div className="flex gap-3">
-              <Button
-                onClick={handleSearch}
-                disabled={isLoading || !credentialsStatus.data?.isValid}
-                className="bg-primary hover:bg-primary/90 text-white"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Buscando...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4 mr-2" strokeWidth={2} />
-                    Buscar
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={handleSearchScaled}
-                disabled={isLoading || !credentialsStatus.data?.isValid}
-                variant="outline"
-                className="border-border hover:bg-muted"
-              >
-                <TrendingUp className="w-4 h-4 mr-2" strokeWidth={2} />
-                Anúncios Escalados
-              </Button>
-            </div>
+          <div className="flex flex-wrap gap-4 mt-8">
+            <Button
+              onClick={handleSearch}
+              disabled={isLoading || !credentialsStatus.data?.isValid}
+              className="btn-premium px-8 min-w-[140px]"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Search className="w-4 h-4" />
+                  Buscar Agora
+                </span>
+              )}
+            </Button>
+            
+            <Button
+              onClick={handleSearchScaled}
+              disabled={isLoading || !credentialsStatus.data?.isValid}
+              variant="outline"
+              className="border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-widest px-6"
+            >
+              <TrendingUp className="w-4 h-4 mr-2 text-yellow-500" />
+              Anúncios Escalados
+            </Button>
           </div>
         </Card>
 
-        {/* Results */}
-        {ads.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              {ads.length} Anúncios Encontrados
+        {/* Results Grid */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-gray-500">
+              {ads.length > 0 ? `${ads.length} Resultados encontrados` : "Resultados da Busca"}
             </h2>
+          </div>
 
-            <div className="grid gap-4">
+          {ads.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6">
               {ads.map((ad, idx) => (
-                <Card
-                  key={idx}
-                  className="border-border/50 p-6 hover:shadow-lg transition-all duration-300"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-foreground mb-2">
-                        {ad.name || "Anúncio"}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {ad.body || "Sem descrição disponível"}
-                      </p>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-primary" strokeWidth={2} />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Gasto</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {ad.spend ? `$${ad.spend}` : "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Eye className="w-4 h-4 text-primary" strokeWidth={2} />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Impressões</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {ad.impressions || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-primary" strokeWidth={2} />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Público</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {ad.targetAudience || "N/A"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-primary" strokeWidth={2} />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Período</p>
-                            <p className="text-sm font-medium text-foreground">
-                              {ad.startDate || "N/A"}
-                            </p>
-                          </div>
-                        </div>
+                <Card key={idx} className="card-premium bg-white/[0.02] border-white/5 p-8 group hover:border-white/20 transition-all">
+                  <div className="flex flex-col md:flex-row gap-8">
+                    {/* Ad Preview Placeholder */}
+                    <div className="w-full md:w-64 h-80 bg-white/5 rounded-2xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden">
+                      {ad.ad_snapshot_url ? (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-gray-600 font-bold uppercase">Preview</div>
+                      ) : (
+                        <Eye className="w-8 h-8 text-gray-800" />
+                      )}
+                      <div className="absolute bottom-4 left-4 right-4 p-3 bg-black/80 backdrop-blur-md rounded-xl border border-white/10">
+                        <p className="text-[10px] font-bold text-white uppercase tracking-tighter truncate">{ad.page_name || "Meta Ad"}</p>
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => toggleFavorite(ad.id || idx.toString(), ad)}
-                      className="p-2 hover:bg-muted rounded-lg transition-colors"
-                    >
-                      <Heart
-                        className={`w-5 h-5 ${
-                          favorites.has(ad.id || idx.toString())
-                            ? "fill-red-500 text-red-500"
-                            : "text-muted-foreground"
-                        }`}
-                        strokeWidth={2}
-                      />
-                    </button>
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex justify-between items-start mb-6">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-bold bg-white/10 text-white px-2 py-0.5 rounded uppercase tracking-widest">Ativo</span>
+                            <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded uppercase tracking-widest">{ad.currency || "USD"}</span>
+                          </div>
+                          <h3 className="text-xl font-bold text-white group-hover:text-primary-foreground transition-colors">
+                            {ad.page_name || "Anúncio Competitivo"}
+                          </h3>
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          onClick={() => toggleFavorite(ad.id || idx.toString(), ad)}
+                          className={cn(
+                            "p-2 rounded-full transition-all",
+                            favorites.has(ad.id || idx.toString()) ? "bg-red-500/10 text-red-500" : "text-gray-600 hover:text-white hover:bg-white/5"
+                          )}
+                        >
+                          <Heart className={cn("w-6 h-6", favorites.has(ad.id || idx.toString()) && "fill-current")} />
+                        </Button>
+                      </div>
+
+                      <p className="text-sm text-gray-400 leading-relaxed mb-8 line-clamp-3 italic">
+                        "{ad.body || "Sem descrição disponível para este criativo."}"
+                      </p>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <DollarSign className="w-3 h-3" /> Gasto
+                          </p>
+                          <p className="text-sm font-bold text-white">{ad.spend ? `$${ad.spend}` : "Sob Consulta"}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <Users className="w-3 h-3" /> Alcance
+                          </p>
+                          <p className="text-sm font-bold text-white">{ad.impressions || "N/A"}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <TrendingUp className="w-3 h-3" /> Escala
+                          </p>
+                          <p className="text-sm font-bold text-white">Alta</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3" /> Lançado
+                          </p>
+                          <p className="text-sm font-bold text-white">{ad.startDate || "Recentemente"}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </Card>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {ads.length === 0 && !isLoading && (
-          <Card className="border-border/50 p-12 text-center">
-            <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" strokeWidth={1.5} />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              Nenhum anúncio encontrado
-            </h3>
-            <p className="text-muted-foreground mb-6">
-              Use a busca acima para encontrar anúncios competitivos
-            </p>
-          </Card>
-        )}
+          ) : !isLoading && (
+            <Card className="card-premium bg-white/[0.01] border-white/5 p-20 text-center">
+              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
+                <Search className="w-8 h-8 text-gray-700" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Pronto para buscar?</h3>
+              <p className="text-gray-500 max-w-sm mx-auto">
+                Utilize os filtros acima para encontrar anúncios competitivos ou clique em "Anúncios Escalados" para ver as tendências.
+              </p>
+            </Card>
+          )}
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
