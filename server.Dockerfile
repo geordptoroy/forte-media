@@ -51,5 +51,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
   CMD node /app/scripts/healthcheck.js
 
-# Iniciar servidor via entrypoint automatizado (caminho absoluto)
-ENTRYPOINT ["/bin/sh", "/app/scripts/docker-entrypoint.sh"]
+# Iniciar servidor via entrypoint unificado (caminho absoluto)
+ENTRYPOINT ["/bin/sh", "/app/scripts/entrypoint.sh"]

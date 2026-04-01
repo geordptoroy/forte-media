@@ -19,6 +19,17 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 
+// Extrair lógica de data para fora do componente para garantir aspas duplas limpas
+const getThirtyDaysAgo = () => {
+  const date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  return date.toISOString().split("T")[0];
+};
+
+const getToday = () => {
+  const date = new Date();
+  return date.toISOString().split("T")[0];
+};
+
 export default function Performance() {
   const [, setLocation] = useLocation();
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -27,22 +38,18 @@ export default function Performance() {
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
   
-  // Definir datas de forma segura para evitar erros de sintaxe no compilador
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const today = new Date().toISOString().split("T")[0];
-
   const listCampaignsQuery = trpc.meta.listCampaigns.useQuery(
     { adAccountId: "" },
-    { enabled: credentialsStatus.data?.hasCredentials }
+    { enabled: !!credentialsStatus.data?.hasCredentials }
   );
   
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
     { 
       campaignId: selectedCampaign || "",
-      dateStart: thirtyDaysAgo,
-      dateStop: today
+      dateStart: getThirtyDaysAgo(),
+      dateStop: getToday()
     },
-    { enabled: !!selectedCampaign && credentialsStatus.data?.hasCredentials }
+    { enabled: !!selectedCampaign && !!credentialsStatus.data?.hasCredentials }
   );
 
   const handleLoadCampaigns = async () => {
@@ -107,7 +114,6 @@ export default function Performance() {
           </Button>
         </div>
 
-        {/* Status Check */}
         {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
           <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
             <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
@@ -121,7 +127,6 @@ export default function Performance() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Campaigns Sidebar List */}
           <div className="lg:col-span-1 space-y-6">
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 px-2">Campanhas Ativas</h2>
             
@@ -139,13 +144,13 @@ export default function Performance() {
                   >
                     <div className="flex justify-between items-start mb-3">
                       <h3 className="text-sm font-bold text-white truncate max-w-[180px]">{campaign.name}</h3>
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${campaign.isActive ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'}`}>
-                        {campaign.isActive ? 'Ativa' : 'Pausada'}
+                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${campaign.isActive ? "bg-green-500/10 text-green-500" : "bg-gray-500/10 text-gray-500"}`}>
+                        {campaign.isActive ? "Ativa" : "Pausada"}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
-                      <span className="flex items-center gap-1"><Target className="w-3" /> {campaign.objective || "Vendas"}</span>
-                      <span className="flex items-center gap-1"><DollarSign className="w-3" /> {campaign.budget || "0.00"}</span>
+                      <span className="flex items-center gap-1"><Target className="w-3 h-3" /> {campaign.objective || "Vendas"}</span>
+                      <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {campaign.budget || "0.00"}</span>
                     </div>
                   </Card>
                 ))}
@@ -161,7 +166,6 @@ export default function Performance() {
             )}
           </div>
 
-          {/* Metrics Detail Area */}
           <div className="lg:col-span-2 space-y-8">
             {campaignMetrics ? (
               <>

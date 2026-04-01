@@ -60,11 +60,8 @@ services:
       PORT: 3000
     ports:
       - "3000:3000"
-    # volumes:
-    #   - ./scripts/docker-entrypoint.sh:/app/scripts/docker-entrypoint.sh:ro
-    # entrypoint: ["/bin/sh", "/app/scripts/docker-entrypoint.sh"]
     healthcheck:
-      test: ["CMD", "node", "scripts/healthcheck.js"]
+      test: ["CMD", "node", "/app/scripts/healthcheck.js"]
       interval: 30s
       timeout: 10s
       retries: 3
