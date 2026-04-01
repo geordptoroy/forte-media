@@ -48,10 +48,25 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath =
-    process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public");
+  // In production Docker deployments, the frontend is served by a dedicated
+  // Nginx container and all static files are handled there. The backend only
+  // needs to expose the /api routes and the health check endpoint.
+  // Attempting to serve static files from the backend image would fail because
+  // the client build artefacts are not copied into the server Docker image.
+  //
+  // For non-Docker production builds (single-server), set SERVE_STATIC=true
+  // and ensure the client build output is available at dist/public relative
+  // to the compiled server bundle.
+  if (process.env.SERVE_STATIC !== "true") {
+    // Register a health check endpoint so Docker HEALTHCHECK works correctly
+    app.get("/health", (_req, res) => {
+      res.status(200).send("ok");
+    });
+    return;
+  }
+
+  const distPath = path.resolve(import.meta.dirname, "public");
+
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
@@ -60,7 +75,7 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  // fall through to index.html if the file doesn't exist
+  // fall through to index.html if the file doesn't exist (SPA routing)
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });

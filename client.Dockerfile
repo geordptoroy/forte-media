@@ -19,7 +19,6 @@ COPY shared ./shared
 COPY tsconfig.json vite.config.ts ./
 
 # Build do frontend (saída em dist/public conforme vite.config.ts)
-# Usamos apenas o build:client para evitar erros de resolução do servidor neste contexto
 RUN pnpm build:client
 
 # Stage 2: Production
@@ -28,8 +27,8 @@ FROM nginx:alpine
 # Copiar build do estágio anterior (dist/public)
 COPY --from=builder /app/dist/public /usr/share/nginx/html
 
-# Copiar configuração do nginx (opcional se já montado via volume, mas bom ter como fallback)
-# COPY nginx/nginx.conf /etc/nginx/nginx.conf
+# Copiar configuração do nginx com suporte a SPA routing (try_files fallback)
+COPY nginx/frontend.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

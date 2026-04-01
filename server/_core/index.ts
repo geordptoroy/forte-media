@@ -35,6 +35,11 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   
+  // Health check endpoint (used by Docker HEALTHCHECK and Nginx)
+  app.get("/health", (_req, res) => {
+    res.status(200).send("ok");
+  });
+
   // Middleware to inject user for non-tRPC routes (like SSE)
   app.use(async (req, res, next) => {
     if (req.path.startsWith("/api/notifications")) {

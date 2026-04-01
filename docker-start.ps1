@@ -78,21 +78,61 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Wait for MySQL to be ready
+# Wait for MySQL to be ready (step 1: ping via localhost inside db container)
 Write-Host "Aguardando MySQL ficar pronto..." -ForegroundColor $WarningColor
+$mysqlReady = $false
 for ($i=1; $i -le 30; $i++) {
     $ping = docker-compose exec -T db mysqladmin ping -h localhost 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nOK: MySQL esta pronto" -ForegroundColor $SuccessColor
+        $mysqlReady = $true
         break
     }
     Write-Host -NoNewline "."
     Start-Sleep -Seconds 1
 }
 
+if (-not $mysqlReady) {
+    Write-Host "`nERRO: MySQL nao ficou pronto a tempo" -ForegroundColor $ErrorColor
+    exit 1
+}
+
+Write-Host "`nOK: MySQL esta aceitando pings" -ForegroundColor $SuccessColor
+
+# Wait for MySQL to accept TCP connections from the backend container (step 2)
+Write-Host "Aguardando MySQL aceitar conexoes TCP do backend..." -ForegroundColor $WarningColor
+$tcpReady = $false
+for ($i=1; $i -le 30; $i++) {
+    $tcpCheck = docker-compose exec -T backend sh -c "nc -z db 3306" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $tcpReady = $true
+        break
+    }
+    Write-Host -NoNewline "."
+    Start-Sleep -Seconds 2
+}
+
+if (-not $tcpReady) {
+    Write-Host "`nAVISO: Nao foi possivel confirmar conexao TCP. Aguardando mais 5 segundos..." -ForegroundColor $WarningColor
+    Start-Sleep -Seconds 5
+} else {
+    Write-Host "`nOK: MySQL esta pronto para conexoes TCP" -ForegroundColor $SuccessColor
+}
+
 # Run database migrations
 Write-Host "Executando migrations do banco de dados..." -ForegroundColor $WarningColor
 docker-compose exec -T backend pnpm db:push
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "AVISO: Migrations falharam. Tentando novamente em 5 segundos..." -ForegroundColor $WarningColor
+    Start-Sleep -Seconds 5
+    docker-compose exec -T backend pnpm db:push
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "AVISO: Migrations ainda falharam. Verifique os logs com: docker-compose logs backend" -ForegroundColor $WarningColor
+    } else {
+        Write-Host "OK: Migrations executadas com sucesso (segunda tentativa)" -ForegroundColor $SuccessColor
+    }
+} else {
+    Write-Host "OK: Migrations executadas com sucesso" -ForegroundColor $SuccessColor
+}
 
 Write-Host ""
 Write-Host "FORTE MEDIA iniciado com sucesso!" -ForegroundColor $SuccessColor
