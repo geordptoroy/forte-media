@@ -2,21 +2,21 @@ import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, de
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
+ * Refactored for local authentication with email and password hash.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  /** User's full name */
   name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
+  /** User's unique email address used for login */
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  /** BCrypt hashed password */
+  passwordHash: text("password_hash"),
+  /** For tracking purposes, can be 'local' or other if added later */
+  loginMethod: varchar("loginMethod", { length: 64 }).default("local"),
+  /** User role for permissions */
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** Timestamps */
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

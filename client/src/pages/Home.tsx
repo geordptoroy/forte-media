@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getLoginUrl } from "@/const";
 import {
   Zap,
   BarChart3,
@@ -36,12 +35,21 @@ export default function Home() {
             </div>
             <span className="font-bold text-lg text-foreground">FORTE MEDIA</span>
           </div>
-          <Button
-            onClick={() => (window.location.href = getLoginUrl())}
-            className="bg-primary hover:bg-primary/90 text-white"
-          >
-            Entrar
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setLocation("/login")}
+              variant="ghost"
+              className="text-foreground"
+            >
+              Entrar
+            </Button>
+            <Button
+              onClick={() => setLocation("/register")}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              Criar Conta
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -74,7 +82,7 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Button
-              onClick={() => (window.location.href = getLoginUrl())}
+              onClick={() => setLocation("/register")}
               size="lg"
               className="bg-gradient-to-r from-primary to-accent hover:shadow-lg text-white font-medium"
             >
@@ -223,11 +231,11 @@ export default function Home() {
             Acesse FORTE MEDIA agora e comece a analisar anúncios competitivos.
           </p>
           <Button
-            onClick={() => (window.location.href = getLoginUrl())}
+            onClick={() => setLocation("/register")}
             size="lg"
             className="bg-gradient-to-r from-primary to-accent hover:shadow-lg text-white font-medium"
           >
-            Entrar com Manus
+            Criar Conta Agora
             <ArrowRight className="w-4 h-4 ml-2" strokeWidth={2.5} />
           </Button>
         </div>

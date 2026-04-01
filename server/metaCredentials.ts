@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { userMetaCredentials } from "../drizzle/schema";
 import { getDb } from "./db";
-import { encryptToken, hashToken, decryptToken, validateTokenHash } from "./crypto";
+import { encryptToken, hashToken, decryptToken } from "./crypto";
 
 /**
  * Armazenar credenciais Meta de um usuário
@@ -17,26 +17,34 @@ export async function storeMetaCredentials(
   const encryptedToken = encryptToken(accessToken);
   const tokenHash = hashToken(accessToken);
 
-  await db
-    .insert(userMetaCredentials)
-    .values({
-      userId,
-      encryptedAccessToken: encryptedToken,
-      tokenHash,
-      permissions,
-      isValid: true,
-      lastValidatedAt: new Date(),
-    })
-    .onDuplicateKeyUpdate({
-      set: {
+  const existing = await db
+    .select()
+    .from(userMetaCredentials)
+    .where(eq(userMetaCredentials.userId, userId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(userMetaCredentials)
+      .set({
         encryptedAccessToken: encryptedToken,
         tokenHash,
         permissions,
         isValid: true,
         lastValidatedAt: new Date(),
         updatedAt: new Date(),
-      },
+      })
+      .where(eq(userMetaCredentials.userId, userId));
+  } else {
+    await db.insert(userMetaCredentials).values({
+      userId,
+      encryptedAccessToken: encryptedToken,
+      tokenHash,
+      permissions,
+      isValid: true,
+      lastValidatedAt: new Date(),
     });
+  }
 }
 
 /**
@@ -88,7 +96,6 @@ export async function hasValidMetaCredentials(userId: number): Promise<boolean> 
 
 /**
  * Validar token Meta via Graph API
- * Retorna as permissões do token se válido
  */
 export async function validateMetaToken(accessToken: string): Promise<{
   valid: boolean;

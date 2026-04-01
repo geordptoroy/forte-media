@@ -1,30 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/_core/hooks/useAuth';
+import { trpc } from '@/lib/trpc';
+import { AlertCircle } from 'lucide-react';
 
 export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
+  const { isAuthenticated } = useAuth();
+  
+  const registerMutation = trpc.auth.register.useMutation();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation('/dashboard');
+    }
+  }, [isAuthenticated, setLocation]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !password) {
-      alert('Preencha todos os campos');
+    setError('');
+    
+    if (!name || !email || !password || !confirmPassword) {
+      setError('Preencha todos os campos');
       return;
     }
+
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Simular registro
-      console.log('Registrando:', { name, email });
+      await registerMutation.mutateAsync({ name, email, password });
       setLocation('/dashboard');
     } catch (err) {
-      console.error('Erro ao criar conta:', err);
-      alert('Erro ao criar conta');
+      setError(err instanceof Error ? err.message : 'Erro ao criar conta');
     } finally {
       setLoading(false);
     }
@@ -43,6 +68,13 @@ export default function Register() {
           </CardHeader>
 
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+                <AlertCircle size={16} />
+                {error}
+              </div>
+            )}
+
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nome completo</label>
@@ -50,6 +82,7 @@ export default function Register() {
                   placeholder="Seu nome"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -59,6 +92,7 @@ export default function Register() {
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -68,6 +102,17 @@ export default function Register() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Confirmar Senha</label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <Button type="submit" disabled={loading} className="w-full">

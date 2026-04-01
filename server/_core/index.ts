@@ -3,11 +3,11 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { notificationManager } from "../notifications";
+import { sdk } from "./sdk";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -34,9 +34,20 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
   
+  // Middleware to inject user for non-tRPC routes (like SSE)
+  app.use(async (req, res, next) => {
+    if (req.path.startsWith("/api/notifications")) {
+      try {
+        const user = await sdk.authenticateRequest(req as any);
+        (req as any).user = user;
+      } catch (error) {
+        // Continue without user, individual routes will handle 401
+      }
+    }
+    next();
+  });
+
   // SSE endpoint for real-time notifications
   app.get("/api/notifications/stream", (req, res) => {
     const userId = (req as any).user?.id;
