@@ -44,8 +44,9 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+COPY scripts/healthcheck.js ./scripts/healthcheck.js
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+  CMD node scripts/healthcheck.js
 
 # Iniciar servidor
 CMD ["node", "dist/index.js"]
