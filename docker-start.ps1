@@ -58,9 +58,14 @@ if (-not (Test-Path "nginx/certs/server.crt") -or -not (Test-Path "nginx/certs/s
 # Create .env file
 Write-Host "Verificando arquivo .env..." -ForegroundColor $WarningColor
 if (-not (Test-Path ".env")) {
-    Write-Host "Criando arquivo .env a partir do exemplo..." -ForegroundColor $WarningColor
-    Copy-Item ".env.example" ".env"
-    Write-Host "AVISO: Por favor, edite o arquivo .env com suas credenciais" -ForegroundColor $WarningColor
+    if (Test-Path ".env.example") {
+        Write-Host "Criando arquivo .env a partir do exemplo..." -ForegroundColor $WarningColor
+        Copy-Item ".env.example" ".env"
+        Write-Host "AVISO: Por favor, edite o arquivo .env com suas credenciais" -ForegroundColor $WarningColor
+    } else {
+        Write-Host "AVISO: .env.example nao encontrado. Criando .env basico..." -ForegroundColor $WarningColor
+        "NODE_ENV=production`nPORT=3000`nDATABASE_URL=mysql://forte_user:forte_password@db:3306/forte_media" | Out-File -FilePath ".env" -Encoding utf8
+    }
 } else {
     Write-Host "OK: Arquivo .env ja existe" -ForegroundColor $SuccessColor
 }
@@ -71,11 +76,16 @@ docker-compose down 2>$null
 
 # Build and start
 Write-Host "Iniciando Docker Compose (Build e Up)..." -ForegroundColor $WarningColor
+Write-Host "Dica: Se houver erro de imagem, verifique sua conexao com a internet." -ForegroundColor $WarningColor
 docker-compose up -d --build
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERRO: Erro ao iniciar Docker Compose" -ForegroundColor $ErrorColor
-    exit 1
+    Write-Host "ERRO: Erro ao iniciar Docker Compose. Tentando sem --build..." -ForegroundColor $WarningColor
+    docker-compose up -d
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERRO: Falha critica ao iniciar Docker Compose." -ForegroundColor $ErrorColor
+        exit 1
+    }
 }
 
 # Wait for MySQL to be ready (step 1: ping via localhost inside db container)
