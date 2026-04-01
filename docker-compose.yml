@@ -1,8 +1,8 @@
 # FORTE MEDIA - Docker Compose Configuration
-# Optimized for Production and Docker-only execution
+# Optimized for Production and Cross-Platform Compatibility (Windows/Linux/macOS)
 
 services:
-  # MySQL Database with production optimizations
+  # MySQL Database
   db:
     image: mysql:8.0-alpine
     container_name: forte-media-db
@@ -34,10 +34,8 @@ services:
       start_period: 30s
     networks:
       - forte-network
-    security_opt:
-      - no-new-privileges:true
 
-  # Backend Node.js + Express with production optimizations
+  # Backend Node.js + Express
   backend:
     build:
       context: .
@@ -63,25 +61,15 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "node", "scripts/healthcheck.js"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     networks:
       - forte-network
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-    read_only_root_filesystem: true
-    tmpfs:
-      - /tmp
-      - /app/node_modules/.cache
 
-  # Frontend React + Vite (Static serving via Nginx in production)
+  # Frontend React + Vite
   frontend:
     build:
       context: .
@@ -105,10 +93,8 @@ services:
       start_period: 20s
     networks:
       - forte-network
-    security_opt:
-      - no-new-privileges:true
 
-  # Nginx Reverse Proxy with HTTPS and security headers
+  # Nginx Reverse Proxy
   nginx:
     image: nginx:alpine
     container_name: forte-media-nginx
@@ -132,12 +118,6 @@ services:
       start_period: 20s
     networks:
       - forte-network
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
 
 volumes:
   db_data:
