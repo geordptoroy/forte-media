@@ -1,6 +1,6 @@
 /**
  * Integração com Meta Ad Library API
- * Busca anúncios competitivos de forma segura
+ * Busca anúncios competitivos com análise avançada de escalabilidade
  */
 
 export interface AdLibrarySearchParams {
@@ -9,6 +9,14 @@ export interface AdLibrarySearchParams {
   adType?: "POLITICAL" | "ISSUE_ADS" | "ALL";
   limit?: number;
   after?: string;
+}
+
+export interface ScalingAnalysisParams {
+  minSpend?: number;
+  minCTR?: number;
+  minROAS?: number;
+  minImpressions?: number;
+  minDaysActive?: number;
 }
 
 export interface AdLibraryAd {
@@ -23,6 +31,13 @@ export interface AdLibraryAd {
   spend: string;
   impressions: number;
   currency: string;
+  mediaType?: string;
+  // Computed fields for scaling analysis
+  scalingScore?: number;
+  scalingReasons?: string[];
+  daysActive?: number;
+  estimatedCPM?: number;
+  estimatedCTR?: number;
 }
 
 export interface AdLibrarySearchResult {
@@ -43,10 +58,13 @@ export async function searchAdLibrary(
   params: AdLibrarySearchParams
 ): Promise<AdLibrarySearchResult> {
   try {
+    // Construir search_terms corretamente: espaço = AND, vírgula = OR
+    const searchTermsFormatted = params.searchTerms.join(" ");
+
     const queryParams = new URLSearchParams({
       access_token: accessToken,
-      search_terms: JSON.stringify(params.searchTerms),
-      ad_reached_countries: JSON.stringify(params.countries),
+      search_terms: searchTermsFormatted,
+      ad_reached_countries: params.countries.join(","),
       ad_type: params.adType || "ALL",
       limit: String(params.limit || 25),
       fields: [
@@ -61,6 +79,7 @@ export async function searchAdLibrary(
         "spend",
         "impressions",
         "currency",
+        "media_type",
       ].join(","),
     });
 
@@ -69,7 +88,7 @@ export async function searchAdLibrary(
     }
 
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/ads_archive?${queryParams.toString()}`,
+      `https://graph.facebook.com/v25.0/ads_archive?${queryParams.toString()}`,
       {
         method: "GET",
         headers: {
@@ -97,6 +116,7 @@ export async function searchAdLibrary(
         spend: string;
         impressions: number;
         currency: string;
+        media_type?: string;
       }>;
       paging?: {
         cursors: {
@@ -119,6 +139,7 @@ export async function searchAdLibrary(
         spend: ad.spend,
         impressions: ad.impressions,
         currency: ad.currency,
+        mediaType: ad.media_type,
       })),
       paging: data.paging || { cursors: { before: "", after: "" } },
     };
@@ -129,12 +150,107 @@ export async function searchAdLibrary(
 }
 
 /**
- * Buscar anúncios escalados (alto gasto e impressões)
+ * Calcular dias ativos de um anúncio
+ */
+function calculateDaysActive(startTime: string, stopTime: string): number {
+  try {
+    const start = new Date(startTime).getTime();
+    const stop = new Date(stopTime).getTime();
+    return Math.ceil((stop - start) / (1000 * 60 * 60 * 24));
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Calcular CPM (Cost Per Mille) estimado
+ */
+function calculateCPM(spend: number, impressions: number): number {
+  if (impressions === 0) return 0;
+  return (spend / impressions) * 1000;
+}
+
+/**
+ * Calcular CTR (Click-Through Rate) estimado baseado em impressões
+ * Nota: Ad Library não fornece clicks, então usamos uma heurística
+ */
+function estimateCTR(impressions: number, spend: number): number {
+  // Heurística: anúncios com mais impressões por dólar tendem a ter melhor CTR
+  // Assumir CTR médio de 1-3% para anúncios bem escalados
+  if (impressions === 0 || spend === 0) return 0;
+  const impressionsPerDollar = impressions / spend;
+  // Normalizar para CTR estimado (0.5% a 5%)
+  return Math.min(5, Math.max(0.5, (impressionsPerDollar / 100) * 2));
+}
+
+/**
+ * Analisar escalabilidade de um anúncio
+ */
+function analyzeScaling(ad: AdLibraryAd): { score: number; reasons: string[] } {
+  const reasons: string[] = [];
+  let score = 0;
+
+  const spend = parseFloat(ad.spend) || 0;
+  const impressions = ad.impressions || 0;
+  const daysActive = calculateDaysActive(ad.adDeliveryStartTime, ad.adDeliveryStopTime);
+  const cpm = calculateCPM(spend, impressions);
+  const estimatedCTR = estimateCTR(impressions, spend);
+
+  // Critério 1: Gasto mínimo (indica confiança do anunciante)
+  if (spend >= 100) {
+    score += 20;
+    reasons.push(`Gasto significativo: $${spend.toFixed(2)}`);
+  }
+
+  // Critério 2: Impressões altas (indica alcance)
+  if (impressions >= 10000) {
+    score += 20;
+    reasons.push(`Alcance elevado: ${impressions.toLocaleString()} impressões`);
+  }
+
+  // Critério 3: CPM baixo (indica eficiência)
+  if (cpm > 0 && cpm <= 1) {
+    score += 20;
+    reasons.push(`CPM muito eficiente: $${cpm.toFixed(2)}`);
+  } else if (cpm > 1 && cpm <= 2) {
+    score += 15;
+    reasons.push(`CPM eficiente: $${cpm.toFixed(2)}`);
+  }
+
+  // Critério 4: CTR estimado alto
+  if (estimatedCTR >= 2) {
+    score += 20;
+    reasons.push(`CTR estimado alto: ${estimatedCTR.toFixed(2)}%`);
+  } else if (estimatedCTR >= 1) {
+    score += 10;
+    reasons.push(`CTR estimado bom: ${estimatedCTR.toFixed(2)}%`);
+  }
+
+  // Critério 5: Duração de atividade (indica consistência)
+  if (daysActive >= 30) {
+    score += 10;
+    reasons.push(`Ativo por ${daysActive} dias (consistência)`);
+  } else if (daysActive >= 7) {
+    score += 5;
+    reasons.push(`Ativo por ${daysActive} dias`);
+  }
+
+  // Critério 6: Tipo de mídia (vídeos tendem a escalar melhor)
+  if (ad.mediaType === "VIDEO") {
+    score += 5;
+    reasons.push("Formato de vídeo (melhor engajamento)");
+  }
+
+  return { score: Math.min(100, score), reasons };
+}
+
+/**
+ * Buscar anúncios escalados (alto desempenho)
  */
 export async function searchScaledAds(
   accessToken: string,
   countries: string[],
-  minSpend?: number
+  params?: ScalingAnalysisParams
 ): Promise<AdLibraryAd[]> {
   try {
     const result = await searchAdLibrary(accessToken, {
@@ -144,15 +260,55 @@ export async function searchScaledAds(
       limit: 100,
     });
 
-    // Filtrar por gasto mínimo se especificado
-    if (minSpend) {
-      return result.ads.filter((ad) => {
-        const spend = parseFloat(ad.spend);
-        return spend >= minSpend;
+    // Enriquecer anúncios com análise de escalabilidade
+    const enrichedAds = result.ads.map((ad) => {
+      const daysActive = calculateDaysActive(ad.adDeliveryStartTime, ad.adDeliveryStopTime);
+      const cpm = calculateCPM(parseFloat(ad.spend) || 0, ad.impressions || 0);
+      const estimatedCTR = estimateCTR(ad.impressions || 0, parseFloat(ad.spend) || 0);
+      const { score, reasons } = analyzeScaling(ad);
+
+      return {
+        ...ad,
+        daysActive,
+        estimatedCPM: cpm,
+        estimatedCTR,
+        scalingScore: score,
+        scalingReasons: reasons,
+      };
+    });
+
+    // Filtrar por critérios de escalabilidade
+    let filtered = enrichedAds;
+
+    if (params?.minSpend) {
+      filtered = filtered.filter((ad) => parseFloat(ad.spend) >= params.minSpend);
+    }
+
+    if (params?.minCTR) {
+      filtered = filtered.filter((ad) => (ad.estimatedCTR || 0) >= params.minCTR);
+    }
+
+    if (params?.minROAS) {
+      // ROAS = Revenue / Spend. Sem dados de revenue, usamos uma heurística baseada em impressões
+      // Assumir $1 de revenue por 1000 impressões como baseline
+      filtered = filtered.filter((ad) => {
+        const estimatedRevenue = (ad.impressions || 0) / 1000;
+        const spend = parseFloat(ad.spend) || 1;
+        const roas = estimatedRevenue / spend;
+        return roas >= params.minROAS;
       });
     }
 
-    return result.ads;
+    if (params?.minImpressions) {
+      filtered = filtered.filter((ad) => ad.impressions >= params.minImpressions);
+    }
+
+    if (params?.minDaysActive) {
+      filtered = filtered.filter((ad) => (ad.daysActive || 0) >= params.minDaysActive);
+    }
+
+    // Ordenar por scaling score (descendente)
+    return filtered.sort((a, b) => (b.scalingScore || 0) - (a.scalingScore || 0));
   } catch (error) {
     console.error("[Ad Library] Scaled ads search error:", error);
     throw error;

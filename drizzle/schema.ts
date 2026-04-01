@@ -27,23 +27,45 @@ export type InsertUser = typeof users.$inferInsert;
 
 /**
  * Armazenamento seguro de credenciais Meta API por usuário
- * Access tokens são criptografados com AES-256-GCM
+ * Suporta múltiplas aplicações Meta por usuário, cada uma com seu próprio Ad Account
+ * Access tokens, App Secrets e System User tokens são criptografados com AES-256-GCM
  */
 export const userMetaCredentials = mysqlTable(
   "user_meta_credentials",
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("user_id").notNull(),
+    
+    // Meta Developer App Configuration
+    metaAppId: varchar("meta_app_id", { length: 255 }).notNull(),
+    encryptedAppSecret: text("encrypted_app_secret"),
+    
+    // Ad Account Configuration
+    adAccountId: varchar("ad_account_id", { length: 64 }),
+    accountName: varchar("account_name", { length: 255 }),
+    
+    // Access Token (User Token or System User Token)
     encryptedAccessToken: text("encrypted_access_token").notNull(),
     tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    
+    // System User Configuration (optional)
+    isSystemUser: boolean("is_system_user").default(false).notNull(),
+    systemUserId: varchar("system_user_id", { length: 255 }),
+    
+    // Permissions and Validation
     permissions: json("permissions").$type<string[]>().notNull(),
     isValid: boolean("is_valid").default(true).notNull(),
     lastValidatedAt: timestamp("last_validated_at"),
+    validationError: text("validation_error"),
+    
+    // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
     userIdIdx: index("user_id_idx").on(table.userId),
+    metaAppIdIdx: index("meta_app_id_idx").on(table.metaAppId),
+    adAccountIdIdx: index("ad_account_id_idx").on(table.adAccountId),
   })
 );
 
