@@ -44,34 +44,33 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center px-4">
-      {/* Background decorative elements */}
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-20 w-72 h-72 bg-accent/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo and Title */}
-        <div className="text-center mb-12 animate-fade-in">
-          <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">FM</span>
+        <div className="text-center mb-12">
+          <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
+            <span className="text-black font-bold text-2xl">FM</span>
           </div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">FORTE MEDIA</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">FORTE MEDIA</h1>
           <p className="text-muted-foreground text-sm">
             Inteligência Competitiva para Anúncios Meta
           </p>
         </div>
 
         {/* Main Card */}
-        <Card className="border-border/50 shadow-lg backdrop-blur-sm bg-card/95 mb-8 animate-slide-in-up">
+        <Card className="card-premium mb-8">
           <CardHeader className="text-center">
-            <CardTitle>Entrar na sua conta</CardTitle>
+            <CardTitle className="text-xl">Entrar na sua conta</CardTitle>
           </CardHeader>
 
           <CardContent>
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400 text-sm">
                 <AlertCircle size={16} />
                 {error}
               </div>
@@ -79,33 +78,39 @@ export default function Login() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">E-mail</label>
+                <label className="text-sm font-medium text-foreground">E-mail</label>
                 <Input
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
+                  className="input-premium"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Senha</label>
+                <label className="text-sm font-medium text-foreground">Senha</label>
                 <Input
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
+                  className="input-premium"
                 />
               </div>
-              <Button type="submit" disabled={loading} className="w-full">
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="btn-premium w-full"
+              >
                 {loading ? 'Entrando...' : 'Entrar'}
               </Button>
             </form>
 
             <p className="text-center text-sm text-muted-foreground mt-4">
               Não tem conta?{' '}
-              <a href="/register" className="text-primary hover:underline">
+              <a href="/register" className="text-white hover:underline font-medium">
                 Criar conta
               </a>
             </p>
@@ -115,8 +120,8 @@ export default function Login() {
         {/* Features */}
         <div className="space-y-3 mb-8">
           <div className="flex items-start gap-3 text-sm">
-            <div className="w-5 h-5 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <BarChart3 className="w-3 h-3 text-primary" strokeWidth={3} />
+            <div className="w-5 h-5 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <BarChart3 className="w-3 h-3 text-white" strokeWidth={3} />
             </div>
             <div>
               <p className="font-medium text-foreground">Análise de Anúncios Competitivos</p>
@@ -125,8 +130,8 @@ export default function Login() {
           </div>
 
           <div className="flex items-start gap-3 text-sm">
-            <div className="w-5 h-5 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Zap className="w-3 h-3 text-primary" strokeWidth={3} />
+            <div className="w-5 h-5 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Zap className="w-3 h-3 text-white" strokeWidth={3} />
             </div>
             <div>
               <p className="font-medium text-foreground">Dashboard de Performance</p>
@@ -135,8 +140,8 @@ export default function Login() {
           </div>
 
           <div className="flex items-start gap-3 text-sm">
-            <div className="w-5 h-5 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Shield className="w-3 h-3 text-primary" strokeWidth={3} />
+            <div className="w-5 h-5 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Shield className="w-3 h-3 text-white" strokeWidth={3} />
             </div>
             <div>
               <p className="font-medium text-foreground">Segurança de Nível Empresarial</p>

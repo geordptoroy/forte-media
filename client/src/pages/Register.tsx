@@ -56,20 +56,25 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <Card>
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative z-10 w-full max-w-md">
+        <Card className="card-premium">
           <CardHeader className="text-center">
-            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-              <span className="text-white font-bold text-lg">FM</span>
+            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
+              <span className="text-black font-bold text-lg">FM</span>
             </div>
-            <CardTitle>FORTE MEDIA</CardTitle>
+            <CardTitle className="text-xl">FORTE MEDIA</CardTitle>
             <p className="text-sm text-muted-foreground mt-2">Criar nova conta</p>
           </CardHeader>
 
           <CardContent>
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400 text-sm">
                 <AlertCircle size={16} />
                 {error}
               </div>
@@ -77,52 +82,60 @@ export default function Register() {
 
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Nome completo</label>
+                <label className="text-sm font-medium text-foreground">Nome completo</label>
                 <Input
                   placeholder="Seu nome"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={loading}
+                  className="input-premium"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">E-mail</label>
+                <label className="text-sm font-medium text-foreground">E-mail</label>
                 <Input
                   type="email"
                   placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
+                  className="input-premium"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Senha</label>
+                <label className="text-sm font-medium text-foreground">Senha</label>
                 <Input
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
+                  className="input-premium"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Confirmar Senha</label>
+                <label className="text-sm font-medium text-foreground">Confirmar Senha</label>
                 <Input
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={loading}
+                  className="input-premium"
                 />
               </div>
-              <Button type="submit" disabled={loading} className="w-full">
+              <Button 
+                type="submit" 
+                disabled={loading} 
+                className="btn-premium w-full"
+              >
                 {loading ? 'Criando conta...' : 'Criar conta'}
               </Button>
             </form>
 
             <p className="text-center text-sm text-muted-foreground mt-4">
               Já tem conta?{' '}
-              <a href="/login" className="text-primary hover:underline">
+              <a href="/login" className="text-white hover:underline font-medium">
                 Entrar
               </a>
             </p>
