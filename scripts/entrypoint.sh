@@ -1,5 +1,4 @@
 #!/bin/sh
-set -e
 
 # FORTE MEDIA - Unified Entrypoint
 # -------------------------------
@@ -22,7 +21,7 @@ done
 echo ">>> OK: MySQL esta pronto."
 
 # 2. Executar Migrations (Drizzle Push)
-echo ">>> Sincronizando schema do banco de dados (DATABASE_URL: $DATABASE_URL)..."
+echo ">>> Sincronizando schema do banco de dados..."
 if ! pnpm db:push; then
   echo "!!! AVISO: Falha na sincronizacao inicial. Tentando novamente em 5s..."
   sleep 5
