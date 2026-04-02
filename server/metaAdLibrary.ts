@@ -280,31 +280,36 @@ export async function searchScaledAds(
     // Filtrar por critérios de escalabilidade
     let filtered = enrichedAds;
 
-    if (params?.minSpend) {
-      filtered = filtered.filter((ad) => parseFloat(ad.spend) >= params.minSpend);
+    if (params?.minSpend !== undefined) {
+      const minSpend = params.minSpend;
+      filtered = filtered.filter((ad) => parseFloat(ad.spend) >= minSpend);
     }
 
-    if (params?.minCTR) {
-      filtered = filtered.filter((ad) => (ad.estimatedCTR || 0) >= params.minCTR);
+    if (params?.minCTR !== undefined) {
+      const minCTR = params.minCTR;
+      filtered = filtered.filter((ad) => (ad.estimatedCTR || 0) >= minCTR);
     }
 
-    if (params?.minROAS) {
+    if (params?.minROAS !== undefined) {
+      const minROAS = params.minROAS;
       // ROAS = Revenue / Spend. Sem dados de revenue, usamos uma heurística baseada em impressões
       // Assumir $1 de revenue por 1000 impressões como baseline
       filtered = filtered.filter((ad) => {
         const estimatedRevenue = (ad.impressions || 0) / 1000;
         const spend = parseFloat(ad.spend) || 1;
         const roas = estimatedRevenue / spend;
-        return roas >= params.minROAS;
+        return roas >= minROAS;
       });
     }
 
-    if (params?.minImpressions) {
-      filtered = filtered.filter((ad) => ad.impressions >= params.minImpressions);
+    if (params?.minImpressions !== undefined) {
+      const minImpressions = params.minImpressions;
+      filtered = filtered.filter((ad) => ad.impressions >= minImpressions);
     }
 
-    if (params?.minDaysActive) {
-      filtered = filtered.filter((ad) => (ad.daysActive || 0) >= params.minDaysActive);
+    if (params?.minDaysActive !== undefined) {
+      const minDaysActive = params.minDaysActive;
+      filtered = filtered.filter((ad) => (ad.daysActive || 0) >= minDaysActive);
     }
 
     // Ordenar por scaling score (descendente)

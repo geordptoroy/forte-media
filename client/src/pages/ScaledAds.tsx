@@ -40,7 +40,7 @@ export default function ScaledAds() {
   };
 
   const handleSearch = async () => {
-    if (!credentialsStatus.data?.isValid) {
+    if (!credentialsStatus.data?.hasCredentials) {
       toast.error('Configure suas credenciais Meta primeiro');
       setLocation('/settings');
       return;
@@ -92,7 +92,7 @@ export default function ScaledAds() {
           
           <Button
             onClick={handleSearch}
-            disabled={isSearching || !credentialsStatus.data?.isValid}
+            disabled={isSearching || !credentialsStatus.data?.hasCredentials}
             className="btn-premium px-8"
           >
             {isSearching ? (
@@ -107,7 +107,7 @@ export default function ScaledAds() {
         </div>
 
         {/* Credentials Warning */}
-        {!credentialsStatus.data?.isValid && !credentialsStatus.isLoading && (
+        {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
           <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
             <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
             <div className="flex-1">
@@ -199,7 +199,7 @@ export default function ScaledAds() {
               </p>
               <Button
                 onClick={handleSearch}
-                disabled={!credentialsStatus.data?.isValid}
+                disabled={!credentialsStatus.data?.hasCredentials}
                 className="btn-premium px-8"
               >
                 Ver Tendências Atuais

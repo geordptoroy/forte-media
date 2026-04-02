@@ -15,6 +15,7 @@ export interface MetaCredentialsConfig {
   isSystemUser?: boolean;
   systemUserId?: string;
   permissions: string[];
+  isValid?: boolean;
 }
 
 /**
@@ -32,17 +33,19 @@ export async function storeMetaCredentials(
   const tokenHash = hashToken(config.accessToken);
   const encryptedAppSecret = config.metaAppSecret ? encryptToken(config.metaAppSecret) : null;
 
-  // Verificar se já existe uma credencial para este App ID e Ad Account
+  // Construir condições de filtro para verificar existência
+  const conditions = [
+    eq(userMetaCredentials.userId, userId),
+    eq(userMetaCredentials.metaAppId, config.metaAppId),
+  ];
+  if (config.adAccountId) {
+    conditions.push(eq(userMetaCredentials.adAccountId, config.adAccountId));
+  }
+
   const existing = await db
     .select()
     .from(userMetaCredentials)
-    .where(
-      and(
-        eq(userMetaCredentials.userId, userId),
-        eq(userMetaCredentials.metaAppId, config.metaAppId),
-        config.adAccountId ? eq(userMetaCredentials.adAccountId, config.adAccountId) : undefined
-      )
-    )
+    .where(and(...conditions))
     .limit(1);
 
   if (existing.length > 0) {
@@ -91,40 +94,41 @@ export async function getMetaCredentials(
   userId: number,
   metaAppId?: string,
   adAccountId?: string
-): Promise<MetaCredentialsConfig | null> {
+): Promise<(MetaCredentialsConfig & { isValid: boolean }) | null> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  let query = db
+  // Construir condições de filtro
+  const conditions = [eq(userMetaCredentials.userId, userId)];
+  if (metaAppId) {
+    conditions.push(eq(userMetaCredentials.metaAppId, metaAppId));
+  }
+  if (adAccountId) {
+    conditions.push(eq(userMetaCredentials.adAccountId, adAccountId));
+  }
+
+  const result = await db
     .select()
     .from(userMetaCredentials)
-    .where(eq(userMetaCredentials.userId, userId));
-
-  if (metaAppId) {
-    query = query.where(eq(userMetaCredentials.metaAppId, metaAppId));
-  }
-
-  if (adAccountId) {
-    query = query.where(eq(userMetaCredentials.adAccountId, adAccountId));
-  }
-
-  const result = await query.limit(1);
+    .where(and(...conditions))
+    .limit(1);
 
   if (!result.length) return null;
 
   const cred = result[0];
   const accessToken = decryptToken(cred.encryptedAccessToken);
-  const metaAppSecret = cred.encryptedAppSecret ? decryptToken(cred.encryptedAppSecret) : undefined;
+  const metaAppSecretDecrypted = cred.encryptedAppSecret ? decryptToken(cred.encryptedAppSecret) : undefined;
 
   return {
     metaAppId: cred.metaAppId,
-    metaAppSecret,
+    metaAppSecret: metaAppSecretDecrypted,
     adAccountId: cred.adAccountId || undefined,
     accountName: cred.accountName || undefined,
     accessToken,
     isSystemUser: cred.isSystemUser,
     systemUserId: cred.systemUserId || undefined,
     permissions: cred.permissions,
+    isValid: cred.isValid,
   };
 }
 
@@ -168,20 +172,23 @@ export async function hasValidMetaCredentials(
   const db = await getDb();
   if (!db) return false;
 
-  let query = db
+  const conditions = [
+    eq(userMetaCredentials.userId, userId),
+    eq(userMetaCredentials.isValid, true),
+  ];
+  if (metaAppId) {
+    conditions.push(eq(userMetaCredentials.metaAppId, metaAppId));
+  }
+  if (adAccountId) {
+    conditions.push(eq(userMetaCredentials.adAccountId, adAccountId));
+  }
+
+  const result = await db
     .select()
     .from(userMetaCredentials)
-    .where(and(eq(userMetaCredentials.userId, userId), eq(userMetaCredentials.isValid, true)));
+    .where(and(...conditions))
+    .limit(1);
 
-  if (metaAppId) {
-    query = query.where(eq(userMetaCredentials.metaAppId, metaAppId));
-  }
-
-  if (adAccountId) {
-    query = query.where(eq(userMetaCredentials.adAccountId, adAccountId));
-  }
-
-  const result = await query.limit(1);
   return result.length > 0;
 }
 
@@ -198,7 +205,6 @@ export async function validateMetaToken(
   error?: string;
 }> {
   try {
-    // Validar token de acesso
     const response = await fetch("https://graph.facebook.com/v25.0/me/permissions", {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -335,20 +341,18 @@ export async function invalidateMetaCredentials(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  let query = db
+  const conditions = [eq(userMetaCredentials.userId, userId)];
+  if (metaAppId) {
+    conditions.push(eq(userMetaCredentials.metaAppId, metaAppId));
+  }
+  if (adAccountId) {
+    conditions.push(eq(userMetaCredentials.adAccountId, adAccountId));
+  }
+
+  await db
     .update(userMetaCredentials)
     .set({ isValid: false, updatedAt: new Date() })
-    .where(eq(userMetaCredentials.userId, userId));
-
-  if (metaAppId) {
-    query = query.where(eq(userMetaCredentials.metaAppId, metaAppId));
-  }
-
-  if (adAccountId) {
-    query = query.where(eq(userMetaCredentials.adAccountId, adAccountId));
-  }
-
-  await query;
+    .where(and(...conditions));
 }
 
 /**

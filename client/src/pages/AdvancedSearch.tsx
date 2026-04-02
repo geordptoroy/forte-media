@@ -191,7 +191,7 @@ export default function AdvancedSearch() {
           <div className="flex gap-4">
             <Button
               onClick={handleSearch}
-              disabled={isSearching || !credentialsStatus.data?.isValid}
+              disabled={isSearching || !credentialsStatus.data?.hasCredentials}
               className="btn-premium px-8"
             >
               {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Filtrar Anúncios"}

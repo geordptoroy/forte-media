@@ -19,6 +19,9 @@ import {
 import { searchAdLibrary, searchScaledAds } from "./metaAdLibrary";
 import { getCampaignMetrics, getAdAccountMetrics, listCampaigns } from "./metaMarketing";
 import { sdk } from "./_core/sdk";
+import { adsRouter } from "./adsRouter";
+import { monitoringRouter } from "./monitoringRouter";
+import { campaignsRouter } from "./campaignsRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -89,6 +92,24 @@ export const appRouter = router({
       } as const;
     }),
   }),
+
+  /**
+   * Router de Favoritos (Ads)
+   * Gerencia os anúncios favoritos do utilizador.
+   */
+  ads: adsRouter,
+
+  /**
+   * Router de Monitoramento
+   * Gerencia os anúncios monitorados pelo utilizador.
+   */
+  monitoring: monitoringRouter,
+
+  /**
+   * Router de Campanhas
+   * Gerencia as campanhas do utilizador armazenadas localmente.
+   */
+  campaigns: campaignsRouter,
 
   meta: router({
     /**
@@ -429,3 +450,5 @@ export const appRouter = router({
       }),
   }),
 });
+
+export type AppRouter = typeof appRouter;

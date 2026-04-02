@@ -142,7 +142,9 @@ class SDKServer {
 
     // Update last signed in
     await db.upsertUser({
+      ...user,
       id: user.id,
+      email: user.email,
       lastSignedIn: new Date(),
     });
 
