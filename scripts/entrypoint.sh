@@ -22,7 +22,7 @@ done
 echo ">>> OK: MySQL esta pronto."
 
 # 2. Executar Migrations (Drizzle Push)
-echo ">>> Sincronizando schema do banco de dados..."
+echo ">>> Sincronizando schema do banco de dados (DATABASE_URL: $DATABASE_URL)..."
 if ! pnpm db:push; then
   echo "!!! AVISO: Falha na sincronizacao inicial. Tentando novamente em 5s..."
   sleep 5
