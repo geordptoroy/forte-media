@@ -27,8 +27,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Instalar pnpm para rodar migrations se necessário
-RUN npm install -g pnpm
+# Instalar pnpm e netcat para o entrypoint
+RUN apk add --no-cache netcat-openbsd && npm install -g pnpm
 
 # Copiar apenas o necessário do estágio de build
 COPY --from=builder /app/dist ./dist

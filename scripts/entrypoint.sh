@@ -1,32 +1,18 @@
 #!/bin/sh
 
-# FORTE MEDIA - Unified Entrypoint
-# -------------------------------
-
 echo ">>> Iniciando Backend Entrypoint..."
 
-# 1. Aguardar MySQL (TCP Check)
+# 1. Aguardar MySQL
 echo ">>> Aguardando MySQL em db:3306..."
-MAX_RETRIES=30
-COUNT=0
 while ! nc -z db 3306; do
-  COUNT=$((COUNT + 1))
-  if [ $COUNT -ge $MAX_RETRIES ]; then
-    echo "!!! ERRO: MySQL nao ficou pronto a tempo."
-    exit 1
-  fi
-  echo ">>> MySQL ainda nao responde ($COUNT/$MAX_RETRIES). Aguardando 2s..."
+  echo ">>> MySQL ainda nao responde. Aguardando 2s..."
   sleep 2
 done
 echo ">>> OK: MySQL esta pronto."
 
-# 2. Executar Migrations (Drizzle Push)
+# 2. Executar Migrations
 echo ">>> Sincronizando schema do banco de dados..."
-if ! pnpm db:push; then
-  echo "!!! AVISO: Falha na sincronizacao inicial. Tentando novamente em 5s..."
-  sleep 5
-  pnpm db:push || echo "!!! AVISO: Falha persistente nas migrations. Continuando arranque..."
-fi
+pnpm db:push || echo "!!! AVISO: Migrations falharam, continuando arranque..."
 
 # 3. Iniciar Servidor
 echo ">>> Iniciando servidor Node.js..."
