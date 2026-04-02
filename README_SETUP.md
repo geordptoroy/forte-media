@@ -11,7 +11,7 @@ FORTE MEDIA v2 é uma aplicação profissional construída com:
 - **Frontend:** React 19 + Vite + Tailwind CSS 4 + Framer Motion + Lucide React
 - **Backend:** Node.js + Express + tRPC + TypeScript
 - **Banco de Dados:** MySQL/TiDB com Drizzle ORM
-- **Autenticação:** Manus OAuth + JWT
+- **Autenticação:** JWT Local (Email/Senha)
 - **Segurança:** AES-256-GCM para criptografia de tokens Meta
 
 ---
@@ -30,10 +30,8 @@ DATABASE_URL=mysql://user:password@localhost:3306/forte_media
 JWT_SECRET=seu-jwt-secret-muito-seguro-32-caracteres-minimo
 ENCRYPTION_KEY=sua-chave-de-criptografia-32-caracteres
 
-# Manus OAuth (fornecido pelo sistema)
+# Configurações de API
 VITE_APP_ID=seu-app-id
-OAUTH_SERVER_URL=https://api.manus.im
-VITE_OAUTH_PORTAL_URL=https://manus.im/login
 
 # Meta API (será preenchido pelo usuário na interface)
 # Não armazene credenciais Meta aqui - use a interface de configurações
@@ -253,7 +251,7 @@ trpc.meta.listCampaigns.useQuery({
 ### Tabelas Principais
 
 #### `users`
-Usuários da plataforma (gerenciado por Manus OAuth)
+Usuários da plataforma (gerenciado localmente)
 
 #### `user_meta_credentials`
 Armazenamento criptografado de tokens Meta por usuário
@@ -404,7 +402,7 @@ WORKDIR /app
 COPY . .
 RUN pnpm install
 RUN pnpm build
-EXPOSE 3000
+EXPOSE 4000
 CMD ["pnpm", "start"]
 ```
 
@@ -433,7 +431,7 @@ CMD ["pnpm", "start"]
 - **Meta for Developers:** https://developers.facebook.com/docs
 - **Ad Library API:** https://developers.facebook.com/docs/ads-archive-api
 - **Marketing API:** https://developers.facebook.com/docs/marketing-api
-- **Manus Documentation:** https://manus.im/docs
+- **Meta Marketing API:** https://developers.facebook.com/docs/marketing-api
 
 ---
 

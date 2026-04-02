@@ -1,6 +1,6 @@
 # 🚀 FORTE MEDIA v2 - Intelligence & Performance Dashboard
 
-Uma plataforma profissional de inteligência competitiva e análise de performance para anúncios do Meta (Facebook/Instagram), desenvolvida com a stack moderna de Manus (tRPC + Drizzle + React 19).
+Uma plataforma profissional de inteligência competitiva e análise de performance para anúncios do Meta (Facebook/Instagram), desenvolvida com a stack moderna (tRPC + Drizzle + React 19).
 
 Este projeto foi otimizado para rodar exclusivamente via **Docker**, garantindo um ambiente isolado, seguro e de fácil implantação.
 
@@ -50,7 +50,7 @@ O projeto é dividido em microserviços gerenciados pelo Docker:
 | :--- | :--- | :--- |
 | **Nginx** | Proxy reverso com suporte a HTTPS e compressão Gzip. | 80 / 443 |
 | **Frontend** | Aplicação React + Vite servida de forma otimizada. | 80 (via Nginx) |
-| **Backend** | API Node.js (Express) compilada com esbuild. | 3000 |
+| **Backend** | API Node.js (Express) compilada com esbuild. | 4000 |
 | **MySQL** | Banco de dados relacional para persistência. | 3306 |
 
 ---
@@ -62,7 +62,6 @@ Após a primeira execução, um arquivo `.env` será criado na raiz. Você **dev
 ```env
 # Configurações da Meta API
 VITE_APP_ID=seu_app_id
-OAUTH_SERVER_URL=https://api.manus.im
 
 # Segurança
 JWT_SECRET=uma_chave_secreta_longa
