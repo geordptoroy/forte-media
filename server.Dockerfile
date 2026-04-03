@@ -29,9 +29,13 @@ COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/shared ./shared
+# Garantir que o diretório scripts existe e copiar o entrypoint
+RUN mkdir -p ./scripts
 COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
-RUN chmod +x ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/entrypoint.sh && \
+    sed -i 's/\r$//' ./scripts/entrypoint.sh
 
 EXPOSE 4000
 
-ENTRYPOINT ["/bin/sh", "./scripts/entrypoint.sh"]
+# Usar caminho absoluto para evitar problemas de WORKDIR
+ENTRYPOINT ["/bin/sh", "/app/scripts/entrypoint.sh"]
