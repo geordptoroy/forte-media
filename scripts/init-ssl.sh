@@ -1,5 +1,9 @@
 #!/bin/sh
+# Garantir que o script para se houver erro
 set -e
+
+# Remover caracteres de retorno de carro (CRLF) se existirem
+sed -i 's/\r$//' "$0"
 
 echo "FORTE MEDIA - SSL Initialization"
 echo "================================"
@@ -10,8 +14,6 @@ mkdir -p /etc/nginx/certs
 # Generate SSL certificates if they don't exist
 if [ ! -f /etc/nginx/certs/server.crt ] || [ ! -f /etc/nginx/certs/server.key ]; then
     echo "Gerando certificados SSL autoassinados..."
-    # Remover qualquer quebra de linha do Windows do script antes de continuar
-    sed -i 's/\r$//' "$0"
     openssl req -x509 -newkey rsa:4096 -keyout /etc/nginx/certs/server.key -out /etc/nginx/certs/server.crt -days 365 -nodes -subj "/C=BR/ST=SP/L=Sao Paulo/O=FORTE MEDIA/CN=localhost"
     chmod 600 /etc/nginx/certs/server.key
     chmod 644 /etc/nginx/certs/server.crt
@@ -20,6 +22,6 @@ else
     echo "OK: Certificados ja existem."
 fi
 
-# Start Nginx
+# Iniciar o servidor Nginx
 echo "Iniciando o servidor Nginx..."
 exec nginx -g 'daemon off;'
