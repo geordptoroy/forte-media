@@ -34,4 +34,4 @@ fi
 
 # Start the Node.js server
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Starting Node.js server..."
-exec node dist/server/index.js
+exec node dist/index.js
