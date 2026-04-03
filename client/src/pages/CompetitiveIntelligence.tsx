@@ -109,11 +109,16 @@ export default function CompetitiveIntelligence() {
           adId: adId,
           pageId: ad.page_id || adId,
           pageName: ad.page_name || ad.name,
-          adBody: ad.body || ad.ad_creative_body,
           adSnapshotUrl: ad.ad_snapshot_url,
-          spend: typeof ad.spend === 'number' ? ad.spend : undefined,
-          impressions: typeof ad.impressions === 'number' ? ad.impressions : undefined,
+          adDeliveryStartTime: ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time) : undefined,
+          adDeliveryStopTime: ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : undefined,
+          publisherPlatforms: ad.publisher_platforms,
+          adCreativeBodies: ad.ad_creative_bodies || (ad.body ? [ad.body] : []),
+          adCreativeLinkTitles: ad.ad_creative_link_titles,
+          adCreativeLinkDescriptions: ad.ad_creative_link_descriptions,
           currency: ad.currency,
+          spend: ad.spend,
+          impressions: ad.impressions,
         });
       }
     }
@@ -220,79 +225,91 @@ export default function CompetitiveIntelligence() {
 
           {ads.length > 0 ? (
             <div className="grid grid-cols-1 gap-6">
-              {ads.map((ad, idx) => (
-                <Card key={idx} className="card-premium bg-white/[0.02] border-white/5 p-8 group hover:border-white/20 transition-all">
-                  <div className="flex flex-col md:flex-row gap-8">
-                    {/* Ad Preview Placeholder */}
-                    <div className="w-full md:w-64 h-80 bg-white/5 rounded-2xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden">
-                      {ad.ad_snapshot_url ? (
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-gray-600 font-bold uppercase">Preview</div>
-                      ) : (
-                        <Eye className="w-8 h-8 text-gray-800" />
-                      )}
-                      <div className="absolute bottom-4 left-4 right-4 p-3 bg-black/80 backdrop-blur-md rounded-xl border border-white/10">
-                        <p className="text-[10px] font-bold text-white uppercase tracking-tighter truncate">{ad.page_name || "Meta Ad"}</p>
+              {ads.map((ad, idx) => {
+                const adId = ad.id || ad.ad_archive_id || idx.toString();
+                const adBody = ad.ad_creative_bodies?.[0] || ad.body || "Sem descrição disponível para este criativo.";
+                
+                return (
+                  <Card key={adId} className="card-premium bg-white/[0.02] border-white/5 p-8 group hover:border-white/20 transition-all">
+                    <div className="flex flex-col md:flex-row gap-8">
+                      {/* Ad Preview */}
+                      <div className="w-full md:w-64 h-80 bg-white/5 rounded-2xl border border-white/10 flex flex-col items-center justify-center relative overflow-hidden">
+                        {ad.ad_snapshot_url ? (
+                          <img 
+                            src={ad.ad_snapshot_url} 
+                            alt={ad.page_name} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder-ad.png"; }}
+                          />
+                        ) : (
+                          <Eye className="w-8 h-8 text-gray-800" />
+                        )}
+                        <div className="absolute bottom-4 left-4 right-4 p-3 bg-black/80 backdrop-blur-md rounded-xl border border-white/10">
+                          <p className="text-[10px] font-bold text-white uppercase tracking-tighter truncate">{ad.page_name || "Meta Ad"}</p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex-1 flex flex-col">
-                      <div className="flex justify-between items-start mb-6">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[10px] font-bold bg-white/10 text-white px-2 py-0.5 rounded uppercase tracking-widest">Ativo</span>
-                            <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded uppercase tracking-widest">{ad.currency || "USD"}</span>
+                      <div className="flex-1 flex flex-col">
+                        <div className="flex justify-between items-start mb-6">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-[10px] font-bold bg-white/10 text-white px-2 py-0.5 rounded uppercase tracking-widest">Ativo</span>
+                              <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded uppercase tracking-widest">{ad.currency || "BRL"}</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-white group-hover:text-primary-foreground transition-colors">
+                              {ad.page_name || "Anúncio Competitivo"}
+                            </h3>
                           </div>
-                          <h3 className="text-xl font-bold text-white group-hover:text-primary-foreground transition-colors">
-                            {ad.page_name || "Anúncio Competitivo"}
-                          </h3>
+                          
+                          <Button
+                            variant="ghost"
+                            onClick={() => toggleFavorite(adId, ad)}
+                            className={cn(
+                              "p-2 rounded-full transition-all",
+                              favorites.has(adId) ? "bg-red-500/10 text-red-500" : "text-gray-600 hover:text-white hover:bg-white/5"
+                            )}
+                          >
+                            <Heart className={cn("w-6 h-6", favorites.has(adId) && "fill-current")} />
+                          </Button>
                         </div>
-                        
-                        <Button
-                          variant="ghost"
-                          onClick={() => toggleFavorite(ad.id || idx.toString(), ad)}
-                          className={cn(
-                            "p-2 rounded-full transition-all",
-                            favorites.has(ad.id || idx.toString()) ? "bg-red-500/10 text-red-500" : "text-gray-600 hover:text-white hover:bg-white/5"
-                          )}
-                        >
-                          <Heart className={cn("w-6 h-6", favorites.has(ad.id || idx.toString()) && "fill-current")} />
-                        </Button>
-                      </div>
 
-                      <p className="text-sm text-gray-400 leading-relaxed mb-8 line-clamp-3 italic">
-                        "{ad.body || "Sem descrição disponível para este criativo."}"
-                      </p>
+                        <p className="text-sm text-gray-400 leading-relaxed mb-8 line-clamp-3 italic">
+                          "{adBody}"
+                        </p>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                            <DollarSign className="w-3 h-3" /> Gasto
-                          </p>
-                          <p className="text-sm font-bold text-white">{ad.spend ? `$${ad.spend}` : "Sob Consulta"}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                            <Users className="w-3 h-3" /> Alcance
-                          </p>
-                          <p className="text-sm font-bold text-white">{ad.impressions || "N/A"}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                            <TrendingUp className="w-3 h-3" /> Escala
-                          </p>
-                          <p className="text-sm font-bold text-white">Alta</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                            <Calendar className="w-3 h-3" /> Lançado
-                          </p>
-                          <p className="text-sm font-bold text-white">{ad.startDate || "Recentemente"}</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                              <DollarSign className="w-3 h-3" /> Gasto
+                            </p>
+                            <p className="text-sm font-bold text-white">{ad.spend?.range || "N/A"}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                              <Users className="w-3 h-3" /> Alcance
+                            </p>
+                            <p className="text-sm font-bold text-white">{ad.impressions?.range || "N/A"}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                              <TrendingUp className="w-3 h-3" /> Escala
+                            </p>
+                            <p className="text-sm font-bold text-white">Alta</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                              <Calendar className="w-3 h-3" /> Lançado
+                            </p>
+                            <p className="text-sm font-bold text-white">
+                              {ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time).toLocaleDateString() : "Recentemente"}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           ) : !isLoading && (
             <Card className="card-premium bg-white/[0.01] border-white/5 p-20 text-center">

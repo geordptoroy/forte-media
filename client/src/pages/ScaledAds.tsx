@@ -6,14 +6,13 @@ import { Card } from '@/components/ui/card';
 import { trpc } from '@/lib/trpc';
 import { useLocation } from 'wouter';
 import { toast } from 'sonner';
-import { Loader2, AlertCircle, Zap, Settings, TrendingUp, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Settings, TrendingUp } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 
 export default function ScaledAds() {
   const [, setLocation] = useLocation();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [hasSearched, setHasSearched] = useState(false);
   const [ads, setAds] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -36,7 +35,6 @@ export default function ScaledAds() {
     setFilters({});
     setPage(1);
     setAds([]);
-    setHasSearched(false);
   };
 
   const handleSearch = async () => {
@@ -46,10 +44,9 @@ export default function ScaledAds() {
       return;
     }
     setIsSearching(true);
-    setHasSearched(true);
     try {
       const result = await searchScaledAdsQuery.refetch();
-      if (result.data?.success && result.data?.ads) {
+      if (result.data?.ads) {
         let filtered = result.data.ads;
         if (filters.search) {
           const q = filters.search.toLowerCase();
@@ -57,14 +54,8 @@ export default function ScaledAds() {
             (ad.page_name || '').toLowerCase().includes(q)
           );
         }
-        if (filters.media_type) {
-          filtered = filtered.filter((ad: any) => ad.media_type === filters.media_type);
-        }
         setAds(filtered);
         toast.success(`${filtered.length} anúncios escalados encontrados`);
-      } else if (result.data?.error) {
-        toast.error(result.data.error);
-        setAds([]);
       } else {
         toast.info('Nenhum anúncio escalado encontrado');
         setAds([]);

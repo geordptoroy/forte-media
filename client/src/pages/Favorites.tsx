@@ -13,7 +13,8 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  TrendingUp
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -41,9 +42,9 @@ export default function Favorites() {
     },
   });
 
-  const handleRemoveFavorite = (id: number) => {
+  const handleRemoveFavorite = (adId: string) => {
     if (confirm("Deseja remover este anúncio dos seus favoritos?")) {
-      removeFavoriteMutation.mutate({ favoriteId: id });
+      removeFavoriteMutation.mutate({ adId });
     }
   };
 
@@ -52,9 +53,10 @@ export default function Favorites() {
   const filteredFavorites = favorites.filter((ad) => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
+    const adBody = ad.adCreativeBodies?.[0] || "";
     return (
       (ad.pageName || "").toLowerCase().includes(query) ||
-      (ad.adBody || "").toLowerCase().includes(query)
+      (adBody).toLowerCase().includes(query)
     );
   });
 
@@ -123,82 +125,94 @@ export default function Favorites() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-6">
-            {filteredFavorites.map((ad) => (
-              <Card key={ad.id} className="card-premium bg-white/[0.02] border-white/5 p-8 group hover:border-white/20 transition-all">
-                <div className="flex flex-col md:flex-row gap-8">
-                  {/* Preview Placeholder */}
-                  <div className="w-full md:w-48 h-60 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden shrink-0">
-                    <Eye className="w-8 h-8 text-gray-800" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3 right-3">
-                      <p className="text-[10px] font-bold text-white uppercase truncate">{ad.pageName}</p>
+            {filteredFavorites.map((ad) => {
+              const adBody = ad.adCreativeBodies?.[0] || "Sem descrição disponível.";
+              const displayImage = ad.adSnapshotUrl || "/placeholder-ad.png";
+              const snapshotUrl = ad.adSnapshotUrl || "#";
+              
+              return (
+                <Card key={ad.id} className="card-premium bg-white/[0.02] border-white/5 p-8 group hover:border-white/20 transition-all">
+                  <div className="flex flex-col md:flex-row gap-8">
+                    {/* Preview Image */}
+                    <div className="w-full md:w-48 h-60 bg-white/5 rounded-2xl border border-white/10 relative overflow-hidden shrink-0">
+                      <img 
+                        src={displayImage} 
+                        alt={ad.pageName || "Ad"} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder-ad.png"; }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                      <div className="absolute bottom-3 left-3 right-3">
+                        <p className="text-[10px] font-bold text-white uppercase truncate">{ad.pageName}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-white group-hover:text-primary-foreground transition-colors">
+                            {ad.pageName || "Anúncio Salvo"}
+                          </h3>
+                          <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1">
+                            ID: {ad.adId}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <a 
+                            href={snapshotUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-2 text-gray-600 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                            title="Ver na Biblioteca de Anúncios"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveFavorite(ad.adId)}
+                            disabled={removeFavoriteMutation.isPending}
+                            className="text-gray-600 hover:text-red-500 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="text-sm text-gray-400 leading-relaxed mb-8 line-clamp-2 italic">
+                        "{adBody}"
+                      </p>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <DollarSign className="w-3 h-3" /> Gasto Est.
+                          </p>
+                          <p className="text-sm font-bold text-white">{ad.spend?.range || "N/A"}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <TrendingUp className="w-3 h-3" /> Impressões
+                          </p>
+                          <p className="text-sm font-bold text-white">
+                            {ad.impressions?.range || "N/A"}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3" /> Salvo em
+                          </p>
+                          <p className="text-sm font-bold text-white">
+                            {new Date(ad.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-white group-hover:text-primary-foreground transition-colors">
-                          {ad.pageName || "Anúncio Salvo"}
-                        </h3>
-                        <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1">
-                          ID: {ad.adId}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-gray-600 hover:text-white hover:bg-white/5"
-                          title="Ver na Biblioteca de Anúncios"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveFavorite(ad.id)}
-                          disabled={removeFavoriteMutation.isPending}
-                          className="text-gray-600 hover:text-red-500 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-gray-400 leading-relaxed mb-8 line-clamp-2 italic">
-                      "{ad.adBody || "Sem descrição disponível."}"
-                    </p>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-auto">
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                          <DollarSign className="w-3 h-3" /> Gasto Est.
-                        </p>
-                        <p className="text-sm font-bold text-white">{ad.spend ? `$${ad.spend}` : "N/A"}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                          <Eye className="w-3 h-3" /> Impressões
-                        </p>
-                        <p className="text-sm font-bold text-white">
-                          {ad.impressions ? Number(ad.impressions).toLocaleString() : "N/A"}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3" /> Salvo em
-                        </p>
-                        <p className="text-sm font-bold text-white">
-                          {new Date(ad.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

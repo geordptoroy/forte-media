@@ -55,15 +55,30 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
       toast.info('Anúncio já está nos favoritos');
       return;
     }
+    
+    // Normalize fields from Meta API
+    const adId = ad.id || ad.ad_archive_id;
+    const pageId = ad.page_id;
+    
+    if (!adId || !pageId) {
+      toast.error('Dados do anúncio incompletos');
+      return;
+    }
+
     addFavoriteMutation.mutate({
-      adId: ad.id || ad.ad_archive_id || ad.page_id || `ad-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      pageId: ad.page_id || ad.id || 'unknown',
+      adId,
+      pageId,
       pageName: ad.page_name,
-      adBody: ad.body || ad.ad_creative_body,
-      adSnapshotUrl: ad.creative_url || ad.ad_snapshot_url,
-      spend: typeof ad.spend === 'number' ? ad.spend : undefined,
-      impressions: typeof ad.impressions === 'number' ? ad.impressions : undefined,
+      adSnapshotUrl: ad.ad_snapshot_url,
+      adDeliveryStartTime: ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time) : undefined,
+      adDeliveryStopTime: ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : undefined,
+      publisherPlatforms: ad.publisher_platforms,
+      adCreativeBodies: ad.ad_creative_bodies,
+      adCreativeLinkTitles: ad.ad_creative_link_titles,
+      adCreativeLinkDescriptions: ad.ad_creative_link_descriptions,
       currency: ad.currency,
+      spend: ad.spend,
+      impressions: ad.impressions,
     });
   };
 
@@ -73,12 +88,24 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
       toast.info('Anúncio já está em monitoramento');
       return;
     }
+    
+    const adId = ad.id || ad.ad_archive_id;
+    const pageId = ad.page_id;
+    
+    if (!adId || !pageId) {
+      toast.error('Dados do anúncio incompletos');
+      return;
+    }
+
     addMonitoredMutation.mutate({
-      adId: ad.id || ad.ad_archive_id || ad.page_id || `ad-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      pageId: ad.page_id || ad.id || 'unknown',
+      adId,
+      pageId,
       pageName: ad.page_name,
     });
   };
+
+  const displayImage = ad.ad_snapshot_url || "/placeholder-ad.png";
+  const displayBody = ad.ad_creative_bodies?.[0] || "Nenhum texto detectado para este criativo.";
 
   return (
     <>
@@ -89,11 +116,10 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
         {/* Media Preview */}
         <div className="relative aspect-[4/3] bg-white/5 overflow-hidden">
           <img
-            src={ad.creative_url || ad.ad_snapshot_url}
+            src={displayImage}
             alt={ad.page_name || "Ad Creative"}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             onError={(e) => {
-              // Fallback para imagem placeholder local se a URL do criativo falhar
               (e.target as HTMLImageElement).src = "/placeholder-ad.png"; 
             }}
           />
@@ -102,13 +128,8 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
           {/* Badges */}
           <div className="absolute top-3 left-3 flex gap-2">
             <span className="text-[8px] font-bold px-2 py-1 rounded bg-black/60 backdrop-blur-md text-white border border-white/10 uppercase tracking-widest">
-              {ad.media_type || 'Creative'}
+              {ad.publisher_platforms?.[0] || 'Meta'}
             </span>
-            {ad.score && (
-              <span className="text-[8px] font-bold px-2 py-1 rounded bg-primary-foreground text-black uppercase tracking-widest">
-                Score {ad.score}
-              </span>
-            )}
           </div>
 
           {/* Quick Actions Overlay */}
@@ -154,19 +175,23 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
               <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest flex items-center gap-1">
                 <DollarSign className="w-2.5 h-2.5" /> Gasto
               </p>
-              <p className="text-xs font-bold text-gray-300">${ad.spend || '0.00'}</p>
+              <p className="text-xs font-bold text-gray-300">
+                {ad.spend?.range || ad.spend || 'N/A'}
+              </p>
             </div>
             <div className="space-y-1">
               <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest flex items-center gap-1">
                 <TrendingUp className="w-2.5 h-2.5" /> Alcance
               </p>
-              <p className="text-xs font-bold text-gray-300">{ad.impressions || 'N/A'}</p>
+              <p className="text-xs font-bold text-gray-300">
+                {ad.impressions?.range || ad.impressions || 'N/A'}
+              </p>
             </div>
           </div>
 
           <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
             <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest flex items-center gap-1">
-              <Calendar className="w-2.5 h-2.5" /> {ad.days_active || '1'}d no ar
+              <Calendar className="w-2.5 h-2.5" /> {ad.ad_delivery_start_time ? 'Iniciado' : 'N/A'}
             </p>
             <Button 
               variant="ghost" 
@@ -185,7 +210,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
             <div className="w-full md:w-1/2 bg-white/[0.02] flex items-center justify-center p-6 border-r border-white/5">
               <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl">
                 <img
-                  src={ad.creative_url || ad.ad_snapshot_url}
+                  src={displayImage}
                   alt={ad.page_name || "Ad Creative"}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -211,18 +236,18 @@ export const AdCard: React.FC<AdCardProps> = ({ ad }) => {
                 <div className="grid grid-cols-2 gap-6">
                   <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/5">
                     <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-1">Gasto Estimado</p>
-                    <p className="text-lg font-bold text-white">${ad.spend || '0.00'}</p>
+                    <p className="text-lg font-bold text-white">{ad.spend?.range || 'N/A'}</p>
                   </div>
                   <div className="p-4 bg-white/[0.03] rounded-2xl border border-white/5">
-                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-1">Score Escala</p>
-                    <p className="text-lg font-bold text-primary-foreground">{ad.score || '---'}</p>
+                    <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest mb-1">Impressões</p>
+                    <p className="text-lg font-bold text-primary-foreground">{ad.impressions?.range || 'N/A'}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Copy do Criativo</p>
                   <div className="p-4 bg-white/[0.02] rounded-2xl border border-white/5 italic text-sm text-gray-400 leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
-                    "{ad.body || ad.ad_creative_body || 'Nenhum texto detectado para este criativo.'}"
+                    "{displayBody}"
                   </div>
                 </div>
               </div>

@@ -16,12 +16,10 @@ import {
   Activity,
   ShieldAlert
 } from "lucide-react";
-import { useLocation } from "wouter";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 
 export default function Monitoring() {
-  const [, setLocation] = useLocation();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAdId, setNewAdId] = useState("");
   const [newPageId, setNewPageId] = useState("");
@@ -75,9 +73,9 @@ export default function Monitoring() {
     });
   };
 
-  const handleRemoveMonitoring = (id: number) => {
+  const handleRemoveMonitoring = (adId: string) => {
     if (confirm("Deseja parar de monitorar este anúncio?")) {
-      removeMonitoredMutation.mutate({ monitoredId: id });
+      removeMonitoredMutation.mutate({ adId });
     }
   };
 
@@ -212,7 +210,7 @@ export default function Monitoring() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleRemoveMonitoring(ad.id)}
+                        onClick={() => handleRemoveMonitoring(ad.adId)}
                         disabled={removeMonitoredMutation.isPending}
                         className="text-gray-600 hover:text-red-500 hover:bg-red-500/10"
                       >
@@ -226,21 +224,23 @@ export default function Monitoring() {
                           <Clock className="w-3 h-3" /> Última Verif.
                         </p>
                         <p className="text-sm font-bold text-white">
-                          {ad.lastCheckedAt ? new Date(ad.lastCheckedAt).toLocaleTimeString() : "Pendente"}
+                          {ad.updatedAt ? new Date(ad.updatedAt).toLocaleTimeString() : "Pendente"}
                         </p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
                           <TrendingUp className="w-3 h-3" /> Gasto Conhecido
                         </p>
-                        <p className="text-sm font-bold text-white">{ad.lastKnownSpend ? `$${ad.lastKnownSpend}` : "---"}</p>
+                        <p className="text-sm font-bold text-white">
+                          {ad.metricsHistory && ad.metricsHistory.length > 0 ? `$${ad.metricsHistory[0].spend || '---'}` : "---"}
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-600 flex items-center gap-1.5">
                           <Eye className="w-3 h-3" /> Impressões
                         </p>
                         <p className="text-sm font-bold text-white">
-                          {ad.lastKnownImpressions ? Number(ad.lastKnownImpressions).toLocaleString() : "---"}
+                          {ad.metricsHistory && ad.metricsHistory.length > 0 ? Number(ad.metricsHistory[0].impressions || 0).toLocaleString() : "---"}
                         </p>
                       </div>
                       <div className="space-y-1">

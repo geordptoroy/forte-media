@@ -11,24 +11,12 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
-  ArrowUpRight,
   Activity,
   Calendar
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
-
-// Extrair lógica de data para fora do componente para garantir aspas duplas limpas
-const getThirtyDaysAgo = () => {
-  const date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  return date.toISOString().split("T")[0];
-};
-
-const getToday = () => {
-  const date = new Date();
-  return date.toISOString().split("T")[0];
-};
 
 export default function Performance() {
   const [, setLocation] = useLocation();
@@ -39,15 +27,13 @@ export default function Performance() {
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
   
   const listCampaignsQuery = trpc.meta.listCampaigns.useQuery(
-    { adAccountId: "" },
+    undefined,
     { enabled: !!credentialsStatus.data?.hasCredentials }
   );
   
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
     { 
       campaignId: selectedCampaign || "",
-      dateStart: getThirtyDaysAgo(),
-      dateStop: getToday()
     },
     { enabled: !!selectedCampaign && !!credentialsStatus.data?.hasCredentials }
   );
