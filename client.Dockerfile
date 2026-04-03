@@ -1,33 +1,32 @@
-# Stage 1: Build
-FROM node:22-alpine AS builder
+# Stage de Build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Instalar pnpm
-RUN npm install -g pnpm
-
-# Copiar arquivos de dependências e patches
+# Copiar apenas os arquivos de lock e package.json para cache de dependencias
 COPY package.json pnpm-lock.yaml ./
-COPY patches ./patches
+COPY client/package.json client/pnpm-lock.yaml client/
+COPY server/package.json server/pnpm-lock.yaml server/
+COPY shared/package.json shared/pnpm-lock.yaml shared/
 
-# Instalar dependências
-RUN pnpm install --frozen-lockfile
+# Instalar dependencias
+RUN corepack enable && pnpm install --frozen-lockfile
 
-# Copiar código fonte e configurações
-COPY client ./client
-COPY shared ./shared
-COPY tsconfig.json vite.config.ts ./
+# Copiar o restante do codigo
+COPY . .
 
-# Build do frontend (saída em dist/public conforme vite.config.ts)
-RUN pnpm build:client
+WORKDIR /app/client
 
-# Stage 2: Production
-FROM nginx:alpine
+# Build do frontend
+RUN pnpm build
 
-# Copiar build do estágio anterior (dist/public)
-COPY --from=builder /app/dist/public /usr/share/nginx/html
+# Stage de Produção
+FROM nginx:stable-alpine
 
-# Copiar configuração do nginx com suporte a SPA routing (try_files fallback)
+# Copiar o build do frontend para o Nginx
+COPY --from=builder /app/client/dist /usr/share/nginx/html
+
+# Copiar a configuracao do Nginx para o frontend
 COPY nginx/frontend.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
