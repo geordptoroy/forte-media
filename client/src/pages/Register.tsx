@@ -1,146 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'wouter';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/_core/hooks/useAuth';
-import { trpc } from '@/lib/trpc';
-import { AlertCircle } from 'lucide-react';
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 export default function Register() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
   const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
-  
-  const registerMutation = trpc.auth.register.useMutation();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      setLocation('/dashboard');
-    }
-  }, [isAuthenticated, setLocation]);
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: () => {
+      setLocation("/dashboard");
+    },
+    onError: (err) => {
+      setError(err.message || "Erro ao criar conta. Tente novamente.");
+    },
+  });
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
+    setError("");
+
     if (!name || !email || !password || !confirmPassword) {
-      setError('Preencha todos os campos');
+      setError("Preencha todos os campos.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
+      setError("As senhas nao coincidem.");
       return;
     }
 
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
+      setError("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
 
-    setLoading(true);
-    try {
-      await registerMutation.mutateAsync({ name, email, password });
-      setLocation('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta');
-    } finally {
-      setLoading(false);
-    }
+    registerMutation.mutate({ name, email, password });
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
-      </div>
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-10">
+          <div className="w-10 h-10 bg-white rounded flex items-center justify-center mb-4">
+            <span className="text-black font-bold text-sm">FM</span>
+          </div>
+          <h1 className="text-xl font-bold text-white tracking-tight">FORTE MEDIA</h1>
+          <p className="text-sm text-gray-500 mt-1">Criar nova conta</p>
+        </div>
 
-      <div className="relative z-10 w-full max-w-md">
-        <Card className="card-premium">
-          <CardHeader className="text-center">
-            <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
-              <span className="text-black font-bold text-lg">FM</span>
+        {/* Form */}
+        <form onSubmit={handleRegister} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-2 text-red-400 text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {error}
             </div>
-            <CardTitle className="text-xl">FORTE MEDIA</CardTitle>
-            <p className="text-sm text-muted-foreground mt-2">Criar nova conta</p>
-          </CardHeader>
+          )}
 
-          <CardContent>
-            {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400 text-sm">
-                <AlertCircle size={16} />
-                {error}
-              </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              Nome completo
+            </label>
+            <Input
+              placeholder="Seu nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={registerMutation.isPending}
+              className="input-premium h-11"
+              autoComplete="name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              E-mail
+            </label>
+            <Input
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={registerMutation.isPending}
+              className="input-premium h-11"
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              Senha
+            </label>
+            <Input
+              type="password"
+              placeholder="Minimo 6 caracteres"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={registerMutation.isPending}
+              className="input-premium h-11"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              Confirmar Senha
+            </label>
+            <Input
+              type="password"
+              placeholder="Repita a senha"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              disabled={registerMutation.isPending}
+              className="input-premium h-11"
+              autoComplete="new-password"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            disabled={registerMutation.isPending}
+            className="btn-premium w-full h-11 text-sm font-bold uppercase tracking-widest"
+          >
+            {registerMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "Criar Conta"
             )}
+          </Button>
+        </form>
 
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Nome completo</label>
-                <Input
-                  placeholder="Seu nome"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={loading}
-                  className="input-premium"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">E-mail</label>
-                <Input
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                  className="input-premium"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Senha</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
-                  className="input-premium"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Confirmar Senha</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={loading}
-                  className="input-premium"
-                />
-              </div>
-              <Button 
-                type="submit" 
-                disabled={loading} 
-                className="btn-premium w-full"
-              >
-                {loading ? 'Criando conta...' : 'Criar conta'}
-              </Button>
-            </form>
-
-            <p className="text-center text-sm text-muted-foreground mt-4">
-              Já tem conta?{' '}
-              <a href="/login" className="text-white hover:underline font-medium">
-                Entrar
-              </a>
-            </p>
-          </CardContent>
-        </Card>
+        <p className="text-center text-sm text-gray-500 mt-6">
+          Ja tem conta?{" "}
+          <a href="/login" className="text-white hover:underline font-medium">
+            Entrar
+          </a>
+        </p>
       </div>
     </div>
   );

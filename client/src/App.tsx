@@ -17,10 +17,37 @@ import Reports from "./pages/Reports";
 import ScaledAds from "./pages/ScaledAds";
 import Favorites from "./pages/Favorites";
 import Monitoring from "./pages/Monitoring";
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 
-// Componente para proteger rotas privadas
-function PrivateRoute({ path, component: Component }: { path: string; component: React.ComponentType<any> }) {
+/**
+ * Tela de carregamento exibida enquanto o estado de autenticacao e verificado.
+ * Inclui o logo da marca para manter consistencia visual.
+ */
+function LoadingScreen() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-black">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
+          <span className="text-black font-bold text-xs">FM</span>
+        </div>
+        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-white/40" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Protege rotas privadas: redireciona para /login se nao autenticado.
+ * Usa wouter de forma consistente (sem window.location.href).
+ */
+function PrivateRoute({
+  path,
+  component: Component,
+}: {
+  path: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  component: ComponentType<any>;
+}) {
   const { isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -36,8 +63,17 @@ function PrivateRoute({ path, component: Component }: { path: string; component:
   return <Route path={path} component={Component} />;
 }
 
-// Componente para rotas públicas (Login/Register) que redirecionam se já logado
-function PublicRoute({ path, component: Component }: { path: string; component: React.ComponentType<any> }) {
+/**
+ * Rotas publicas (Login/Register): redireciona para /dashboard se ja autenticado.
+ */
+function PublicRoute({
+  path,
+  component: Component,
+}: {
+  path: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  component: ComponentType<any>;
+}) {
   const { isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -48,25 +84,21 @@ function PublicRoute({ path, component: Component }: { path: string; component: 
   }, [isAuthenticated, loading, setLocation]);
 
   if (loading) return <LoadingScreen />;
-  return <Route path={path} component={Component} />;
-}
 
-function LoadingScreen() {
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-black">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-white"></div>
-    </div>
-  );
+  return <Route path={path} component={Component} />;
 }
 
 function Router() {
   return (
     <Switch>
+      {/* Rota publica principal */}
       <Route path="/" component={Home} />
+
+      {/* Rotas de autenticacao */}
       <PublicRoute path="/login" component={Login} />
       <PublicRoute path="/register" component={Register} />
-      
-      {/* Rotas Protegidas */}
+
+      {/* Rotas protegidas */}
       <PrivateRoute path="/dashboard" component={Dashboard} />
       <PrivateRoute path="/settings" component={Settings} />
       <PrivateRoute path="/competitive-intelligence" component={CompetitiveIntelligence} />
@@ -76,7 +108,8 @@ function Router() {
       <PrivateRoute path="/ads" component={ScaledAds} />
       <PrivateRoute path="/favorites" component={Favorites} />
       <PrivateRoute path="/monitoring" component={Monitoring} />
-      
+
+      {/* Fallback 404 */}
       <Route component={NotFound} />
     </Switch>
   );
@@ -87,7 +120,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster position="top-right" theme="dark" />
+          <Toaster position="top-right" theme="dark" richColors />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

@@ -1,78 +1,88 @@
-import { useState } from 'react';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { AdCard } from '@/components/ads/AdCard';
-import { trpc } from '@/lib/trpc';
-import { useLocation } from 'wouter';
-import { toast } from 'sonner';
-import { Search, Loader2, AlertCircle, Filter, Globe, Layers } from 'lucide-react';
-import DashboardLayout from '@/components/DashboardLayout';
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { AdCard } from "@/components/ads/AdCard";
+import { PageHeader } from "@/components/PageHeader";
+import { CredentialsWarning } from "@/components/CredentialsWarning";
+import { EmptyState } from "@/components/EmptyState";
+import { PaginationControls } from "@/components/PaginationControls";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Search, Loader2, Filter, Globe, Layers } from "lucide-react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function AdvancedSearch() {
-  const [, setLocation] = useLocation();
   const [filters, setFilters] = useState({
-    keywords: '',
-    media_type: '',
-    country: 'BR',
-    ad_type: 'ALL' as 'ALL' | 'POLITICAL' | 'ISSUE_ADS',
+    keywords: "",
+    media_type: "",
+    country: "BR",
+    ad_type: "ALL" as "ALL" | "POLITICAL" | "ISSUE_ADS",
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [ads, setAds] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [page, setPage] = useState(1);
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
 
   const searchAdsQuery = trpc.meta.searchAds.useQuery(
     {
-      searchTerms: filters.keywords.split(",").map((k) => k.trim()).filter(Boolean),
-      countries: [filters.country || 'BR'],
+      searchTerms: filters.keywords
+        .split(",")
+        .map((k) => k.trim())
+        .filter(Boolean),
+      countries: [filters.country || "BR"],
       limit: 50,
     },
     { enabled: false }
   );
 
+  const { page, totalPages, paginatedItems, goToNext, goToPrev, hasNext, hasPrev, reset } =
+    usePagination(ads, 12);
+
   const handleSearch = async () => {
     if (!credentialsStatus.data?.hasCredentials) {
-      toast.error('Configure suas credenciais Meta primeiro');
-      setLocation('/settings');
+      toast.error("Configure suas credenciais Meta primeiro");
       return;
     }
     if (!filters.keywords.trim()) {
-      toast.error('Insira pelo menos uma palavra-chave');
+      toast.error("Insira pelo menos uma palavra-chave");
       return;
     }
     setIsSearching(true);
     setHasSearched(true);
-    setPage(1);
+    reset();
     try {
       const result = await searchAdsQuery.refetch();
       if (result.data?.ads) {
-        let filtered = result.data.ads;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let filtered: any[] = result.data.ads;
         if (filters.media_type) {
-          // Simplistic media type filtering on frontend for now
-          // In a real scenario, this would be part of the API query
-          filtered = filtered.filter((ad: any) => {
-            if (filters.media_type === 'video') return ad.publisher_platforms?.includes('instagram');
+          filtered = filtered.filter((ad) => {
+            if (filters.media_type === "video")
+              return (ad.publisher_platforms as string[])?.includes("instagram");
             return true;
           });
         }
         setAds(filtered);
-        toast.success(`${filtered.length} anúncios encontrados`);
+        toast.success(`${filtered.length} anuncios encontrados`);
       } else {
-        toast.info('Nenhum anúncio encontrado');
+        toast.info("Nenhum anuncio encontrado");
         setAds([]);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao buscar anúncios');
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao buscar anuncios"
+      );
       setAds([]);
     } finally {
       setIsSearching(false);
@@ -80,205 +90,188 @@ export default function AdvancedSearch() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearch();
+    if (e.key === "Enter") handleSearch();
   };
-
-  const PAGE_SIZE = 12;
-  const totalPages = Math.max(1, Math.ceil(ads.length / PAGE_SIZE));
-  const paginatedAds = ads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <DashboardLayout>
-      <div className="space-y-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Busca Avançada</h1>
-            <p className="text-gray-500 font-medium">Filtros granulares para encontrar exatamente o que você precisa na Meta Ad Library.</p>
-          </div>
-          
-          <Button
-            onClick={handleSearch}
-            disabled={isSearching || !credentialsStatus.data?.hasCredentials || !filters.keywords.trim()}
-            className="btn-premium px-8"
-          >
-            {isSearching ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <span className="flex items-center gap-2">
-                <Search className="w-4 h-4" />
-                Executar Busca
-              </span>
-            )}
-          </Button>
-        </div>
+      <div className="space-y-8">
+        <PageHeader
+          title="Busca Avancada"
+          subtitle="Filtros granulares para encontrar exatamente o que voce precisa na Meta Ad Library."
+          actions={
+            <Button
+              onClick={handleSearch}
+              disabled={
+                isSearching ||
+                !credentialsStatus.data?.hasCredentials ||
+                !filters.keywords.trim()
+              }
+              className="btn-premium"
+            >
+              {isSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  Executar Busca
+                </>
+              )}
+            </Button>
+          }
+        />
 
-        {/* Credentials Warning */}
-        {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
-          <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
-            <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-yellow-500 uppercase tracking-wider">Acesso à API Requerido</p>
-              <p className="text-xs text-gray-400 mt-1">
-                A busca avançada utiliza a API oficial da Meta. Configure seu token em Configurações para continuar.
-              </p>
-            </div>
-          </Card>
+        {/* Aviso de credenciais */}
+        {!credentialsStatus.isLoading && !credentialsStatus.data?.hasCredentials && (
+          <CredentialsWarning message="A busca na Meta Ad Library requer uma conexao ativa com a Meta API." />
         )}
 
-        {/* Search Form */}
-        <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
-          <div className="flex items-center gap-2 mb-8">
+        {/* Filters */}
+        <Card className="card-premium bg-white/[0.02] border-white/5 p-6">
+          <div className="flex items-center gap-2 mb-6">
             <Filter className="w-4 h-4 text-gray-500" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Parâmetros de Pesquisa</h2>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500">
+              Filtros de Busca
+            </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1">Palavras-chave</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Keywords */}
+            <div className="sm:col-span-2 space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                Palavras-chave
+              </label>
               <Input
-                placeholder="Ex: iPhone, Promoção, Black Friday..."
+                placeholder="Ex: emagrecimento, curso online..."
                 value={filters.keywords}
-                onChange={(e) => setFilters((prev) => ({ ...prev, keywords: e.target.value }))}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, keywords: e.target.value }))
+                }
                 onKeyDown={handleKeyDown}
                 className="input-premium"
               />
+              <p className="text-[10px] text-gray-600">
+                Separe multiplas palavras com virgula
+              </p>
             </div>
-            
+
+            {/* Country */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1">Região</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1">
+                <Globe className="w-3 h-3" />
+                Pais
+              </label>
               <Select
                 value={filters.country}
-                onValueChange={(value) => setFilters((prev) => ({ ...prev, country: value }))}
+                onValueChange={(v) =>
+                  setFilters((p) => ({ ...p, country: v }))
+                }
               >
-                <SelectTrigger className="input-premium h-11">
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-gray-500" />
-                    <SelectValue placeholder="País" />
-                  </div>
+                <SelectTrigger className="input-premium">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-black border-white/10">
+                <SelectContent>
                   <SelectItem value="BR">Brasil</SelectItem>
                   <SelectItem value="US">Estados Unidos</SelectItem>
                   <SelectItem value="PT">Portugal</SelectItem>
-                  <SelectItem value="ES">Espanha</SelectItem>
+                  <SelectItem value="MX">Mexico</SelectItem>
                   <SelectItem value="AR">Argentina</SelectItem>
-                  <SelectItem value="MX">México</SelectItem>
+                  <SelectItem value="CO">Colombia</SelectItem>
+                  <SelectItem value="ALL">Todos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Ad Type */}
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500 ml-1">Formato</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1">
+                <Layers className="w-3 h-3" />
+                Tipo de Anuncio
+              </label>
               <Select
-                value={filters.media_type}
-                onValueChange={(value) => setFilters((prev) => ({ ...prev, media_type: value }))}
+                value={filters.ad_type}
+                onValueChange={(v) =>
+                  setFilters((p) => ({
+                    ...p,
+                    ad_type: v as typeof filters.ad_type,
+                  }))
+                }
               >
-                <SelectTrigger className="input-premium h-11">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-gray-500" />
-                    <SelectValue placeholder="Todos" />
-                  </div>
+                <SelectTrigger className="input-premium">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-black border-white/10">
-                  <SelectItem value="">Todos</SelectItem>
-                  <SelectItem value="image">Imagem</SelectItem>
-                  <SelectItem value="video">Vídeo</SelectItem>
-                  <SelectItem value="carousel">Carrossel</SelectItem>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos</SelectItem>
+                  <SelectItem value="POLITICAL">Politico</SelectItem>
+                  <SelectItem value="ISSUE_ADS">Questoes Sociais</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="flex gap-4">
-            <Button
-              onClick={handleSearch}
-              disabled={isSearching || !credentialsStatus.data?.hasCredentials}
-              className="btn-premium px-8"
-            >
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Filtrar Anúncios"}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setFilters({ keywords: '', media_type: '', country: 'BR', ad_type: 'ALL' });
-                setAds([]);
-                setHasSearched(false);
-              }}
-              className="text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-white"
-            >
-              Limpar Filtros
-            </Button>
           </div>
         </Card>
 
-        {/* Results */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-gray-500">
-              {ads.length > 0 ? `${ads.length} Resultados encontrados` : "Resultados da Pesquisa"}
-            </h2>
-          </div>
-
-          {isSearching ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <div key={i} className="bg-white/5 h-80 rounded-2xl animate-pulse border border-white/5" />
-              ))}
+        {/* Loading */}
+        {isSearching && (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+              <p className="text-sm text-gray-500">Buscando anuncios...</p>
             </div>
-          ) : hasSearched && ads.length === 0 ? (
-            <Card className="card-premium bg-white/[0.01] border-white/5 p-20 text-center">
-              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
-                <Search className="w-8 h-8 text-gray-700" />
+          </div>
+        )}
+
+        {/* Results */}
+        {!isSearching && (
+          <>
+            {ads.length > 0 && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Search className="w-3.5 h-3.5" />
+                  <span className="font-bold">
+                    {ads.length} resultado{ads.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-600">
+                  Pagina {page} de {totalPages}
+                </span>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Nada encontrado</h3>
-              <p className="text-gray-500 max-w-sm mx-auto">
-                Tente simplificar suas palavras-chave ou alterar a região da busca.
-              </p>
-            </Card>
-          ) : ads.length > 0 ? (
-            <>
+            )}
+
+            {hasSearched && ads.length === 0 && (
+              <EmptyState
+                icon={Search}
+                title="Nenhum resultado encontrado"
+                description="Tente palavras-chave diferentes ou ajuste os filtros de busca."
+              />
+            )}
+
+            {!hasSearched && ads.length === 0 && (
+              <EmptyState
+                icon={Search}
+                title="Pronto para buscar"
+                description="Insira palavras-chave e clique em Executar Busca para encontrar anuncios na Meta Ad Library."
+              />
+            )}
+
+            {paginatedItems.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {paginatedAds.map((ad) => (
-                  <AdCard key={ad.id || ad.ad_archive_id} ad={ad} />
+                {paginatedItems.map((ad, i) => (
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  <AdCard key={((ad as any).id as string) || String(i)} ad={ad as any} />
                 ))}
               </div>
-              
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-12 pt-8 border-t border-white/5">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white"
-                  >
-                    Anterior
-                  </Button>
-                  <div className="px-4 py-2 bg-white/5 rounded-lg border border-white/10">
-                    <span className="text-xs font-bold text-white">
-                      {page} / {totalPages}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white"
-                  >
-                    Próxima
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-20 bg-white/[0.01] rounded-[2rem] border border-white/5 border-dashed">
-              <Layers className="w-12 h-12 text-gray-800 mb-6" />
-              <h3 className="text-lg font-bold text-white mb-2">Aguardando Parâmetros</h3>
-              <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                Preencha as palavras-chave acima para iniciar uma busca profunda na biblioteca de anúncios da Meta.
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPrev={goToPrev}
+              onNext={goToNext}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
+            />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

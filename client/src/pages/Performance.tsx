@@ -2,6 +2,10 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
+import { CredentialsWarning } from "@/components/CredentialsWarning";
+import { EmptyState } from "@/components/EmptyState";
+import DashboardLayout from "@/components/DashboardLayout";
 import {
   BarChart3,
   TrendingUp,
@@ -9,42 +13,59 @@ import {
   Users,
   Target,
   Loader2,
-  AlertCircle,
   RefreshCw,
   Activity,
-  Calendar
+  Calendar,
+  MousePointerClick,
+  Eye,
 } from "lucide-react";
-import { useLocation } from "wouter";
 import { toast } from "sonner";
-import DashboardLayout from "@/components/DashboardLayout";
+
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
+  objective?: string;
+  budget?: number;
+  budgetType?: string;
+}
+
+interface CampaignMetrics {
+  impressions?: number;
+  clicks?: number;
+  spend?: number;
+  reach?: number;
+  ctr?: number;
+  cpc?: number;
+  cpm?: number;
+  frequency?: number;
+  conversions?: number;
+  costPerConversion?: number;
+  roas?: number;
+  dateRange?: string;
+}
 
 export default function Performance() {
-  const [, setLocation] = useLocation();
-  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
-  const [campaignMetrics, setCampaignMetrics] = useState<any>(null);
+  const [campaignMetrics, setCampaignMetrics] = useState<CampaignMetrics | null>(null);
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
-  
-  const listCampaignsQuery = trpc.meta.listCampaigns.useQuery(
-    undefined,
-    { enabled: !!credentialsStatus.data?.hasCredentials }
-  );
-  
+
+  const listCampaignsQuery = trpc.meta.listCampaigns.useQuery(undefined, {
+    enabled: !!credentialsStatus.data?.hasCredentials,
+  });
+
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
-    { 
-      campaignId: selectedCampaign || "",
-    },
+    { campaignId: selectedCampaign || "" },
     { enabled: !!selectedCampaign && !!credentialsStatus.data?.hasCredentials }
   );
 
   const handleLoadCampaigns = async () => {
     if (!credentialsStatus.data?.hasCredentials) {
       toast.error("Configure suas credenciais Meta primeiro");
-      setLocation("/settings");
       return;
     }
-
     try {
       const result = await listCampaignsQuery.refetch();
       if (result.data?.campaigns) {
@@ -63,157 +84,226 @@ export default function Performance() {
     try {
       const result = await getCampaignMetricsQuery.refetch();
       if (result.data?.metrics) {
-        setCampaignMetrics(result.data.metrics);
-        toast.success("Métricas carregadas");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setCampaignMetrics(result.data.metrics as any);
+        toast.success("Metricas carregadas");
       } else {
-        toast.error("Nenhuma métrica encontrada");
+        toast.error("Nenhuma metrica encontrada");
+        setCampaignMetrics(null);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erro ao carregar métricas");
+      toast.error(error instanceof Error ? error.message : "Erro ao carregar metricas");
+      setCampaignMetrics(null);
     }
   };
 
-  const isLoading = listCampaignsQuery.isFetching || getCampaignMetricsQuery.isFetching;
+  const isLoading =
+    listCampaignsQuery.isFetching || getCampaignMetricsQuery.isFetching;
+
+  const selectedCampaignData = campaigns.find((c) => c.id === selectedCampaign);
+
+  const metricCards = campaignMetrics
+    ? [
+        {
+          icon: Eye,
+          label: "Impressoes",
+          value: campaignMetrics.impressions?.toLocaleString("pt-BR") ?? "—",
+        },
+        {
+          icon: MousePointerClick,
+          label: "Cliques",
+          value: campaignMetrics.clicks?.toLocaleString("pt-BR") ?? "—",
+        },
+        {
+          icon: DollarSign,
+          label: "Gasto",
+          value: campaignMetrics.spend
+            ? `$${campaignMetrics.spend.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+            : "—",
+        },
+        {
+          icon: Users,
+          label: "Alcance",
+          value: campaignMetrics.reach?.toLocaleString("pt-BR") ?? "—",
+        },
+        {
+          icon: Activity,
+          label: "CTR",
+          value: campaignMetrics.ctr
+            ? `${campaignMetrics.ctr.toFixed(2)}%`
+            : "—",
+        },
+        {
+          icon: Target,
+          label: "CPC",
+          value: campaignMetrics.cpc
+            ? `$${campaignMetrics.cpc.toFixed(2)}`
+            : "—",
+        },
+        {
+          icon: BarChart3,
+          label: "CPM",
+          value: campaignMetrics.cpm
+            ? `$${campaignMetrics.cpm.toFixed(2)}`
+            : "—",
+        },
+        {
+          icon: TrendingUp,
+          label: "ROAS",
+          value: campaignMetrics.roas
+            ? `${campaignMetrics.roas.toFixed(2)}x`
+            : "—",
+        },
+      ]
+    : [];
 
   return (
     <DashboardLayout>
-      <div className="space-y-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Performance</h1>
-            <p className="text-gray-500 font-medium">Análise profunda de métricas e ROI das suas campanhas ativas.</p>
-          </div>
-          
-          <Button
-            onClick={handleLoadCampaigns}
-            disabled={isLoading || !credentialsStatus.data?.hasCredentials}
-            className="btn-premium px-8"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <span className="flex items-center gap-2">
-                <RefreshCw className="w-4 h-4" />
-                Sincronizar Campanhas
-              </span>
-            )}
-          </Button>
-        </div>
+      <div className="space-y-8">
+        <PageHeader
+          title="Performance"
+          subtitle="Analise profunda de metricas e ROI das suas campanhas ativas."
+          actions={
+            <Button
+              onClick={handleLoadCampaigns}
+              disabled={isLoading || !credentialsStatus.data?.hasCredentials}
+              className="btn-premium"
+            >
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Sincronizar Campanhas
+                </>
+              )}
+            </Button>
+          }
+        />
 
-        {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
-          <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
-            <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-yellow-500 uppercase tracking-wider">Métricas Indisponíveis</p>
-              <p className="text-xs text-gray-400 mt-1">
-                Conecte sua Meta API para visualizar o desempenho em tempo real das suas contas de anúncio.
-              </p>
-            </div>
-          </Card>
+        {/* Aviso de credenciais */}
+        {!credentialsStatus.isLoading && !credentialsStatus.data?.hasCredentials && (
+          <CredentialsWarning message="Conecte sua Meta API para visualizar o desempenho em tempo real das suas contas de anuncio." />
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-1 space-y-6">
-            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 px-2">Campanhas Ativas</h2>
-            
-            {campaigns.length > 0 ? (
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {campaigns.map((campaign) => (
-                  <Card
-                    key={campaign.id}
-                    onClick={() => handleLoadMetrics(campaign.id)}
-                    className={`card-premium p-5 cursor-pointer transition-all border-white/5 ${
-                      selectedCampaign === campaign.id 
-                        ? "bg-white/10 border-white/20 ring-1 ring-white/20" 
-                        : "bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="text-sm font-bold text-white truncate max-w-[180px]">{campaign.name}</h3>
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${campaign.isActive ? "bg-green-500/10 text-green-500" : "bg-gray-500/10 text-gray-500"}`}>
-                        {campaign.isActive ? "Ativa" : "Pausada"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
-                      <span className="flex items-center gap-1"><Target className="w-3 h-3" /> {campaign.objective || "Vendas"}</span>
-                      <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {campaign.budget || "0.00"}</span>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="card-premium bg-white/[0.01] border-white/5 p-10 text-center border-dashed">
-                <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Campaign List */}
+          <div className="lg:col-span-1 space-y-4">
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">
+              Campanhas Ativas
+            </h2>
+
+            {campaigns.length === 0 ? (
+              <Card className="card-premium bg-white/[0.02] border-white/5 p-8 text-center">
+                <BarChart3 className="w-8 h-8 text-gray-700 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">
                   {credentialsStatus.data?.hasCredentials
-                    ? "Nenhuma campanha sincronizada"
-                    : "Conecte sua conta Meta para sincronizar campanhas"}
+                    ? "Clique em Sincronizar para carregar suas campanhas."
+                    : "Configure suas credenciais Meta para ver campanhas."}
                 </p>
               </Card>
+            ) : (
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                {campaigns.map((campaign) => (
+                  <button
+                    key={campaign.id}
+                    onClick={() => handleLoadMetrics(campaign.id)}
+                    className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
+                      selectedCampaign === campaign.id
+                        ? "bg-white text-black border-white"
+                        : "bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/[0.04] text-white"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-sm font-bold leading-tight truncate">
+                        {campaign.name}
+                      </p>
+                      <span
+                        className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          selectedCampaign === campaign.id
+                            ? "bg-black/10 text-black"
+                            : campaign.status === "ACTIVE"
+                            ? "bg-green-500/10 text-green-500"
+                            : "bg-gray-500/10 text-gray-500"
+                        }`}
+                      >
+                        {campaign.status}
+                      </span>
+                    </div>
+                    {campaign.objective && (
+                      <p
+                        className={`text-[10px] uppercase tracking-wider ${
+                          selectedCampaign === campaign.id
+                            ? "text-black/60"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {campaign.objective}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
-          <div className="lg:col-span-2 space-y-8">
-            {campaignMetrics ? (
+          {/* Metrics Panel */}
+          <div className="lg:col-span-2 space-y-6">
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500">
+              Metricas
+              {selectedCampaignData && (
+                <span className="ml-2 text-white normal-case tracking-normal font-normal">
+                  — {selectedCampaignData.name}
+                </span>
+              )}
+            </h2>
+
+            {getCampaignMetricsQuery.isFetching ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+              </div>
+            ) : !selectedCampaign ? (
+              <EmptyState
+                icon={BarChart3}
+                title="Selecione uma campanha"
+                description="Escolha uma campanha na lista para visualizar suas metricas detalhadas."
+              />
+            ) : campaignMetrics ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="card-premium bg-white/[0.02] border-white/5 p-8 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                      <DollarSign className="w-12 h-12 text-white" />
-                    </div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Investimento Total</p>
-                    <p className="text-4xl font-bold text-white tracking-tighter">${campaignMetrics.spend || "0.00"}</p>
-                    <div className="mt-4 flex items-center gap-2 text-green-500 text-[10px] font-bold uppercase">
-                      {campaignMetrics.spendTrend || "N/A"}
-                    </div>
-                  </Card>
-
-                  <Card className="card-premium bg-white/[0.02] border-white/5 p-8 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                      <TrendingUp className="w-12 h-12 text-white" />
-                    </div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">ROAS da Campanha</p>
-                    <p className="text-4xl font-bold text-white tracking-tighter">{campaignMetrics.roas || "0.00"}x</p>
-                    <div className="mt-4 flex items-center gap-2 text-gray-500 text-[10px] font-bold uppercase">
-                      {campaignMetrics.roasTrend || "N/A"}
-                    </div>
-                  </Card>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  {[
-                    { label: "Impressões", value: campaignMetrics.impressions || "0", icon: Users },
-                    { label: "Cliques", value: campaignMetrics.clicks || "0", icon: Activity },
-                    { label: "CTR", value: `${campaignMetrics.ctr || "0"}%`, icon: Target },
-                    { label: "CPC Médio", value: `$${campaignMetrics.cpc || "0.00"}`, icon: DollarSign },
-                  ].map((stat, i) => (
-                    <Card key={i} className="card-premium bg-white/[0.02] border-white/5 p-5">
-                      <stat.icon className="w-4 h-4 text-gray-600 mb-3" />
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1">{stat.label}</p>
-                      <p className="text-lg font-bold text-white">{stat.value}</p>
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {metricCards.map((metric, i) => (
+                    <Card
+                      key={i}
+                      className="card-premium bg-white/[0.02] border-white/5 p-4"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <metric.icon className="w-4 h-4 text-gray-500" />
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                          {metric.label}
+                        </p>
+                      </div>
+                      <p className="text-xl font-bold text-white">{metric.value}</p>
                     </Card>
                   ))}
                 </div>
 
-                <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
-                  <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-white">Análise de Tendência</h3>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase">
-                      <Calendar className="w-3 h-3" /> Últimos 30 dias
+                {/* Date Range */}
+                {campaignMetrics.dateRange && (
+                  <Card className="card-premium bg-white/[0.02] border-white/5 p-4">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Calendar className="w-4 h-4" />
+                      <span>Periodo: {campaignMetrics.dateRange}</span>
                     </div>
-                  </div>
-                  <div className="h-64 w-full bg-white/[0.01] rounded-2xl border border-white/5 flex items-center justify-center">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gray-800">Gráficos de performance em desenvolvimento. Em breve!</p>
-                  </div>
-                </Card>
+                  </Card>
+                )}
               </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-20 bg-white/[0.01] rounded-[2rem] border border-white/5 border-dashed">
-                <BarChart3 className="w-12 h-12 text-gray-800 mb-6" />
-                <h3 className="text-lg font-bold text-white mb-2">Selecione uma Campanha</h3>
-                <p className="text-gray-500 text-sm max-w-xs mx-auto">
-                  Escolha uma campanha na lista ao lado para carregar as métricas detalhadas de performance.
-                </p>
-              </div>
+              <EmptyState
+                icon={Activity}
+                title="Nenhuma metrica disponivel"
+                description="Nao foi possivel carregar as metricas desta campanha. Tente novamente."
+              />
             )}
           </div>
         </div>

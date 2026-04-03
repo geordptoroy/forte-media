@@ -1,203 +1,183 @@
-import { useState } from 'react';
-import { AdCard } from '@/components/ads/AdCard';
-import { AdFilters } from '@/components/ads/AdFilters';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { trpc } from '@/lib/trpc';
-import { useLocation } from 'wouter';
-import { toast } from 'sonner';
-import { Loader2, AlertCircle, Zap, Settings, TrendingUp } from 'lucide-react';
-import DashboardLayout from '@/components/DashboardLayout';
+import { useState } from "react";
+import { AdCard } from "@/components/ads/AdCard";
+import { AdFilters } from "@/components/ads/AdFilters";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
+import { CredentialsWarning } from "@/components/CredentialsWarning";
+import { EmptyState } from "@/components/EmptyState";
+import { PaginationControls } from "@/components/PaginationControls";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
+import { Loader2, Zap, TrendingUp } from "lucide-react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function ScaledAds() {
-  const [, setLocation] = useLocation();
-  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [ads, setAds] = useState<any[]>([]);
+  const [ads, setAds] = useState<unknown[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
 
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
     {
-      countries: ['BR'],
+      countries: ["BR"],
       minSpend: filters.score_min ? Number(filters.score_min) * 100 : 1000,
     },
     { enabled: false }
   );
 
+  const { page, totalPages, paginatedItems, setPage, goToNext, goToPrev, hasNext, hasPrev, reset } =
+    usePagination(ads, 12);
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-    setPage(1);
+    reset();
+    setAds([]);
   };
 
   const handleReset = () => {
     setFilters({});
-    setPage(1);
+    reset();
     setAds([]);
   };
 
   const handleSearch = async () => {
     if (!credentialsStatus.data?.hasCredentials) {
-      toast.error('Configure suas credenciais Meta primeiro');
-      setLocation('/settings');
+      toast.error("Configure suas credenciais Meta primeiro");
       return;
     }
     setIsSearching(true);
     try {
       const result = await searchScaledAdsQuery.refetch();
       if (result.data?.ads) {
-        let filtered = result.data.ads;
+        let filtered: unknown[] = result.data.ads;
         if (filters.search) {
           const q = filters.search.toLowerCase();
-          filtered = filtered.filter((ad: any) =>
-            (ad.page_name || '').toLowerCase().includes(q)
+          filtered = filtered.filter((ad) =>
+            (((ad as Record<string, unknown>).page_name as string) || "").toLowerCase().includes(q)
           );
         }
         setAds(filtered);
-        toast.success(`${filtered.length} anúncios escalados encontrados`);
+        reset();
+        toast.success(`${filtered.length} anuncios escalados encontrados`);
       } else {
-        toast.info('Nenhum anúncio escalado encontrado');
+        toast.info("Nenhum anuncio escalado encontrado");
         setAds([]);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao buscar anúncios escalados');
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao buscar anuncios escalados"
+      );
       setAds([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const PAGE_SIZE = 12;
-  const totalPages = Math.max(1, Math.ceil(ads.length / PAGE_SIZE));
-  const paginatedAds = ads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   return (
     <DashboardLayout>
-      <div className="space-y-10">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Anúncios Scaled</h1>
-            <p className="text-gray-500 font-medium">Identifique criativos que estão recebendo alto investimento agora.</p>
-          </div>
-          
-          <Button
-            onClick={handleSearch}
-            disabled={isSearching || !credentialsStatus.data?.hasCredentials}
-            className="btn-premium px-8"
-          >
-            {isSearching ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <span className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-yellow-500" />
-                Sincronizar Escala
-              </span>
-            )}
-          </Button>
-        </div>
+      <div className="space-y-8">
+        <PageHeader
+          title="Anuncios Scaled"
+          subtitle="Identifique criativos que estao recebendo alto investimento agora."
+          actions={
+            <Button
+              onClick={handleSearch}
+              disabled={isSearching || !credentialsStatus.data?.hasCredentials}
+              className="btn-premium"
+            >
+              {isSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2 text-yellow-500" />
+                  Sincronizar Escala
+                </>
+              )}
+            </Button>
+          }
+        />
 
-        {/* Credentials Warning */}
-        {!credentialsStatus.data?.hasCredentials && !credentialsStatus.isLoading && (
-          <Card className="card-premium bg-yellow-500/5 border-yellow-500/20 p-6 flex items-start gap-4">
-            <AlertCircle className="w-6 h-6 text-yellow-500 shrink-0 mt-1" />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-yellow-500 uppercase tracking-wider">Acesso à API Requerido</p>
-              <p className="text-xs text-gray-400 mt-1">
-                A detecção de escala exige uma conexão ativa com a Meta Marketing API para analisar volumes de investimento.
-              </p>
-              <Button
-                variant="link"
-                onClick={() => setLocation('/settings')}
-                className="text-white hover:text-gray-300 text-xs font-bold uppercase tracking-widest p-0 h-auto mt-4"
-              >
-                Configurar agora <Settings className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
-          </Card>
+        {/* Aviso de credenciais */}
+        {!credentialsStatus.isLoading && !credentialsStatus.data?.hasCredentials && (
+          <CredentialsWarning message="A deteccao de escala exige uma conexao ativa com a Meta Marketing API para analisar volumes de investimento." />
         )}
 
-        {/* Filters Area */}
-        <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
-          <div className="flex items-center gap-2 mb-8">
-            <TrendingUp className="w-4 h-4 text-gray-500" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-500">Parâmetros de Escala</h2>
-          </div>
-          
-          <AdFilters
-            filters={filters}
-            onChange={handleFilterChange}
-            onReset={handleReset}
-          />
-        </Card>
+        {/* Filters */}
+        <AdFilters
+          filters={filters}
+          onChange={handleFilterChange}
+          onReset={handleReset}
+        />
 
-        {/* Results Grid */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-gray-500">
-              {ads.length > 0 ? `${ads.length} Anúncios em Escala` : "Tendências de Investimento"}
-            </h2>
-          </div>
-
-          {isSearching ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <div key={i} className="bg-white/5 h-80 rounded-2xl animate-pulse border border-white/5" />
-              ))}
+        {/* Loading */}
+        {isSearching && (
+          <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
+              <p className="text-sm text-gray-500">Analisando escala de anuncios...</p>
             </div>
-          ) : ads.length > 0 ? (
-            <>
+          </div>
+        )}
+
+        {/* Results */}
+        {!isSearching && (
+          <>
+            {ads.length > 0 && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <TrendingUp className="w-3.5 h-3.5 text-yellow-500" />
+                  <span className="font-bold">
+                    {ads.length} anuncio{ads.length !== 1 ? "s" : ""} escalados
+                  </span>
+                </div>
+                <span className="text-xs text-gray-600">
+                  Pagina {page} de {totalPages}
+                </span>
+              </div>
+            )}
+
+            {ads.length === 0 && !isSearching && (
+              <EmptyState
+                icon={Zap}
+                title="Nenhum anuncio escalado"
+                description={
+                  credentialsStatus.data?.hasCredentials
+                    ? "Clique em Sincronizar Escala para buscar anuncios com alto investimento."
+                    : "Configure suas credenciais Meta para detectar anuncios escalados."
+                }
+                actionLabel={
+                  credentialsStatus.data?.hasCredentials
+                    ? "Sincronizar Agora"
+                    : undefined
+                }
+                onAction={
+                  credentialsStatus.data?.hasCredentials ? handleSearch : undefined
+                }
+                actionDisabled={isSearching}
+              />
+            )}
+
+            {paginatedItems.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {paginatedAds.map((ad) => (
-                  <AdCard key={ad.id || ad.ad_archive_id} ad={ad} />
+                {paginatedItems.map((ad, i) => (
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  <AdCard key={((ad as any).id as string) || String(i)} ad={ad as any} />
                 ))}
               </div>
-              
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-12 pt-8 border-t border-white/5">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white"
-                  >
-                    Anterior
-                  </Button>
-                  <div className="px-4 py-2 bg-white/5 rounded-lg border border-white/10">
-                    <span className="text-xs font-bold text-white">
-                      {page} / {totalPages}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="text-xs font-bold uppercase tracking-widest text-gray-400 hover:text-white"
-                  >
-                    Próxima
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <Card className="card-premium bg-white/[0.01] border-white/5 p-20 text-center">
-              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
-                <Zap className="w-8 h-8 text-gray-700" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Descubra o que está escalando</h3>
-              <p className="text-gray-500 max-w-sm mx-auto mb-8">
-                Clique no botão de sincronização para buscar anúncios com alto volume de investimento nas últimas 24 horas.
-              </p>
-              <Button
-                onClick={handleSearch}
-                disabled={!credentialsStatus.data?.hasCredentials}
-                className="btn-premium px-8"
-              >
-                Ver Tendências Atuais
-              </Button>
-            </Card>
-          )}
-        </div>
+            )}
+
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPrev={goToPrev}
+              onNext={goToNext}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
+            />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
