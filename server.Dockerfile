@@ -29,7 +29,9 @@ COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.lock
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/shared ./shared
+COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/entrypoint.sh
 
 EXPOSE 4000
 
-CMD ["node", "dist/server/index.js"]
+ENTRYPOINT ["/bin/sh", "./scripts/entrypoint.sh"]
