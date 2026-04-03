@@ -1,11 +1,16 @@
 #!/bin/sh
+# Garantir que o script para se houver erro
 set -e
 
-echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Starting Backend Entrypoint..."
-echo ">>> NODE_ENV: ${NODE_ENV}"
-echo ">>> PORT: ${PORT}"
+# Remover caracteres de retorno de carro (CRLF) se existirem
+# Isso é uma redundância de segurança para o Docker em Windows
+sed -i 's/\r$//' "$0"
 
-# Wait for MySQL to be ready
+echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Starting Backend Entrypoint..."
+echo ">>> NODE_ENV: ${NODE_ENV:-production}"
+echo ">>> PORT: ${PORT:-4000}"
+
+# Aguardar pela Base de Dados
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Waiting for MySQL at db:3306..."
 RETRY_COUNT=0
 MAX_RETRIES=30
@@ -24,15 +29,17 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
   exit 1
 fi
 
-# Run migrations (non-blocking if they fail)
+# Sincronizar esquema da base de dados (Drizzle)
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Syncing database schema..."
-# Usar drizzle-kit push com o ficheiro de configuração correto
-if ./node_modules/.bin/drizzle-kit push --config=drizzle.config.ts 2>&1; then
-  echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database migrations completed successfully"
+# Usamos o ficheiro .js para evitar dependência de ts-node em produção
+if [ -f "drizzle.config.js" ]; then
+  ./node_modules/.bin/drizzle-kit push --config=drizzle.config.js
+  echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database schema synced successfully"
 else
-  echo "!!! [$(date '+%Y-%m-%d %H:%M:%S')] Database migrations failed, but continuing startup..."
+  echo "!!! [$(date '+%Y-%m-%d %H:%M:%S')] Warning: drizzle.config.js not found, skipping migration"
 fi
 
-# Start the Node.js server
+# Iniciar o Servidor Node.js
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Starting Node.js server..."
+# Usar exec para que o Node receba sinais do Docker (SIGTERM)
 exec node dist/index.js
