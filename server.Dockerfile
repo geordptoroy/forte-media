@@ -3,12 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar apenas os arquivos de lock e package.json da raiz para cache de dependencias
-# O projeto usa um unico pnpm-lock.yaml na raiz para o workspace
+# O projeto usa um único package.json e pnpm-lock.yaml na raiz
 COPY package.json pnpm-lock.yaml ./
-COPY client/package.json client/
-COPY server/package.json server/
-COPY shared/package.json shared/
 
 # Instalar dependencias usando o lock da raiz
 RUN corepack enable && pnpm install --frozen-lockfile
@@ -16,7 +12,7 @@ RUN corepack enable && pnpm install --frozen-lockfile
 # Copiar o restante do codigo
 COPY . .
 
-# Build do TypeScript
+# Build do TypeScript (o comando 'pnpm build:server' usa o esbuild)
 RUN pnpm build:server
 
 # Stage de Produção

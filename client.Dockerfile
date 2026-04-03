@@ -3,12 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar apenas os arquivos de lock e package.json da raiz para cache de dependencias
-# O projeto usa um unico pnpm-lock.yaml na raiz para o workspace
+# O projeto usa um único package.json e pnpm-lock.yaml na raiz
 COPY package.json pnpm-lock.yaml ./
-COPY client/package.json client/
-COPY server/package.json server/
-COPY shared/package.json shared/
 
 # Instalar dependencias usando o lock da raiz
 RUN corepack enable && pnpm install --frozen-lockfile
@@ -16,16 +12,14 @@ RUN corepack enable && pnpm install --frozen-lockfile
 # Copiar o restante do codigo
 COPY . .
 
-WORKDIR /app/client
-
-# Build do frontend
-RUN pnpm build
+# Build do frontend (o comando 'pnpm build:client' usa o vite.config.ts na raiz)
+RUN pnpm build:client
 
 # Stage de Produção
 FROM nginx:stable-alpine
 
-# Copiar o build do frontend para o Nginx
-COPY --from=builder /app/client/dist /usr/share/nginx/html
+# Copiar o build do frontend para o Nginx (o output vai para dist/public de acordo com vite.config.ts)
+COPY --from=builder /app/dist/public /usr/share/nginx/html
 
 # Copiar a configuracao do Nginx para o frontend
 COPY nginx/frontend.conf /etc/nginx/conf.d/default.conf
