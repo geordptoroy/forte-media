@@ -26,34 +26,29 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
- * Armazenamento seguro de credenciais Meta API por usuário
- * Suporta múltiplas aplicações Meta por usuário, cada uma com seu próprio Ad Account
- * Access tokens, App Secrets e System User tokens são criptografados com AES-256-GCM
+ * Armazenamento seguro de credenciais Meta API por usuário.
+ * Cada usuário agora fornece seu próprio Access Token.
  */
 export const userMetaCredentials = mysqlTable(
   "user_meta_credentials",
   {
     id: int("id").autoincrement().primaryKey(),
-    userId: int("user_id").notNull(),
+    userId: int("user_id").notNull().unique(),
     
-    // Meta Developer App Configuration
-    metaAppId: varchar("meta_app_id", { length: 255 }).notNull(),
+    // Meta Developer App Configuration (Optional if using User Token)
+    metaAppId: varchar("meta_app_id", { length: 255 }),
     encryptedAppSecret: text("encrypted_app_secret"),
     
-    // Ad Account Configuration
-    adAccountId: varchar("ad_account_id", { length: 64 }),
-    accountName: varchar("account_name", { length: 255 }),
-    
-    // Access Token (User Token or System User Token)
+    // Access Token (User Token provided by the user in the UI)
     encryptedAccessToken: text("encrypted_access_token").notNull(),
     tokenHash: varchar("token_hash", { length: 64 }).notNull(),
     
-    // System User Configuration (optional)
-    isSystemUser: boolean("is_system_user").default(false).notNull(),
-    systemUserId: varchar("system_user_id", { length: 255 }),
+    // Ad Account Configuration (Optional, for campaign management)
+    adAccountId: varchar("ad_account_id", { length: 64 }),
+    accountName: varchar("account_name", { length: 255 }),
     
     // Permissions and Validation
-    permissions: json("permissions").$type<string[]>().notNull(),
+    permissions: json("permissions").$type<string[]>().notNull().default([]),
     isValid: boolean("is_valid").default(true).notNull(),
     lastValidatedAt: timestamp("last_validated_at"),
     validationError: text("validation_error"),
@@ -64,8 +59,6 @@ export const userMetaCredentials = mysqlTable(
   },
   (table) => ({
     userIdIdx: index("user_id_idx").on(table.userId),
-    metaAppIdIdx: index("meta_app_id_idx").on(table.metaAppId),
-    adAccountIdIdx: index("ad_account_id_idx").on(table.adAccountId),
   })
 );
 
@@ -73,24 +66,39 @@ export type UserMetaCredentials = typeof userMetaCredentials.$inferSelect;
 export type InsertUserMetaCredentials = typeof userMetaCredentials.$inferInsert;
 
 /**
- * Anúncios competitivos favoritos do usuário
+ * Anúncios competitivos favoritos do usuário.
+ * Refatorado para incluir todos os campos da API ads_archive da Meta.
  */
 export const favoriteAds = mysqlTable(
   "favorite_ads",
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("user_id").notNull(),
+    
+    // Meta API Fields
     adId: varchar("ad_id", { length: 64 }).notNull(),
     pageId: varchar("page_id", { length: 64 }).notNull(),
     pageName: text("page_name"),
-    adBody: text("ad_body"),
     adSnapshotUrl: text("ad_snapshot_url"),
-    spend: decimal("spend", { precision: 12, scale: 2 }),
-    impressions: int("impressions"),
+    adDeliveryStartTime: timestamp("ad_delivery_start_time"),
+    adDeliveryStopTime: timestamp("ad_delivery_stop_time"),
+    publisherPlatforms: json("publisher_platforms").$type<string[]>().notNull().default([]),
+    
+    // Creative Content
+    adCreativeBodies: json("ad_creative_bodies").$type<string[]>().notNull().default([]),
+    adCreativeLinkTitles: json("ad_creative_link_titles").$type<string[]>().notNull().default([]),
+    adCreativeLinkDescriptions: json("ad_creative_link_descriptions").$type<string[]>().notNull().default([]),
+    
+    // Performance Data (Limited for common ads in BR)
     currency: varchar("currency", { length: 3 }),
-    deliveryStartTime: timestamp("delivery_start_time"),
-    deliveryStopTime: timestamp("delivery_stop_time"),
-    metaData: json("meta_data"),
+    spend: json("spend").$type<{ min?: number; max?: number; range?: string }>(),
+    impressions: json("impressions").$type<{ min?: number; max?: number; range?: string }>(),
+    
+    // Demographic and Regional (Political/EU only)
+    demographicDistribution: json("demographic_distribution"),
+    regionDistribution: json("region_distribution"),
+    
+    // Internal Tracking
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -105,7 +113,7 @@ export type FavoriteAd = typeof favoriteAds.$inferSelect;
 export type InsertFavoriteAd = typeof favoriteAds.$inferInsert;
 
 /**
- * Monitoramento contínuo de anúncios competitivos
+ * Monitoramento contínuo de anúncios competitivos.
  */
 export const monitoredAds = mysqlTable(
   "monitored_ads",
@@ -118,9 +126,17 @@ export const monitoredAds = mysqlTable(
     monitoringStatus: mysqlEnum("monitoring_status", ["active", "paused", "completed"]).default("active").notNull(),
     lastCheckedAt: timestamp("last_checked_at"),
     isStillActive: boolean("is_still_active").default(true).notNull(),
-    lastKnownSpend: decimal("last_known_spend", { precision: 12, scale: 2 }),
-    lastKnownImpressions: int("last_known_impressions"),
-    spendHistory: json("spend_history").$type<Array<{ date: string; spend: number; impressions: number }>>(),
+    
+    // Historical Data for analysis
+    lastKnownSpend: json("last_known_spend"),
+    lastKnownImpressions: json("last_known_impressions"),
+    metricsHistory: json("metrics_history").$type<Array<{ 
+      date: string; 
+      spend?: any; 
+      impressions?: any;
+      isActive: boolean;
+    }>>().notNull().default([]),
+    
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -135,7 +151,7 @@ export type MonitoredAd = typeof monitoredAds.$inferSelect;
 export type InsertMonitoredAd = typeof monitoredAds.$inferInsert;
 
 /**
- * Campanhas do usuário para análise de performance (UTMify-style)
+ * Campanhas do usuário para análise de performance.
  */
 export const userCampaigns = mysqlTable(
   "user_campaigns",
@@ -174,7 +190,7 @@ export type UserCampaign = typeof userCampaigns.$inferSelect;
 export type InsertUserCampaign = typeof userCampaigns.$inferInsert;
 
 /**
- * Histórico de métricas de campanhas para análise de tendências
+ * Histórico de métricas de campanhas para análise de tendências.
  */
 export const campaignMetricsHistory = mysqlTable(
   "campaign_metrics_history",

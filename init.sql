@@ -1,12 +1,10 @@
 -- FORTE MEDIA Database Initialization
--- MySQL 8.0 Schema
+-- MySQL 8.0 Schema - Refactored for Meta ads_archive API
 
 -- Create database if not exists
 CREATE DATABASE IF NOT EXISTS `forte_media`;
 
 -- Ensure user exists and has permissions
--- Note: User creation is handled by Docker environment variables,
--- but we ensure permissions here just in case.
 GRANT ALL PRIVILEGES ON `forte_media`.* TO 'forte_user'@'%';
 FLUSH PRIVILEGES;
 
@@ -16,56 +14,56 @@ USE `forte_media`;
 -- Create users table
 CREATE TABLE IF NOT EXISTS `users` (
   `id` int AUTO_INCREMENT PRIMARY KEY,
-  `email` varchar(255) NOT NULL UNIQUE,
-  `name` varchar(255) NOT NULL,
+  `name` varchar(255),
+  `email` varchar(320) NOT NULL UNIQUE,
   `password_hash` text,
-  `role` enum('admin', 'user') DEFAULT 'user',
   `loginMethod` varchar(64) DEFAULT 'local',
-  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `last_signed_in` timestamp DEFAULT CURRENT_TIMESTAMP,
-  INDEX `idx_email` (`email`),
-  INDEX `idx_role` (`role`)
+  `role` enum('user', 'admin') DEFAULT 'user' NOT NULL,
+  `createdAt` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `lastSignedIn` timestamp DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create user_meta_credentials table
+-- Create user_meta_credentials table (One-to-One relationship)
 CREATE TABLE IF NOT EXISTS `user_meta_credentials` (
   `id` int AUTO_INCREMENT PRIMARY KEY,
-  `user_id` int NOT NULL,
-  `meta_app_id` varchar(255) NOT NULL,
+  `user_id` int NOT NULL UNIQUE,
+  `meta_app_id` varchar(255),
   `encrypted_app_secret` text,
+  `encrypted_access_token` text NOT NULL,
+  `token_hash` varchar(64) NOT NULL,
   `ad_account_id` varchar(64),
   `account_name` varchar(255),
-  `encrypted_access_token` longtext NOT NULL,
-  `token_hash` varchar(255) NOT NULL,
-  `is_system_user` boolean DEFAULT false,
-  `system_user_id` varchar(255),
-  `permissions` json,
+  `permissions` json NOT NULL DEFAULT '[]',
   `is_valid` boolean DEFAULT true,
   `last_validated_at` timestamp NULL,
   `validation_error` text,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  INDEX `idx_user_id` (`user_id`),
-  INDEX `idx_is_valid` (`is_valid`)
+  INDEX `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create favorite_ads table
+-- Create favorite_ads table (Refactored for ads_archive API)
 CREATE TABLE IF NOT EXISTS `favorite_ads` (
   `id` int AUTO_INCREMENT PRIMARY KEY,
   `user_id` int NOT NULL,
-  `ad_id` varchar(255) NOT NULL,
-  `page_id` varchar(255) NOT NULL,
-  `page_name` varchar(255),
-  `ad_body` text,
+  `ad_id` varchar(64) NOT NULL,
+  `page_id` varchar(64) NOT NULL,
+  `page_name` text,
   `ad_snapshot_url` text,
-  `spend` decimal(12, 2),
-  `impressions` int,
+  `ad_delivery_start_time` timestamp NULL,
+  `ad_delivery_stop_time` timestamp NULL,
+  `publisher_platforms` json NOT NULL DEFAULT '[]',
+  `ad_creative_bodies` json NOT NULL DEFAULT '[]',
+  `ad_creative_link_titles` json NOT NULL DEFAULT '[]',
+  `ad_creative_link_descriptions` json NOT NULL DEFAULT '[]',
   `currency` varchar(3),
-  `delivery_start_time` timestamp NULL,
-  `delivery_stop_time` timestamp NULL,
-  `meta_data` json,
+  `spend` json,
+  `impressions` json,
+  `demographic_distribution` json,
+  `region_distribution` json,
   `notes` text,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -79,15 +77,15 @@ CREATE TABLE IF NOT EXISTS `favorite_ads` (
 CREATE TABLE IF NOT EXISTS `monitored_ads` (
   `id` int AUTO_INCREMENT PRIMARY KEY,
   `user_id` int NOT NULL,
-  `ad_id` varchar(255) NOT NULL,
-  `page_id` varchar(255) NOT NULL,
-  `page_name` varchar(255),
+  `ad_id` varchar(64) NOT NULL,
+  `page_id` varchar(64) NOT NULL,
+  `page_name` text,
   `monitoring_status` enum('active', 'paused', 'completed') DEFAULT 'active',
   `last_checked_at` timestamp NULL,
   `is_still_active` boolean DEFAULT true,
-  `last_known_spend` decimal(12, 2),
-  `last_known_impressions` int,
-  `spend_history` json,
+  `last_known_spend` json,
+  `last_known_impressions` json,
+  `metrics_history` json NOT NULL DEFAULT '[]',
   `notes` text,
   `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -101,8 +99,8 @@ CREATE TABLE IF NOT EXISTS `monitored_ads` (
 CREATE TABLE IF NOT EXISTS `user_campaigns` (
   `id` int AUTO_INCREMENT PRIMARY KEY,
   `user_id` int NOT NULL,
-  `campaign_id` varchar(255) NOT NULL,
-  `campaign_name` varchar(255) NOT NULL,
+  `campaign_id` varchar(64) NOT NULL,
+  `campaign_name` text NOT NULL,
   `ad_account_id` varchar(64) NOT NULL,
   `status` enum('active', 'paused', 'completed', 'archived') DEFAULT 'active',
   `objective` varchar(64),
