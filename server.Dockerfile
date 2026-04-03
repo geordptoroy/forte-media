@@ -1,55 +1,73 @@
-# Stage 1: Build
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy dependency files
+COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Stage 2: Builder
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Instalar pnpm e esbuild
-RUN npm install -g pnpm esbuild
+# Install pnpm
+RUN npm install -g pnpm
 
-# Copiar arquivos de dependências e patches
-COPY package.json pnpm-lock.yaml ./
-COPY patches ./patches
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
 
-# Instalar dependências
-RUN pnpm install --frozen-lockfile
-
-# Copiar código fonte e configurações
+# Copy source files
 COPY server ./server
 COPY shared ./shared
 COPY drizzle ./drizzle
 COPY drizzle.config.ts tsconfig.json vite.config.ts ./
 
-# Build do backend usando o script do package.json
+# Build the backend
 RUN pnpm build:server
 
-# Stage 2: Production
+# Stage 3: Production
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Instalar pnpm e netcat para o entrypoint
-RUN apk add --no-cache netcat-openbsd && npm install -g pnpm
+# Install runtime dependencies (netcat for healthcheck, curl for debugging)
+RUN apk add --no-cache netcat-openbsd curl
 
-# Copiar apenas o necessário do estágio de build
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy built application and dependencies
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 
-# Copiar scripts e garantir permissões de execução
-COPY scripts /app/scripts
+# Copy scripts
+COPY scripts ./scripts
+
+# Ensure scripts are executable
 RUN chmod +x /app/scripts/*.sh
 
-# Variáveis de ambiente padrão
+# Environment variables
 ENV NODE_ENV=production
 ENV PORT=4000
 
+# Expose port
 EXPOSE 4000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
-  CMD node /app/scripts/healthcheck.js
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=45s \
+  CMD curl -f http://localhost:4000/health || exit 1
 
-# Iniciar servidor via entrypoint unificado (caminho absoluto)
+# Start application
 ENTRYPOINT ["/bin/sh", "/app/scripts/entrypoint.sh"]
