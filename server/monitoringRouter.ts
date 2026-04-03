@@ -5,12 +5,12 @@ import { getDb } from "./db";
 import { monitoredAds } from "../drizzle/schema";
 
 /**
- * Router de Monitoramento
- * Gerencia os anúncios monitorados pelo utilizador no banco de dados.
+ * Monitoring Router - Refactored for Meta ads_archive API
+ * Handles continuous monitoring of competitive ads
  */
 export const monitoringRouter = router({
   /**
-   * Adicionar um anúncio ao monitoramento
+   * Add an ad to monitoring
    */
   addMonitored: protectedProcedure
     .input(
@@ -18,18 +18,15 @@ export const monitoringRouter = router({
         adId: z.string().min(1, "Ad ID is required"),
         pageId: z.string().min(1, "Page ID is required"),
         pageName: z.string().optional(),
-        alertConfig: z.record(z.string(), z.any()).optional(),
         notes: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available" };
-        }
+        if (!db) throw new Error("Database not available");
 
-        // Verificar se já está a ser monitorado
+        // Check if already being monitored
         const existing = await db
           .select()
           .from(monitoredAds)
@@ -42,7 +39,7 @@ export const monitoringRouter = router({
           .limit(1);
 
         if (existing.length > 0) {
-          // Se já existe mas está pausado, reativar
+          // If exists but paused, reactivate
           if (existing[0].monitoringStatus !== "active") {
             await db
               .update(monitoredAds)
@@ -61,7 +58,7 @@ export const monitoringRouter = router({
           monitoringStatus: "active",
           isStillActive: true,
           notes: input.notes,
-          spendHistory: [],
+          metricsHistory: [],
         });
 
         return { success: true, message: "Monitoring started" };
@@ -75,26 +72,24 @@ export const monitoringRouter = router({
     }),
 
   /**
-   * Remover um anúncio do monitoramento
+   * Remove an ad from monitoring
    */
   removeMonitored: protectedProcedure
     .input(
       z.object({
-        monitoredId: z.number().int().positive("Monitored ID must be a positive integer"),
+        adId: z.string().min(1),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available" };
-        }
+        if (!db) throw new Error("Database not available");
 
         await db
           .delete(monitoredAds)
           .where(
             and(
-              eq(monitoredAds.id, input.monitoredId),
+              eq(monitoredAds.adId, input.adId),
               eq(monitoredAds.userId, ctx.user.id)
             )
           );
@@ -110,14 +105,12 @@ export const monitoringRouter = router({
     }),
 
   /**
-   * Listar todos os anúncios monitorados do utilizador
+   * Get all monitored ads for the user
    */
   getMonitored: protectedProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) {
-        return { success: false, error: "Database not available", monitored: [] };
-      }
+      if (!db) throw new Error("Database not available");
 
       const monitored = await db
         .select()
@@ -137,28 +130,26 @@ export const monitoringRouter = router({
   }),
 
   /**
-   * Atualizar o status de monitoramento de um anúncio
+   * Update monitoring status
    */
   updateStatus: protectedProcedure
     .input(
       z.object({
-        monitoredId: z.number().int().positive(),
+        adId: z.string().min(1),
         status: z.enum(["active", "paused", "completed"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available" };
-        }
+        if (!db) throw new Error("Database not available");
 
         await db
           .update(monitoredAds)
           .set({ monitoringStatus: input.status, updatedAt: new Date() })
           .where(
             and(
-              eq(monitoredAds.id, input.monitoredId),
+              eq(monitoredAds.adId, input.adId),
               eq(monitoredAds.userId, ctx.user.id)
             )
           );

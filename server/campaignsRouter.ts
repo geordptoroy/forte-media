@@ -5,19 +5,17 @@ import { getDb } from "./db";
 import { userCampaigns, campaignMetricsHistory } from "../drizzle/schema";
 
 /**
- * Router de Campanhas
- * Gerencia as campanhas do utilizador armazenadas localmente no banco de dados.
+ * Campaigns Router - Refactored for Meta Marketing API compatibility
+ * Handles management of own user campaigns
  */
 export const campaignsRouter = router({
   /**
-   * Listar todas as campanhas do utilizador
+   * List all user campaigns
    */
   getCampaigns: protectedProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) {
-        return { success: false, error: "Database not available", campaigns: [] };
-      }
+      if (!db) throw new Error("Database not available");
 
       const campaigns = await db
         .select()
@@ -37,7 +35,7 @@ export const campaignsRouter = router({
   }),
 
   /**
-   * Criar ou atualizar uma campanha
+   * Create or update a campaign (Upsert)
    */
   upsertCampaign: protectedProcedure
     .input(
@@ -64,11 +62,9 @@ export const campaignsRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available" };
-        }
+        if (!db) throw new Error("Database not available");
 
-        // Verificar se já existe
+        // Check if exists
         const existing = await db
           .select()
           .from(userCampaigns)
@@ -125,7 +121,7 @@ export const campaignsRouter = router({
     }),
 
   /**
-   * Remover uma campanha
+   * Delete a campaign
    */
   deleteCampaign: protectedProcedure
     .input(
@@ -136,9 +132,7 @@ export const campaignsRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available" };
-        }
+        if (!db) throw new Error("Database not available");
 
         await db
           .delete(userCampaigns)
@@ -160,41 +154,39 @@ export const campaignsRouter = router({
     }),
 
   /**
-   * Obter histórico de métricas de uma campanha
+   * Get metrics history for a campaign
    */
   getMetricsHistory: protectedProcedure
     .input(
       z.object({
-        campaignId: z.number().int().positive("Campaign ID must be a positive integer"),
+        id: z.number().int().positive("Internal ID is required"),
       })
     )
     .query(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available", history: [] };
-        }
+        if (!db) throw new Error("Database not available");
 
-        // Verificar se a campanha pertence ao utilizador
+        // Verify campaign ownership
         const campaign = await db
           .select()
           .from(userCampaigns)
           .where(
             and(
-              eq(userCampaigns.id, input.campaignId),
+              eq(userCampaigns.id, input.id),
               eq(userCampaigns.userId, ctx.user.id)
             )
           )
           .limit(1);
 
         if (campaign.length === 0) {
-          return { success: false, error: "Campaign not found", history: [] };
+          throw new Error("Campaign not found");
         }
 
         const history = await db
           .select()
           .from(campaignMetricsHistory)
-          .where(eq(campaignMetricsHistory.campaignId, input.campaignId))
+          .where(eq(campaignMetricsHistory.campaignId, input.id))
           .orderBy(desc(campaignMetricsHistory.recordedAt));
 
         return { success: true, history };
@@ -209,12 +201,12 @@ export const campaignsRouter = router({
     }),
 
   /**
-   * Registar snapshot de métricas para uma campanha
+   * Record a metrics snapshot for a campaign
    */
   recordMetrics: protectedProcedure
     .input(
       z.object({
-        campaignId: z.number().int().positive(),
+        id: z.number().int().positive(),
         spend: z.number(),
         impressions: z.number().int(),
         clicks: z.number().int(),
@@ -229,28 +221,26 @@ export const campaignsRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const db = await getDb();
-        if (!db) {
-          return { success: false, error: "Database not available" };
-        }
+        if (!db) throw new Error("Database not available");
 
-        // Verificar se a campanha pertence ao utilizador
+        // Verify campaign ownership
         const campaign = await db
           .select()
           .from(userCampaigns)
           .where(
             and(
-              eq(userCampaigns.id, input.campaignId),
+              eq(userCampaigns.id, input.id),
               eq(userCampaigns.userId, ctx.user.id)
             )
           )
           .limit(1);
 
         if (campaign.length === 0) {
-          return { success: false, error: "Campaign not found" };
+          throw new Error("Campaign not found");
         }
 
         await db.insert(campaignMetricsHistory).values({
-          campaignId: input.campaignId,
+          campaignId: input.id,
           spend: String(input.spend),
           impressions: input.impressions,
           clicks: input.clicks,
