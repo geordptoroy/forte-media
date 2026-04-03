@@ -26,7 +26,8 @@ fi
 
 # Run migrations (non-blocking if they fail)
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Syncing database schema..."
-if ./node_modules/.bin/drizzle-kit push 2>&1; then
+# Usar drizzle-kit push com o ficheiro de configuração correto
+if ./node_modules/.bin/drizzle-kit push --config=drizzle.config.ts 2>&1; then
   echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database migrations completed successfully"
 else
   echo "!!! [$(date '+%Y-%m-%d %H:%M:%S')] Database migrations failed, but continuing startup..."

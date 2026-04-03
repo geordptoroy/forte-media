@@ -29,6 +29,8 @@ COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 # Garantir que o diretório scripts existe e copiar o entrypoint
 RUN mkdir -p ./scripts
 COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
