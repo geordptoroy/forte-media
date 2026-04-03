@@ -58,10 +58,13 @@ export interface AdRecord {
     beneficiary?: string;
     payer?: string;
   }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delivery_by_region?: Record<string, any>;
 }
 
-const META_API_BASE_URL = "https://graph.facebook.com/v19.0";
+// Versão da Graph API — atualizada para v21.0
+const META_API_VERSION = "v21.0";
+const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 const ADS_ARCHIVE_ENDPOINT = `${META_API_BASE_URL}/ads_archive`;
 
 /**
@@ -91,7 +94,14 @@ export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<
     throw new Error("At least one country code (ad_reached_countries) is required");
   }
 
-  if (!params.searchTerms && (!params.searchPageIds || params.searchPageIds.length === 0)) {
+  // Normaliza searchTerms: string vazia ou "*" são substituídos por "." (curinga genérico válido)
+  const normalizedSearchTerms = params.searchTerms?.trim();
+  const effectiveSearchTerms =
+    normalizedSearchTerms === "" || normalizedSearchTerms === "*"
+      ? "."
+      : normalizedSearchTerms;
+
+  if (!effectiveSearchTerms && (!params.searchPageIds || params.searchPageIds.length === 0)) {
     throw new Error("Either search_terms or search_page_ids must be provided");
   }
 
@@ -99,6 +109,7 @@ export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<
     throw new Error("Maximum 10 page IDs allowed in search_page_ids");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queryParams: Record<string, any> = {
     access_token: params.accessToken,
     ad_reached_countries: JSON.stringify(params.adReachedCountries),
@@ -106,8 +117,8 @@ export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<
     limit: params.limit || 100,
   };
 
-  if (params.searchTerms) {
-    queryParams.search_terms = params.searchTerms;
+  if (effectiveSearchTerms) {
+    queryParams.search_terms = effectiveSearchTerms;
   }
 
   if (params.searchPageIds) {
@@ -141,12 +152,18 @@ export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<
     });
 
     return response.data;
-  } catch (error: any) {
-    if (error.response?.data?.error) {
-      const metaError = error.response.data.error;
-      throw new Error(`Meta API Error: ${metaError.message || JSON.stringify(metaError)}`);
+  } catch (error: unknown) {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.data?.error
+    ) {
+      const metaError = error.response.data.error as { message?: string; code?: number; type?: string };
+      const msg = metaError.message || JSON.stringify(metaError);
+      console.error("[Meta Ads] Graph API error:", metaError);
+      throw new Error(`Meta API Error (${metaError.code ?? "?"}): ${msg}`);
     }
-    throw new Error(`Failed to search ads archive: ${error.message}`);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to search ads archive: ${errMsg}`);
   }
 }
 
@@ -196,8 +213,8 @@ export async function validateAccessToken(accessToken: string): Promise<boolean>
       },
       timeout: 10000,
     });
-    return !!response.data?.id;
-  } catch (error) {
+    return !!(response.data?.id);
+  } catch {
     return false;
   }
 }

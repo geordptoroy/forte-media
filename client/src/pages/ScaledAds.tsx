@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdCard } from "@/components/ads/AdCard";
 import { AdFilters } from "@/components/ads/AdFilters";
 import { Button } from "@/components/ui/button";
@@ -16,35 +16,55 @@ export default function ScaledAds() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [ads, setAds] = useState<unknown[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
 
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
     {
       countries: ["BR"],
-      minSpend: filters.score_min ? Number(filters.score_min) * 100 : 1000,
+      minSpend: filters.score_min ? Number(filters.score_min) * 100 : undefined,
     },
-    { enabled: false }
+    {
+      // Desabilitado manualmente — controlamos a execução via refetch()
+      enabled: false,
+      retry: false,
+    }
   );
 
   const { page, totalPages, paginatedItems, setPage, goToNext, goToPrev, hasNext, hasPrev, reset } =
     usePagination(ads, 12);
 
+  // Carrega automaticamente quando as credenciais estiverem disponíveis e ainda não carregou
+  useEffect(() => {
+    if (
+      !hasLoaded &&
+      !credentialsStatus.isLoading &&
+      credentialsStatus.data?.hasCredentials &&
+      credentialsStatus.data?.isValid
+    ) {
+      handleSearch(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credentialsStatus.isLoading, credentialsStatus.data?.hasCredentials, credentialsStatus.data?.isValid]);
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     reset();
     setAds([]);
+    setHasLoaded(false);
   };
 
   const handleReset = () => {
     setFilters({});
     reset();
     setAds([]);
+    setHasLoaded(false);
   };
 
-  const handleSearch = async () => {
+  const handleSearch = async (silent = false) => {
     if (!credentialsStatus.data?.hasCredentials) {
-      toast.error("Configure suas credenciais Meta primeiro");
+      if (!silent) toast.error("Configure suas credenciais Meta primeiro");
       return;
     }
     setIsSearching(true);
@@ -58,18 +78,32 @@ export default function ScaledAds() {
             (((ad as Record<string, unknown>).page_name as string) || "").toLowerCase().includes(q)
           );
         }
+        if (filters.media_type) {
+          const mt = filters.media_type.toLowerCase();
+          filtered = filtered.filter(
+            (ad) =>
+              (((ad as Record<string, unknown>).mediaType as string) || "").toLowerCase() === mt
+          );
+        }
         setAds(filtered);
+        setHasLoaded(true);
         reset();
-        toast.success(`${filtered.length} anuncios escalados encontrados`);
+        if (!silent) {
+          toast.success(`${filtered.length} anuncio${filtered.length !== 1 ? "s" : ""} escalado${filtered.length !== 1 ? "s" : ""} encontrado${filtered.length !== 1 ? "s" : ""}`);
+        }
       } else {
-        toast.info("Nenhum anuncio escalado encontrado");
+        if (!silent) toast.info("Nenhum anuncio escalado encontrado");
         setAds([]);
+        setHasLoaded(true);
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Erro ao buscar anuncios escalados"
-      );
+      if (!silent) {
+        toast.error(
+          error instanceof Error ? error.message : "Erro ao buscar anuncios escalados"
+        );
+      }
       setAds([]);
+      setHasLoaded(true);
     } finally {
       setIsSearching(false);
     }
@@ -83,7 +117,7 @@ export default function ScaledAds() {
           subtitle="Identifique criativos que estao recebendo alto investimento agora."
           actions={
             <Button
-              onClick={handleSearch}
+              onClick={() => handleSearch(false)}
               disabled={isSearching || !credentialsStatus.data?.hasCredentials}
               className="btn-premium"
             >
@@ -138,7 +172,7 @@ export default function ScaledAds() {
               </div>
             )}
 
-            {ads.length === 0 && !isSearching && (
+            {ads.length === 0 && hasLoaded && (
               <EmptyState
                 icon={Zap}
                 title="Nenhum anuncio escalado"
@@ -153,7 +187,7 @@ export default function ScaledAds() {
                     : undefined
                 }
                 onAction={
-                  credentialsStatus.data?.hasCredentials ? handleSearch : undefined
+                  credentialsStatus.data?.hasCredentials ? () => handleSearch(false) : undefined
                 }
                 actionDisabled={isSearching}
               />

@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { userMetaCredentials } from "../drizzle/schema";
 import { getDb } from "./db";
 import { encryptToken, hashToken, decryptToken } from "./crypto";
@@ -14,6 +14,9 @@ export interface MetaCredentialsConfig {
   accountName?: string;
   permissions: string[];
 }
+
+// Versão da Graph API — atualizada para v21.0
+const GRAPH_API_VERSION = "v21.0";
 
 /**
  * Armazenar ou atualizar credenciais Meta de um usuário
@@ -113,25 +116,33 @@ export async function validateMetaToken(
   error?: string;
 }> {
   try {
-    const response = await fetch("https://graph.facebook.com/v19.0/me/permissions", {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    const response = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/me/permissions`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
 
     if (!response.ok) {
-      const errorData = await response.json() as any;
+      const errorData = (await response.json()) as { error?: { message?: string } };
       return {
         valid: false,
         permissions: [],
-        error: errorData?.error?.message || `Meta API returned ${response.status}: ${response.statusText}`,
+        error:
+          errorData?.error?.message ||
+          `Meta API returned ${response.status}: ${response.statusText}`,
       };
     }
 
-    const data = (await response.json()) as { data?: Array<{ permission: string; status: string }> };
-    const permissions = data.data
-      ?.filter((p) => p.status === "granted")
-      .map((p) => p.permission) || [];
+    const data = (await response.json()) as {
+      data?: Array<{ permission: string; status: string }>;
+    };
+    const permissions =
+      data.data
+        ?.filter((p) => p.status === "granted")
+        .map((p) => p.permission) || [];
 
     return {
       valid: true,
@@ -142,7 +153,10 @@ export async function validateMetaToken(
     return {
       valid: false,
       permissions: [],
-      error: error instanceof Error ? error.message : "Unknown error during token validation",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error during token validation",
     };
   }
 }

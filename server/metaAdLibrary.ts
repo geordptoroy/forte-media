@@ -50,6 +50,9 @@ export interface AdLibrarySearchResult {
   };
 }
 
+// Versão da API Graph — atualizada para v21.0
+const GRAPH_API_VERSION = "v21.0";
+
 /**
  * Buscar anúncios na Ad Library
  */
@@ -59,12 +62,14 @@ export async function searchAdLibrary(
 ): Promise<AdLibrarySearchResult> {
   try {
     // Construir search_terms corretamente: espaço = AND, vírgula = OR
-    const searchTermsFormatted = params.searchTerms.join(" ");
+    // A Meta Ad Library exige um termo não vazio; usamos "." como curinga genérico
+    const rawTerms = params.searchTerms.join(" ").trim();
+    const searchTermsFormatted = rawTerms === "" || rawTerms === "*" ? "." : rawTerms;
 
     const queryParams = new URLSearchParams({
       access_token: accessToken,
       search_terms: searchTermsFormatted,
-      ad_reached_countries: params.countries.join(","),
+      ad_reached_countries: JSON.stringify(params.countries),
       ad_type: params.adType || "ALL",
       limit: String(params.limit || 25),
       fields: [
@@ -88,7 +93,7 @@ export async function searchAdLibrary(
     }
 
     const response = await fetch(
-      `https://graph.facebook.com/v25.0/ads_archive?${queryParams.toString()}`,
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/ads_archive?${queryParams.toString()}`,
       {
         method: "GET",
         headers: {
@@ -98,9 +103,10 @@ export async function searchAdLibrary(
     );
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as { error?: { message?: string; code?: number } };
+      const msg = error?.error?.message || `HTTP ${response.status}`;
       console.error("[Ad Library] API error:", error);
-      throw new Error(`Ad Library API error: ${response.status}`);
+      throw new Error(`Ad Library API error: ${msg}`);
     }
 
     const data = (await response.json()) as {
@@ -152,11 +158,11 @@ export async function searchAdLibrary(
 /**
  * Calcular dias ativos de um anúncio
  */
-function calculateDaysActive(startTime: string, stopTime: string): number {
+function calculateDaysActive(startTime: string, stopTime?: string): number {
   try {
     const start = new Date(startTime).getTime();
-    const stop = new Date(stopTime).getTime();
-    return Math.ceil((stop - start) / (1000 * 60 * 60 * 24));
+    const end = stopTime ? new Date(stopTime).getTime() : Date.now();
+    return Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
   } catch {
     return 0;
   }
@@ -176,7 +182,6 @@ function calculateCPM(spend: number, impressions: number): number {
  */
 function estimateCTR(impressions: number, spend: number): number {
   // Heurística: anúncios com mais impressões por dólar tendem a ter melhor CTR
-  // Assumir CTR médio de 1-3% para anúncios bem escalados
   if (impressions === 0 || spend === 0) return 0;
   const impressionsPerDollar = impressions / spend;
   // Normalizar para CTR estimado (0.5% a 5%)
@@ -254,7 +259,7 @@ export async function searchScaledAds(
 ): Promise<AdLibraryAd[]> {
   try {
     const result = await searchAdLibrary(accessToken, {
-      searchTerms: ["*"],
+      searchTerms: ["."],
       countries,
       adType: "ALL",
       limit: 100,
@@ -292,8 +297,6 @@ export async function searchScaledAds(
 
     if (params?.minROAS !== undefined) {
       const minROAS = params.minROAS;
-      // ROAS = Revenue / Spend. Sem dados de revenue, usamos uma heurística baseada em impressões
-      // Assumir $1 de revenue por 1000 impressões como baseline
       filtered = filtered.filter((ad) => {
         const estimatedRevenue = (ad.impressions || 0) / 1000;
         const spend = parseFloat(ad.spend) || 1;

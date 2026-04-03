@@ -14,6 +14,7 @@ import { adsRouter } from "./adsRouter";
 import { monitoringRouter } from "./monitoringRouter";
 import { campaignsRouter } from "./campaignsRouter";
 import { searchAdsArchive } from "./services/metaAdsService";
+import { searchScaledAds as searchScaledAdsLibrary } from "./metaAdLibrary";
 
 export const appRouter = router({
   system: systemRouter,
@@ -208,13 +209,15 @@ export const appRouter = router({
       }),
 
     /**
-     * Search scaled ads (high spend/performance)
+     * Search scaled ads (high spend/performance) using Meta Ad Library
+     * Automatically fetches on page load — no manual trigger required.
      */
     searchScaledAds: protectedProcedure
       .input(
         z.object({
           countries: z.array(z.string()).min(1),
           minSpend: z.number().optional(),
+          searchTerms: z.string().optional(),
         })
       )
       .query(async ({ ctx, input }) => {
@@ -223,15 +226,25 @@ export const appRouter = router({
           throw new Error("Meta credentials not configured");
         }
 
-        // Use the same search service but with scaling logic
-        const result = await searchAdsArchive({
-          accessToken: creds.accessToken,
-          adReachedCountries: input.countries,
-          searchTerms: "", // Empty search for broad discovery
-          limit: 50,
-        });
+        try {
+          // Usa a biblioteca dedicada de Ad Library com análise de escalabilidade
+          const ads = await searchScaledAdsLibrary(
+            creds.accessToken,
+            input.countries,
+            {
+              minSpend: input.minSpend,
+            }
+          );
 
-        return { ads: result.data };
+          return { ads };
+        } catch (error) {
+          console.error("[Meta] searchScaledAds error:", error);
+          // Retorna lista vazia em vez de lançar exceção para não bloquear a UI
+          return {
+            ads: [],
+            error: error instanceof Error ? error.message : "Failed to search scaled ads",
+          };
+        }
       }),
 
     /**
@@ -242,7 +255,7 @@ export const appRouter = router({
       if (!creds || !creds.isValid || !creds.adAccountId) {
         return { campaigns: [] };
       }
-      
+
       // Basic placeholder for Marketing API integration
       return { campaigns: [] };
     }),
