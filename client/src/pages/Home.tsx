@@ -173,7 +173,17 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 py-8 px-4">
-        <div className="container text-center text-xs text-gray-600">
+        <div className="container text-center text-xs text-gray-600 space-y-4">
+          <div className="flex justify-center gap-6">
+            <button 
+              onClick={() => setLocation("/privacy-policy")}
+              className="hover:text-white transition-colors"
+            >
+              Política de Privacidade
+            </button>
+            <button className="hover:text-white transition-colors">Termos de Uso</button>
+            <button className="hover:text-white transition-colors">Suporte</button>
+          </div>
           <p>
             2026 FORTE MEDIA. Todos os direitos reservados. Desenvolvido para
             profissionais de marketing digital.

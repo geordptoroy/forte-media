@@ -17,6 +17,7 @@ import Reports from "./pages/Reports";
 import ScaledAds from "./pages/ScaledAds";
 import Favorites from "./pages/Favorites";
 import Monitoring from "./pages/Monitoring";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { useEffect, type ComponentType } from "react";
 
 /**
@@ -93,6 +94,7 @@ function Router() {
     <Switch>
       {/* Rota publica principal */}
       <Route path="/" component={Home} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
 
       {/* Rotas de autenticacao */}
       <PublicRoute path="/login" component={Login} />
