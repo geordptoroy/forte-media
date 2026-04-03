@@ -8,15 +8,18 @@ import { EmptyState } from "@/components/EmptyState";
 import { PaginationControls } from "@/components/PaginationControls";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, Zap, TrendingUp } from "lucide-react";
+import { Loader2, Zap, TrendingUp, AlertCircle } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { usePagination } from "@/hooks/usePagination";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ScaledAds() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [ads, setAds] = useState<unknown[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isPermissionError, setIsPermissionError] = useState(false);
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
 
@@ -53,6 +56,8 @@ export default function ScaledAds() {
     reset();
     setAds([]);
     setHasLoaded(false);
+    setApiError(null);
+    setIsPermissionError(false);
   };
 
   const handleReset = () => {
@@ -60,6 +65,8 @@ export default function ScaledAds() {
     reset();
     setAds([]);
     setHasLoaded(false);
+    setApiError(null);
+    setIsPermissionError(false);
   };
 
   const handleSearch = async (silent = false) => {
@@ -68,8 +75,23 @@ export default function ScaledAds() {
       return;
     }
     setIsSearching(true);
+    setApiError(null);
+    setIsPermissionError(false);
     try {
       const result = await searchScaledAdsQuery.refetch();
+      
+      // Verificar se há erro na resposta
+      if (result.data?.error) {
+        setApiError(result.data.error);
+        setIsPermissionError(result.data.isPermissionError ?? false);
+        setAds([]);
+        setHasLoaded(true);
+        if (!silent) {
+          toast.error(result.data.error);
+        }
+        return;
+      }
+
       if (result.data?.ads) {
         let filtered: unknown[] = result.data.ads;
         if (filters.search) {
@@ -97,10 +119,10 @@ export default function ScaledAds() {
         setHasLoaded(true);
       }
     } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Erro ao buscar anuncios escalados";
+      setApiError(errMsg);
       if (!silent) {
-        toast.error(
-          error instanceof Error ? error.message : "Erro ao buscar anuncios escalados"
-        );
+        toast.error(errMsg);
       }
       setAds([]);
       setHasLoaded(true);
@@ -138,6 +160,34 @@ export default function ScaledAds() {
           <CredentialsWarning message="A deteccao de escala exige uma conexao ativa com a Meta Marketing API para analisar volumes de investimento." />
         )}
 
+        {/* Erro de permissão da Ad Library API */}
+        {isPermissionError && apiError && (
+          <Alert className="border-orange-200 bg-orange-50">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>Ad Library API não autorizada:</strong> Sua aplicação Meta precisa de aprovação para acessar a Ads Library.{" "}
+              <a
+                href="https://developers.facebook.com/docs/marketing-api/reference/ads-archive"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-semibold hover:text-orange-900"
+              >
+                Clique aqui para autorizar
+              </a>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Erro genérico da API */}
+        {apiError && !isPermissionError && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <strong>Erro ao buscar anúncios:</strong> {apiError}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Filters */}
         <AdFilters
           filters={filters}
@@ -172,7 +222,7 @@ export default function ScaledAds() {
               </div>
             )}
 
-            {ads.length === 0 && hasLoaded && (
+            {ads.length === 0 && hasLoaded && !apiError && (
               <EmptyState
                 icon={Zap}
                 title="Nenhum anuncio escalado"

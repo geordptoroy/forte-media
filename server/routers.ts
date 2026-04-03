@@ -211,6 +211,9 @@ export const appRouter = router({
     /**
      * Search scaled ads (high spend/performance) using Meta Ad Library
      * Automatically fetches on page load — no manual trigger required.
+     * 
+     * IMPORTANTE: A aplicação Meta deve estar autorizada para acessar a Ad Library API.
+     * Veja: https://developers.facebook.com/docs/marketing-api/reference/ads-archive
      */
     searchScaledAds: protectedProcedure
       .input(
@@ -223,7 +226,10 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const creds = await getMetaCredentials(ctx.user.id);
         if (!creds || !creds.isValid) {
-          throw new Error("Meta credentials not configured");
+          return {
+            ads: [],
+            error: "Meta credentials not configured. Please add your access token in settings.",
+          };
         }
 
         try {
@@ -238,11 +244,26 @@ export const appRouter = router({
 
           return { ads };
         } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : "Failed to search scaled ads";
           console.error("[Meta] searchScaledAds error:", error);
+
+          // Detectar erro de permissão da Ad Library API
+          if (
+            errorMsg.includes("Application does not have permission") ||
+            errorMsg.includes("OAuthException") ||
+            errorMsg.includes("error_subcode: 2332002")
+          ) {
+            return {
+              ads: [],
+              error: "Ad Library API not authorized. Your Meta app needs approval to access the Ads Library. Visit: https://developers.facebook.com/docs/marketing-api/reference/ads-archive",
+              isPermissionError: true,
+            };
+          }
+
           // Retorna lista vazia em vez de lançar exceção para não bloquear a UI
           return {
             ads: [],
-            error: error instanceof Error ? error.message : "Failed to search scaled ads",
+            error: errorMsg,
           };
         }
       }),
