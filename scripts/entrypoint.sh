@@ -26,7 +26,7 @@ fi
 
 # Run migrations (non-blocking if they fail)
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Syncing database schema..."
-if pnpm db:push 2>&1; then
+if ./node_modules/.bin/drizzle-kit push 2>&1; then
   echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database migrations completed successfully"
 else
   echo "!!! [$(date '+%Y-%m-%d %H:%M:%S')] Database migrations failed, but continuing startup..."
@@ -34,4 +34,4 @@ fi
 
 # Start the Node.js server
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Starting Node.js server..."
-exec node dist/index.js
+exec node dist/server/index.js

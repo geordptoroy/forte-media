@@ -3,13 +3,14 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar apenas os arquivos de lock e package.json para cache de dependencias
+# Copiar apenas os arquivos de lock e package.json da raiz para cache de dependencias
+# O projeto usa um unico pnpm-lock.yaml na raiz para o workspace
 COPY package.json pnpm-lock.yaml ./
-COPY client/package.json client/pnpm-lock.yaml client/
-COPY server/package.json server/pnpm-lock.yaml server/
-COPY shared/package.json shared/pnpm-lock.yaml shared/
+COPY client/package.json client/
+COPY server/package.json server/
+COPY shared/package.json shared/
 
-# Instalar dependencias
+# Instalar dependencias usando o lock da raiz
 RUN corepack enable && pnpm install --frozen-lockfile
 
 # Copiar o restante do codigo
@@ -25,7 +26,7 @@ WORKDIR /app
 
 # Copiar apenas os arquivos necessarios do estagio de build
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.lock
+COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/shared ./shared
