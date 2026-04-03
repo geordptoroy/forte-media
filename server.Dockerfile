@@ -6,6 +6,9 @@ WORKDIR /app
 # O projeto usa um único package.json e pnpm-lock.yaml na raiz
 COPY package.json pnpm-lock.yaml ./
 
+# Copiar a pasta de patches necessária para a instalação de dependências
+COPY patches ./patches
+
 # Instalar dependencias usando o lock da raiz
 RUN corepack enable && pnpm install --frozen-lockfile
 
