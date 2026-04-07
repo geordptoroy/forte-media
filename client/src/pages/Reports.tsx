@@ -20,7 +20,15 @@ import {
   Loader2,
   FileJson,
   FileSpreadsheet,
+  Calendar,
+  Zap,
+  ShieldCheck,
+  TrendingUp,
+  FileText,
+  PieChart
 } from "lucide-react";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function Reports() {
   const [period, setPeriod] = useState("30d");
@@ -55,15 +63,15 @@ export default function Reports() {
     setLoading(true);
     try {
       const rows: string[][] = [
-        ["Tipo", "ID", "Nome/Pagina", "Gasto Min", "Impressoes Min", "Data"],
+        ["Tipo", "ID", "Nome/Pagina", "Gasto Min", "Impressoes Min", "Data Criacao"],
       ];
       recentFavorites.forEach((fav) =>
         rows.push([
           "Favorito",
           fav.adId,
           fav.pageName || "",
-          String(fav.spend?.min ?? ""),
-          String(fav.impressions?.min ?? ""),
+          String(fav.spend?.min ?? "N/A"),
+          String(fav.impressions?.min ?? "N/A"),
           new Date(fav.createdAt).toLocaleDateString("pt-BR"),
         ])
       );
@@ -72,8 +80,8 @@ export default function Reports() {
           "Monitorado",
           mon.adId,
           mon.pageName || "",
-          "",
-          "",
+          "N/A",
+          "N/A",
           new Date(mon.createdAt).toLocaleDateString("pt-BR"),
         ])
       );
@@ -82,11 +90,11 @@ export default function Reports() {
           "Campanha",
           camp.campaignId,
           camp.campaignName,
-          String(camp.totalSpend ?? ""),
-          String(camp.totalImpressions ?? ""),
+          String(camp.totalSpend ?? "0"),
+          String(camp.totalImpressions ?? "0"),
           camp.startDate
             ? new Date(camp.startDate).toLocaleDateString("pt-BR")
-            : "",
+            : "N/A",
         ])
       );
 
@@ -103,14 +111,12 @@ export default function Reports() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `forte-media-report-${period}-${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
+      link.download = `forte-media-report-${period}-${new Date().toISOString().split("T")[0]}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.success("Relatorio CSV exportado");
+      toast.success("Relatório CSV exportado com sucesso!");
     } catch {
-      toast.error("Erro ao gerar relatorio");
+      toast.error("Erro ao gerar relatório CSV");
     } finally {
       setLoading(false);
     }
@@ -122,9 +128,16 @@ export default function Reports() {
       const report = {
         period,
         generatedAt: new Date().toISOString(),
-        favorites: recentFavorites,
-        monitored: recentMonitored,
-        campaigns,
+        summary: {
+          favorites: recentFavorites.length,
+          monitored: recentMonitored.length,
+          campaigns: campaigns.length,
+        },
+        data: {
+          favorites: recentFavorites,
+          monitored: recentMonitored,
+          campaigns,
+        }
       };
       const blob = new Blob([JSON.stringify(report, null, 2)], {
         type: "application/json",
@@ -135,9 +148,9 @@ export default function Reports() {
       link.download = `forte-media-report-${period}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.success("Relatorio JSON exportado");
+      toast.success("Relatório JSON exportado com sucesso!");
     } catch {
-      toast.error("Erro ao gerar relatorio");
+      toast.error("Erro ao gerar relatório JSON");
     } finally {
       setLoading(false);
     }
@@ -153,87 +166,75 @@ export default function Reports() {
     monitoredQuery.isLoading ||
     campaignsQuery.isLoading;
 
-  const summaryCards = [
-    {
-      icon: Heart,
-      label: "Favoritos no Periodo",
-      value: recentFavorites.length,
-    },
-    {
-      icon: Eye,
-      label: "Monitorados no Periodo",
-      value: recentMonitored.length,
-    },
-    {
-      icon: BarChart3,
-      label: "Campanhas Totais",
-      value: campaigns.length,
-    },
-    {
-      icon: Download,
-      label: "Total de Registros",
-      value: recentFavorites.length + recentMonitored.length + campaigns.length,
-    },
+  const stats = [
+    { label: "Favoritos", value: recentFavorites.length, icon: Heart, color: "text-red-500", bg: "bg-red-500/10" },
+    { label: "Monitorados", value: recentMonitored.length, icon: Eye, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Campanhas", value: campaigns.length, icon: BarChart3, color: "text-green-500", bg: "bg-green-500/10" },
+    { label: "Total Registros", value: recentFavorites.length + recentMonitored.length + campaigns.length, icon: Zap, color: "text-yellow-500", bg: "bg-yellow-500/10" },
   ];
 
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          title="Relatorios"
-          subtitle="Exporte dados estrategicos e analises consolidadas da sua operacao."
+          title="Relatórios e BI"
+          subtitle="Extraia inteligência estratégica da sua operação para análise em ferramentas externas."
         />
 
-        {/* Config Panel */}
-        <Card className="card-premium bg-white/[0.02] border-white/5 p-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="p-2 bg-white/5 rounded-lg border border-white/10">
-              <Download className="w-5 h-5 text-white" />
+        {/* Export Panel */}
+        <Card className="card-premium bg-white/[0.02] border-white/5 p-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+            <PieChart className="w-48 h-48 text-white" />
+          </div>
+
+          <div className="flex items-start gap-4 mb-10 relative z-10">
+            <div className="p-3 bg-white/5 rounded-2xl border border-white/10">
+              <Download className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Exportar Relatorio</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Selecione o periodo e formato para exportar seus dados.
+              <h2 className="text-xl font-black text-white tracking-tight">Exportação de Dados</h2>
+              <p className="text-xs text-gray-500 mt-1 font-bold uppercase tracking-widest">
+                Consolide sua inteligência de mercado em um único arquivo.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                Periodo
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 relative z-10">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <Calendar className="w-3 h-3" /> Período de Análise
               </label>
               <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger className="input-premium">
+                <SelectTrigger className="input-premium h-12">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7d">Ultimos 7 dias</SelectItem>
-                  <SelectItem value="30d">Ultimos 30 dias</SelectItem>
-                  <SelectItem value="90d">Ultimos 90 dias</SelectItem>
+                <SelectContent className="bg-black border-white/10 text-white">
+                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90d">Últimos 90 dias</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                Formato
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                <FileText className="w-3 h-3" /> Formato do Arquivo
               </label>
               <Select value={format} onValueChange={setFormat}>
-                <SelectTrigger className="input-premium">
+                <SelectTrigger className="input-premium h-12">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-black border-white/10 text-white">
                   <SelectItem value="csv">
                     <div className="flex items-center gap-2">
-                      <FileSpreadsheet className="w-4 h-4" />
-                      CSV (Excel)
+                      <FileSpreadsheet className="w-4 h-4 text-green-500" />
+                      <span>CSV (Excel / Sheets)</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="json">
                     <div className="flex items-center gap-2">
-                      <FileJson className="w-4 h-4" />
-                      JSON
+                      <FileJson className="w-4 h-4 text-yellow-500" />
+                      <span>JSON (Sistemas / BI)</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -241,80 +242,92 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-            {summaryCards.map((card, i) => (
-              <div
+          {/* Real-time Summary */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 relative z-10">
+            {stats.map((stat, i) => (
+              <motion.div
                 key={i}
-                className="p-4 bg-white/5 rounded-xl border border-white/10 text-center"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="p-5 bg-white/[0.03] rounded-2xl border border-white/5 text-center group hover:border-white/10 transition-all"
               >
-                <card.icon className="w-4 h-4 text-gray-500 mx-auto mb-2" />
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mx-auto mb-3", stat.bg, stat.color)}>
+                  <stat.icon className="w-4 h-4" />
+                </div>
                 {isDataLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-gray-600 mx-auto" />
+                  <Loader2 className="w-6 h-6 animate-spin text-white/10 mx-auto" />
                 ) : (
-                  <p className="text-2xl font-bold text-white">{card.value}</p>
+                  <p className="text-2xl font-black text-white">{stat.value}</p>
                 )}
-                <p className="text-[9px] font-bold uppercase tracking-widest text-gray-600 mt-1">
-                  {card.label}
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-600 mt-1">
+                  {stat.label}
                 </p>
-              </div>
+              </motion.div>
             ))}
           </div>
 
           <Button
             onClick={handleExport}
             disabled={loading || isDataLoading}
-            className="btn-premium w-full sm:w-auto px-10"
+            className="btn-premium w-full h-14 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl relative z-10"
           >
             {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                <Download className="w-4 h-4 mr-2" />
-                Exportar {format.toUpperCase()}
+                <Download className="w-5 h-5 mr-3" />
+                Gerar e Baixar Relatório
               </>
             )}
           </Button>
         </Card>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Documentation / Info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             {
-              title: "Dados Incluidos",
+              title: "O que será exportado?",
+              icon: FileText,
               items: [
-                "Anuncios favoritos com metricas",
-                "Anuncios monitorados e status",
-                "Campanhas e performance",
+                "Criativos salvos na biblioteca",
+                "Status de rastreio Utmify-style",
+                "Métricas de campanhas ativas",
+                "IDs de anúncios e páginas Meta",
               ],
             },
             {
-              title: "Formatos Suportados",
+              title: "Como usar os dados?",
+              icon: TrendingUp,
               items: [
-                "CSV — compativel com Excel e Google Sheets",
-                "JSON — para integracao com sistemas",
+                "Importe no Excel para pivot tables",
+                "Suba no PowerBI para dashboards",
+                "Use JSON para scripts de automação",
+                "Histórico de atividade offline",
               ],
             },
             {
-              title: "Privacidade",
+              title: "Segurança e BI",
+              icon: ShieldCheck,
               items: [
-                "Dados exportados localmente",
-                "Nenhum dado enviado a terceiros",
-                "Conformidade com LGPD",
+                "Exportação 100% local no browser",
+                "Nenhum dado sensível sai da conta",
+                "Conformidade total com LGPD",
+                "Backup offline de estratégias",
               ],
             },
           ].map((section, i) => (
-            <Card
-              key={i}
-              className="card-premium bg-white/[0.02] border-white/5 p-5"
-            >
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
-                {section.title}
-              </h3>
-              <ul className="space-y-2">
+            <Card key={i} className="card-premium bg-white/[0.02] border-white/5 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <section.icon className="w-4 h-4 text-gray-500" />
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-white">
+                  {section.title}
+                </h3>
+              </div>
+              <ul className="space-y-3">
                 {section.items.map((item, j) => (
-                  <li key={j} className="flex items-start gap-2 text-xs text-gray-400">
-                    <span className="w-1 h-1 rounded-full bg-gray-600 mt-1.5 shrink-0" />
+                  <li key={j} className="flex items-start gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-relaxed">
+                    <div className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 shrink-0" />
                     {item}
                   </li>
                 ))}

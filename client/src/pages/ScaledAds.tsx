@@ -1,288 +1,104 @@
 import { useState, useEffect } from "react";
-import { AdCard } from "@/components/ads/AdCard";
-import { AdFilters } from "@/components/ads/AdFilters";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/PageHeader";
-import { CredentialsWarning } from "@/components/CredentialsWarning";
-import { EmptyState } from "@/components/EmptyState";
-import { PaginationControls } from "@/components/PaginationControls";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import { Loader2, Zap, TrendingUp, AlertCircle } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
 import DashboardLayout from "@/components/DashboardLayout";
-import { usePagination } from "@/hooks/usePagination";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AdCard } from "@/components/ads/AdCard";
+import {
+  Zap,
+  Loader2,
+  Search,
+  TrendingUp,
+  RefreshCcw
+} from "lucide-react";
+import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function ScaledAds() {
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [ads, setAds] = useState<unknown[]>([]);
+  const [searchTerms, setSearchTerms] = useState("");
+  const [country, setCountry] = useState("BR");
+  const [ads, setAds] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isPermissionError, setIsPermissionError] = useState(false);
 
-  const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
-
-  // Não passa minSpend pois spend não está disponível na Ad Library API para anúncios comuns.
-  // O filtro de score é aplicado no frontend após receber os dados.
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
-    {
-      countries: ["BR"],
-    },
-    {
-      // Desabilitado manualmente — controlamos a execução via refetch()
-      enabled: false,
-      retry: false,
-    }
+    { countries: [country], searchTerms },
+    { enabled: false }
   );
 
-  const { page, totalPages, paginatedItems, setPage, goToNext, goToPrev, hasNext, hasPrev, reset } =
-    usePagination(ads, 12);
-
-  // Carrega automaticamente quando as credenciais estiverem disponíveis e ainda não carregou
-  useEffect(() => {
-    if (
-      !hasLoaded &&
-      !credentialsStatus.isLoading &&
-      credentialsStatus.data?.hasCredentials &&
-      credentialsStatus.data?.isValid
-    ) {
-      handleSearch(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [credentialsStatus.isLoading, credentialsStatus.data?.hasCredentials, credentialsStatus.data?.isValid]);
-
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    reset();
-    setAds([]);
-    setHasLoaded(false);
-    setApiError(null);
-    setIsPermissionError(false);
-  };
-
-  const handleReset = () => {
-    setFilters({});
-    reset();
-    setAds([]);
-    setHasLoaded(false);
-    setApiError(null);
-    setIsPermissionError(false);
-  };
-
-  const handleSearch = async (silent = false) => {
-    if (!credentialsStatus.data?.hasCredentials) {
-      if (!silent) toast.error("Configure suas credenciais Meta primeiro");
-      return;
-    }
+  const handleSearch = async () => {
     setIsSearching(true);
-    setApiError(null);
-    setIsPermissionError(false);
     try {
       const result = await searchScaledAdsQuery.refetch();
-      
-      // Verificar se há erro na resposta
-      if (result.data?.error) {
-        setApiError(result.data.error);
-        // Detectar erro de permissão baseado na mensagem
-        setIsPermissionError(result.data.error.toLowerCase().includes("permission") || result.data.error.includes("OAuth"));
-        setAds([]);
-        setHasLoaded(true);
-        if (!silent) {
-          toast.error(result.data.error);
-        }
-        return;
-      }
-
-      if (result.data?.ads) {
-        let filtered: unknown[] = result.data.ads;
-
-        // Filtro por nome do anunciante (page_name — snake_case vindo do backend)
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          filtered = filtered.filter((ad) => {
-            const adObj = ad as Record<string, unknown>;
-            const pageName = (adObj.page_name as string) || "";
-            return pageName.toLowerCase().includes(q);
-          });
-        }
-
-        // Filtro por tipo de mídia (media_type — snake_case vindo do backend)
-        if (filters.media_type) {
-          const mt = filters.media_type.toLowerCase();
-          filtered = filtered.filter((ad) => {
-            const adObj = ad as Record<string, unknown>;
-            // Suporta tanto snake_case (media_type) quanto camelCase (mediaType)
-            const mediaType = ((adObj.media_type as string) || (adObj.mediaType as string) || "").toLowerCase();
-            return mediaType === mt;
-          });
-        }
-
-        // Filtro por score mínimo (scalingScore calculado no backend)
-        if (filters.score_min) {
-          const minScore = Number(filters.score_min);
-          filtered = filtered.filter((ad) => {
-            const adObj = ad as Record<string, unknown>;
-            const score = (adObj.scalingScore as number) || 0;
-            return score >= minScore;
-          });
-        }
-
-        setAds(filtered);
-        setHasLoaded(true);
-        reset();
-        if (!silent) {
-          toast.success(`${filtered.length} anuncio${filtered.length !== 1 ? "s" : ""} escalado${filtered.length !== 1 ? "s" : ""} encontrado${filtered.length !== 1 ? "s" : ""}`);
-        }
+      if (result.data?.success && result.data?.data) {
+        setAds(result.data.data);
+        toast.success(`${result.data.data.length} anúncios escalados minerados`);
       } else {
-        if (!silent) toast.info("Nenhum anuncio escalado encontrado");
-        setAds([]);
-        setHasLoaded(true);
+        toast.error(result.data?.error || "Erro ao buscar anúncios escalados");
       }
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : "Erro ao buscar anuncios escalados";
-      setApiError(errMsg);
-      if (!silent) {
-        toast.error(errMsg);
-      }
-      setAds([]);
-      setHasLoaded(true);
+      toast.error("Erro na conexão com a Meta API");
     } finally {
       setIsSearching(false);
     }
   };
 
+  useEffect(() => {
+    handleSearch();
+  }, [country]);
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
         <PageHeader
-          title="Anuncios Scaled"
-          subtitle="Identifique criativos que estao recebendo alto investimento agora."
-          actions={
-            <Button
-              onClick={() => handleSearch(false)}
-              disabled={isSearching || !credentialsStatus.data?.hasCredentials}
-              className="btn-premium"
-            >
-              {isSearching ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 mr-2 text-yellow-500" />
-                  Sincronizar Escala
-                </>
-              )}
-            </Button>
-          }
+          title="Anúncios Scaled"
+          subtitle="Identifique criativos que estão recebendo alto investimento agora."
         />
 
-        {/* Aviso de credenciais */}
-        {!credentialsStatus.isLoading && !credentialsStatus.data?.hasCredentials && (
-          <CredentialsWarning message="A deteccao de escala exige uma conexao ativa com a Meta Marketing API para analisar volumes de investimento." />
-        )}
-
-        {/* Erro de permissão da Ad Library API */}
-        {isPermissionError && apiError && (
-          <Alert className="border-orange-200 bg-orange-50">
-            <AlertCircle className="h-4 w-4 text-orange-600" />
-            <AlertDescription className="text-orange-800">
-              <strong>Ad Library API não autorizada:</strong> Sua aplicação Meta precisa de aprovação para acessar a Ads Library.{" "}
-              <a
-                href="https://developers.facebook.com/docs/marketing-api/reference/ads-archive"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline font-semibold hover:text-orange-900"
-              >
-                Clique aqui para autorizar
-              </a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Erro genérico da API */}
-        {apiError && !isPermissionError && (
-          <Alert className="border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              <strong>Erro ao buscar anúncios:</strong> {apiError}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Filters */}
-        <AdFilters
-          filters={filters}
-          onChange={handleFilterChange}
-          onReset={handleReset}
-        />
-
-        {/* Loading */}
-        {isSearching && (
-          <div className="flex items-center justify-center py-20">
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-600" />
-              <p className="text-sm text-gray-500">Analisando escala de anuncios...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Results */}
-        {!isSearching && (
-          <>
-            {ads.length > 0 && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <TrendingUp className="w-3.5 h-3.5 text-yellow-500" />
-                  <span className="font-bold">
-                    {ads.length} anuncio{ads.length !== 1 ? "s" : ""} escalados
-                  </span>
-                </div>
-                <span className="text-xs text-gray-600">
-                  Pagina {page} de {totalPages}
-                </span>
-              </div>
-            )}
-
-            {ads.length === 0 && hasLoaded && !apiError && (
-              <EmptyState
-                icon={Zap}
-                title="Nenhum anuncio escalado"
-                description={
-                  credentialsStatus.data?.hasCredentials
-                    ? "Clique em Sincronizar Escala para buscar anuncios com alto investimento."
-                    : "Configure suas credenciais Meta para detectar anuncios escalados."
-                }
-                actionLabel={
-                  credentialsStatus.data?.hasCredentials
-                    ? "Sincronizar Agora"
-                    : undefined
-                }
-                onAction={
-                  credentialsStatus.data?.hasCredentials ? () => handleSearch(false) : undefined
-                }
-                actionDisabled={isSearching}
+        <Card className="bg-white/[0.02] border-white/5 p-6 rounded-[2rem]">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <Input
+                placeholder="Pesquisar por nicho ou concorrente..."
+                value={searchTerms}
+                onChange={(e) => setSearchTerms(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="input-premium h-14 pl-12 text-lg"
               />
-            )}
+            </div>
+            <Button onClick={handleSearch} disabled={isSearching} className="btn-premium h-14 px-10">
+              {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sincronizar Escala"}
+            </Button>
+          </div>
+        </Card>
 
-            {paginatedItems.length > 0 && (
+        <div className="min-h-[400px]">
+          <AnimatePresence mode="wait">
+            {isSearching ? (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-32 gap-4">
+                <Loader2 className="w-10 h-10 animate-spin text-white/10" />
+                <p className="text-sm text-gray-600 font-black uppercase tracking-widest">Minerando Criativos...</p>
+              </motion.div>
+            ) : ads.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {paginatedItems.map((ad, i) => (
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  <AdCard key={((ad as any).id as string) || String(i)} ad={ad as any} />
+                {ads.map((ad, i) => (
+                  <motion.div key={ad.id || i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                    <AdCard ad={ad} />
+                  </motion.div>
                 ))}
               </div>
+            ) : (
+              <EmptyState
+                icon={Zap}
+                title="Inicie sua análise"
+                description="Digite um termo acima para descobrir o que está performando agora."
+              />
             )}
-
-            <PaginationControls
-              page={page}
-              totalPages={totalPages}
-              onPrev={goToPrev}
-              onNext={goToNext}
-              hasPrev={hasPrev}
-              hasNext={hasNext}
-            />
-          </>
-        )}
+          </AnimatePresence>
+        </div>
       </div>
     </DashboardLayout>
   );

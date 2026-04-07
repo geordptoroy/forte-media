@@ -133,42 +133,55 @@ export const appRouter = router({
       }
     }),
 
-    searchAds: protectedProcedure
+    // Unified Search Procedure for Advanced Search
+    searchByKeywords: protectedProcedure
       .input(
         z.object({
-          searchTerms: z.array(z.string()).min(1),
-          countries: z.array(z.string()).min(1),
-          limit: z.number().optional(),
+          keywords: z.string().min(1),
+          countries: z.array(z.string()).default(["BR"]),
+          adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "CREDIT_ADS", "EMPLOYMENT_ADS", "HOUSING_ADS"]).default("ALL"),
+          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ACTIVE"),
+          limit: z.number().max(100).default(50),
           after: z.string().optional(),
         })
       )
       .query(async ({ ctx, input }) => {
         const creds = await getMetaCredentials(ctx.user.id);
-        if (!creds || !creds.isValid) throw new Error("Meta credentials not configured");
+        if (!creds || !creds.isValid) {
+          return { success: false, error: "Meta credentials not configured or invalid." };
+        }
 
-        const result = await searchAdsArchive({
-          userId: ctx.user.id,
-          accessToken: creds.accessToken,
-          adReachedCountries: input.countries,
-          searchTerms: input.searchTerms.join(","),
-          limit: input.limit,
-          after: input.after,
-        });
+        try {
+          const result = await searchAdsArchive({
+            userId: ctx.user.id,
+            accessToken: creds.accessToken,
+            adReachedCountries: input.countries,
+            searchTerms: input.keywords,
+            adType: input.adType,
+            adActiveStatus: input.adActiveStatus,
+            limit: input.limit,
+            after: input.after,
+          });
 
-        return { ads: result.data, paging: result.paging };
+          return { success: true, data: result.data, paging: result.paging };
+        } catch (error: any) {
+          logger.error("[Meta] searchByKeywords error:", error);
+          return { success: false, error: error.message };
+        }
       }),
 
+    // Optimized Scaled Ads Search for Dashboard
     searchScaledAds: protectedProcedure
       .input(
         z.object({
-          countries: z.array(z.string()).min(1),
+          countries: z.array(z.string()).default(["BR"]),
           searchTerms: z.string().optional(),
         })
       )
       .query(async ({ ctx, input }) => {
         const creds = await getMetaCredentials(ctx.user.id);
         if (!creds || !creds.isValid) {
-          return { ads: [], error: "Meta credentials not configured." };
+          return { success: false, error: "Meta credentials not configured." };
         }
 
         try {
@@ -176,12 +189,12 @@ export const appRouter = router({
             ctx.user.id,
             creds.accessToken,
             input.countries,
-            {}
+            { searchTerms: input.searchTerms }
           );
-          return { ads };
+          return { success: true, data: ads };
         } catch (error: any) {
           logger.error("[Meta] searchScaledAds error:", error);
-          return { ads: [], error: error.message };
+          return { success: false, error: error.message };
         }
       }),
 

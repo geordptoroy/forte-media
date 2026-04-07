@@ -16,6 +16,7 @@ export interface AdLibrarySearchParams {
 }
 
 export interface ScalingAnalysisParams {
+  searchTerms?: string;
   minSpend?: number;
   minCTR?: number;
   minROAS?: number;
@@ -173,7 +174,7 @@ export async function searchScaledAds(
   try {
     const result = await searchAdLibrary(accessToken, {
       userId,
-      searchTerms: ["."],
+      searchTerms: params?.searchTerms ? [params.searchTerms] : ["."],
       countries,
       adType: "ALL",
       limit: 100,

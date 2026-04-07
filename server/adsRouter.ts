@@ -102,6 +102,73 @@ export const adsRouter = router({
     }),
 
   /**
+   * Toggle an ad in favorites (add if not exists, remove if exists)
+   */
+  toggleFavorite: protectedProcedure
+    .input(
+      z.object({
+        adId: z.string().min(1),
+        pageId: z.string().min(1),
+        pageName: z.string().optional(),
+        adSnapshotUrl: z.string().optional(),
+        adDeliveryStartTime: z.date().optional(),
+        adDeliveryStopTime: z.date().optional(),
+        publisherPlatforms: z.array(z.string()).optional(),
+        adCreativeBodies: z.array(z.string()).optional(),
+        adCreativeLinkTitles: z.array(z.string()).optional(),
+        adCreativeLinkDescriptions: z.array(z.string()).optional(),
+        currency: z.string().optional(),
+        spend: z.any().optional(),
+        impressions: z.any().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Check if already favorited
+        const existing = await db
+          .select()
+          .from(favoriteAds)
+          .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
+
+        if (existing.length > 0) {
+          // Remove if exists
+          await db
+            .delete(favoriteAds)
+            .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
+          return { success: true, action: "removed", message: "Removido dos favoritos" };
+        } else {
+          // Add if not exists
+          await db.insert(favoriteAds).values({
+            userId: ctx.user.id,
+            adId: input.adId,
+            pageId: input.pageId,
+            pageName: input.pageName,
+            adSnapshotUrl: input.adSnapshotUrl,
+            adDeliveryStartTime: input.adDeliveryStartTime,
+            adDeliveryStopTime: input.adDeliveryStopTime,
+            publisherPlatforms: input.publisherPlatforms || [],
+            adCreativeBodies: input.adCreativeBodies || [],
+            adCreativeLinkTitles: input.adCreativeLinkTitles || [],
+            adCreativeLinkDescriptions: input.adCreativeLinkDescriptions || [],
+            currency: input.currency,
+            spend: input.spend,
+            impressions: input.impressions,
+          });
+          return { success: true, action: "added", message: "Adicionado aos favoritos" };
+        }
+      } catch (error) {
+        console.error("[Ads] toggleFavorite error:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to toggle favorite",
+        };
+      }
+    }),
+
+  /**
    * Remove an ad from favorites
    */
   removeFavorite: protectedProcedure

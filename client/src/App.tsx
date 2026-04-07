@@ -10,11 +10,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
-import CompetitiveIntelligence from "./pages/CompetitiveIntelligence";
 import AdvancedSearch from "./pages/AdvancedSearch";
 import Performance from "./pages/Performance";
 import Reports from "./pages/Reports";
-import ScaledAds from "./pages/ScaledAds";
 import Favorites from "./pages/Favorites";
 import Monitoring from "./pages/Monitoring";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -22,7 +20,6 @@ import { useEffect, type ComponentType } from "react";
 
 /**
  * Tela de carregamento exibida enquanto o estado de autenticacao e verificado.
- * Inclui o logo da marca para manter consistencia visual.
  */
 function LoadingScreen() {
   return (
@@ -39,7 +36,6 @@ function LoadingScreen() {
 
 /**
  * Protege rotas privadas: redireciona para /login se nao autenticado.
- * Usa wouter de forma consistente (sem window.location.href).
  */
 function PrivateRoute({
   path,
@@ -100,16 +96,25 @@ function Router() {
       <PublicRoute path="/login" component={Login} />
       <PublicRoute path="/register" component={Register} />
 
-      {/* Rotas protegidas */}
+      {/* Rotas protegidas unificadas */}
+      {/* Dashboard agora e o centro de Anuncios Escalados */}
       <PrivateRoute path="/dashboard" component={Dashboard} />
-      <PrivateRoute path="/settings" component={Settings} />
-      <PrivateRoute path="/competitive-intelligence" component={CompetitiveIntelligence} />
+      
+      {/* Busca Avancada para pesquisa granular */}
       <PrivateRoute path="/search" component={AdvancedSearch} />
-      <PrivateRoute path="/performance" component={Performance} />
-      <PrivateRoute path="/reports" component={Reports} />
-      <PrivateRoute path="/ads" component={ScaledAds} />
-      <PrivateRoute path="/favorites" component={Favorites} />
+      
+      {/* Rastreamento estilo Utmify (Monitoramento de anuncios proprios) */}
       <PrivateRoute path="/monitoring" component={Monitoring} />
+      
+      {/* Performance da conta conectada */}
+      <PrivateRoute path="/performance" component={Performance} />
+      
+      {/* Biblioteca e Favoritos */}
+      <PrivateRoute path="/favorites" component={Favorites} />
+      <PrivateRoute path="/reports" component={Reports} />
+      
+      {/* Configuracoes */}
+      <PrivateRoute path="/settings" component={Settings} />
 
       {/* Fallback 404 */}
       <Route component={NotFound} />
