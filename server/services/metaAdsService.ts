@@ -42,10 +42,13 @@ export interface AdRecord {
   ad_creative_bodies?: string[];
   ad_creative_link_titles?: string[];
   ad_creative_link_descriptions?: string[];
+  ad_creative_images?: Array<{ url?: string; height?: number; width?: number }>;
+  ad_creative_videos?: Array<{ url?: string; thumbnail_url?: string }>;
   currency?: string;
   spend?: { min?: number; max?: number; range?: string };
   impressions?: { min?: number; max?: number; range?: string };
   media_type?: string;
+  ad_reached_countries?: string[];
 }
 
 const META_API_VERSION = "v21.0";
@@ -58,6 +61,8 @@ const DEFAULT_FIELDS = [
   "publisher_platforms", "ad_creative_bodies",
   "ad_creative_link_titles", "ad_creative_link_descriptions",
   "currency", "spend", "impressions", "media_type",
+  "ad_creative_images", "ad_creative_videos",
+  "ad_reached_countries",
 ];
 
 export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<AdsArchiveResponse> {
