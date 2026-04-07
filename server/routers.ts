@@ -219,7 +219,8 @@ export const appRouter = router({
       .input(
         z.object({
           countries: z.array(z.string()).min(1),
-          minSpend: z.number().optional(),
+          // minSpend removido: spend não é retornado pela Ad Library API para anúncios comuns.
+          // O filtro de score é aplicado no frontend usando scalingScore calculado pelo backend.
           searchTerms: z.string().optional(),
         })
       )
@@ -237,9 +238,7 @@ export const appRouter = router({
           const ads = await searchScaledAdsLibrary(
             creds.accessToken,
             input.countries,
-            {
-              minSpend: input.minSpend,
-            }
+            {} // Sem filtros de spend/impressions pois não são retornados pela API para anúncios comuns
           );
 
           return { ads };

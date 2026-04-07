@@ -1,7 +1,14 @@
 /**
  * Integração com Meta Ad Library API
  * Busca anúncios competitivos com análise avançada de escalabilidade
+ *
+ * IMPORTANTE: A Meta Ad Library API (ads_archive) retorna campos em snake_case.
+ * Os campos spend, impressions e media_type NÃO são retornados para anúncios
+ * comuns (ad_type=ALL). Apenas anúncios políticos (POLITICAL_AND_ISSUE_ADS)
+ * possuem esses campos em países específicos.
  */
+
+import { searchAdsArchive } from "./services/metaAdsService";
 
 export interface AdLibrarySearchParams {
   searchTerms: string[];
@@ -19,19 +26,25 @@ export interface ScalingAnalysisParams {
   minDaysActive?: number;
 }
 
+/**
+ * Estrutura do anúncio retornado — campos em snake_case para compatibilidade
+ * com AdCard.tsx e demais componentes do frontend.
+ */
 export interface AdLibraryAd {
   id: string;
-  pageId: string;
-  pageName: string;
-  adCreativeBodies: string[];
-  adCreativeLinkCaptions: string[];
-  adDeliveryStartTime: string;
-  adDeliveryStopTime: string;
-  adSnapshotUrl: string;
-  spend: string;
-  impressions: number;
-  currency: string;
-  mediaType?: string;
+  page_id: string;
+  page_name: string;
+  ad_snapshot_url: string;
+  ad_delivery_start_time?: string;
+  ad_delivery_stop_time?: string;
+  publisher_platforms?: string[];
+  ad_creative_bodies?: string[];
+  ad_creative_link_titles?: string[];
+  ad_creative_link_descriptions?: string[];
+  currency?: string;
+  spend?: { range?: string; min?: number; max?: number } | string | null;
+  impressions?: { range?: string; min?: number; max?: number } | string | null;
+  media_type?: string;
   // Computed fields for scaling analysis
   scalingScore?: number;
   scalingReasons?: string[];
@@ -50,104 +63,69 @@ export interface AdLibrarySearchResult {
   };
 }
 
-// Versão da API Graph — atualizada para v21.0
-const GRAPH_API_VERSION = "v21.0";
-
 /**
- * Buscar anúncios na Ad Library
+ * Buscar anúncios na Ad Library usando o serviço centralizado metaAdsService
  */
 export async function searchAdLibrary(
   accessToken: string,
   params: AdLibrarySearchParams
 ): Promise<AdLibrarySearchResult> {
   try {
-    // Construir search_terms corretamente: espaço = AND, vírgula = OR
+    // Normalizar search_terms: espaço = AND, vírgula = OR
     // A Meta Ad Library exige um termo não vazio; usamos "." como curinga genérico
     const rawTerms = params.searchTerms.join(" ").trim();
     const searchTermsFormatted = rawTerms === "" || rawTerms === "*" ? "." : rawTerms;
 
-    const queryParams = new URLSearchParams({
-      access_token: accessToken,
-      search_terms: searchTermsFormatted,
-      ad_reached_countries: JSON.stringify(params.countries),
-      ad_type: params.adType || "ALL",
-      limit: String(params.limit || 25),
+    const result = await searchAdsArchive({
+      accessToken,
+      adReachedCountries: params.countries,
+      searchTerms: searchTermsFormatted,
+      adType: params.adType === "ALL" ? "ALL" : undefined,
+      limit: params.limit || 25,
+      after: params.after,
       fields: [
         "id",
         "page_id",
         "page_name",
-        "ad_creative_bodies",
-        "ad_creative_link_captions",
+        "ad_snapshot_url",
         "ad_delivery_start_time",
         "ad_delivery_stop_time",
-        "ad_snapshot_url",
+        "publisher_platforms",
+        "ad_creative_bodies",
+        "ad_creative_link_titles",
+        "ad_creative_link_descriptions",
+        "currency",
         "spend",
         "impressions",
-        "currency",
         "media_type",
-      ].join(","),
+      ],
     });
 
-    if (params.after) {
-      queryParams.append("after", params.after);
-    }
-
-    const response = await fetch(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/ads_archive?${queryParams.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json() as { error?: { message?: string; code?: number } };
-      const msg = error?.error?.message || `HTTP ${response.status}`;
-      console.error("[Ad Library] API error:", error);
-      throw new Error(`Ad Library API error: ${msg}`);
-    }
-
-    const data = (await response.json()) as {
-      data?: Array<{
-        id: string;
-        page_id: string;
-        page_name: string;
-        ad_creative_bodies?: string[];
-        ad_creative_link_captions?: string[];
-        ad_delivery_start_time: string;
-        ad_delivery_stop_time: string;
-        ad_snapshot_url: string;
-        spend: string;
-        impressions: number;
-        currency: string;
-        media_type?: string;
-      }>;
-      paging?: {
-        cursors: {
-          before: string;
-          after: string;
-        };
-      };
-    };
-
     return {
-      ads: (data.data || []).map((ad) => ({
+      ads: (result.data || []).map((ad) => ({
         id: ad.id,
-        pageId: ad.page_id,
-        pageName: ad.page_name,
-        adCreativeBodies: ad.ad_creative_bodies || [],
-        adCreativeLinkCaptions: ad.ad_creative_link_captions || [],
-        adDeliveryStartTime: ad.ad_delivery_start_time,
-        adDeliveryStopTime: ad.ad_delivery_stop_time,
-        adSnapshotUrl: ad.ad_snapshot_url,
-        spend: ad.spend,
-        impressions: ad.impressions,
+        page_id: ad.page_id,
+        page_name: ad.page_name,
+        ad_snapshot_url: ad.ad_snapshot_url,
+        ad_delivery_start_time: ad.ad_delivery_start_time,
+        ad_delivery_stop_time: ad.ad_delivery_stop_time,
+        publisher_platforms: ad.publisher_platforms,
+        ad_creative_bodies: ad.ad_creative_bodies,
+        ad_creative_link_titles: ad.ad_creative_link_titles,
+        ad_creative_link_descriptions: ad.ad_creative_link_descriptions,
         currency: ad.currency,
-        mediaType: ad.media_type,
+        spend: ad.spend ?? null,
+        impressions: ad.impressions ?? null,
+        media_type: (ad as unknown as Record<string, unknown>).media_type as string | undefined,
       })),
-      paging: data.paging || { cursors: { before: "", after: "" } },
+      paging: result.paging
+        ? {
+            cursors: {
+              before: result.paging.cursors?.before || "",
+              after: result.paging.cursors?.after || "",
+            },
+          }
+        : { cursors: { before: "", after: "" } },
     };
   } catch (error) {
     console.error("[Ad Library] Search error:", error);
@@ -158,7 +136,8 @@ export async function searchAdLibrary(
 /**
  * Calcular dias ativos de um anúncio
  */
-function calculateDaysActive(startTime: string, stopTime?: string): number {
+function calculateDaysActive(startTime?: string, stopTime?: string): number {
+  if (!startTime) return 0;
   try {
     const start = new Date(startTime).getTime();
     const end = stopTime ? new Date(stopTime).getTime() : Date.now();
@@ -166,6 +145,29 @@ function calculateDaysActive(startTime: string, stopTime?: string): number {
   } catch {
     return 0;
   }
+}
+
+/**
+ * Extrair valor numérico de spend/impressions (que pode ser objeto range ou string)
+ */
+function extractNumericValue(value: AdLibraryAd["spend"] | AdLibraryAd["impressions"]): number {
+  if (!value) return 0;
+  if (typeof value === "string") return parseFloat(value) || 0;
+  if (typeof value === "object") {
+    // Objeto com min/max — usar média
+    const min = value.min ?? 0;
+    const max = value.max ?? 0;
+    if (min > 0 || max > 0) return (min + max) / 2;
+    // Tentar extrair do campo range (ex: "1000-5000")
+    if (value.range) {
+      const parts = value.range.split("-").map((p) => parseFloat(p.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return (parts[0] + parts[1]) / 2;
+      }
+      return parseFloat(value.range) || 0;
+    }
+  }
+  return 0;
 }
 
 /**
@@ -190,14 +192,15 @@ function estimateCTR(impressions: number, spend: number): number {
 
 /**
  * Analisar escalabilidade de um anúncio
+ * Quando spend/impressions não estão disponíveis, usa critérios alternativos
  */
 function analyzeScaling(ad: AdLibraryAd): { score: number; reasons: string[] } {
   const reasons: string[] = [];
   let score = 0;
 
-  const spend = parseFloat(ad.spend) || 0;
-  const impressions = ad.impressions || 0;
-  const daysActive = calculateDaysActive(ad.adDeliveryStartTime, ad.adDeliveryStopTime);
+  const spend = extractNumericValue(ad.spend);
+  const impressions = extractNumericValue(ad.impressions);
+  const daysActive = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
   const cpm = calculateCPM(spend, impressions);
   const estimatedCTR = estimateCTR(impressions, spend);
 
@@ -233,17 +236,38 @@ function analyzeScaling(ad: AdLibraryAd): { score: number; reasons: string[] } {
 
   // Critério 5: Duração de atividade (indica consistência)
   if (daysActive >= 30) {
-    score += 10;
-    reasons.push(`Ativo por ${daysActive} dias (consistência)`);
+    score += 20;
+    reasons.push(`Ativo por ${daysActive} dias (consistência alta)`);
+  } else if (daysActive >= 14) {
+    score += 15;
+    reasons.push(`Ativo por ${daysActive} dias (consistência boa)`);
   } else if (daysActive >= 7) {
-    score += 5;
+    score += 10;
     reasons.push(`Ativo por ${daysActive} dias`);
+  } else if (daysActive >= 1) {
+    score += 5;
+    reasons.push(`Ativo por ${daysActive} dia${daysActive > 1 ? "s" : ""}`);
   }
 
   // Critério 6: Tipo de mídia (vídeos tendem a escalar melhor)
-  if (ad.mediaType === "VIDEO") {
-    score += 5;
+  if (ad.media_type === "VIDEO") {
+    score += 10;
     reasons.push("Formato de vídeo (melhor engajamento)");
+  }
+
+  // Critério 7: Múltiplas plataformas (indica campanha escalada)
+  if (ad.publisher_platforms && ad.publisher_platforms.length >= 3) {
+    score += 10;
+    reasons.push(`Veiculado em ${ad.publisher_platforms.length} plataformas`);
+  } else if (ad.publisher_platforms && ad.publisher_platforms.length >= 2) {
+    score += 5;
+    reasons.push(`Veiculado em ${ad.publisher_platforms.length} plataformas`);
+  }
+
+  // Critério 8: Tem copy criativo (indica anúncio bem estruturado)
+  if (ad.ad_creative_bodies && ad.ad_creative_bodies.length > 0) {
+    score += 5;
+    reasons.push("Criativo com copy definido");
   }
 
   return { score: Math.min(100, score), reasons };
@@ -251,6 +275,7 @@ function analyzeScaling(ad: AdLibraryAd): { score: number; reasons: string[] } {
 
 /**
  * Buscar anúncios escalados (alto desempenho)
+ * Retorna anúncios ordenados por score de escalabilidade
  */
 export async function searchScaledAds(
   accessToken: string,
@@ -267,9 +292,11 @@ export async function searchScaledAds(
 
     // Enriquecer anúncios com análise de escalabilidade
     const enrichedAds = result.ads.map((ad) => {
-      const daysActive = calculateDaysActive(ad.adDeliveryStartTime, ad.adDeliveryStopTime);
-      const cpm = calculateCPM(parseFloat(ad.spend) || 0, ad.impressions || 0);
-      const estimatedCTR = estimateCTR(ad.impressions || 0, parseFloat(ad.spend) || 0);
+      const daysActive = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
+      const spendNum = extractNumericValue(ad.spend);
+      const impressionsNum = extractNumericValue(ad.impressions);
+      const cpm = calculateCPM(spendNum, impressionsNum);
+      const estimatedCTR = estimateCTR(impressionsNum, spendNum);
       const { score, reasons } = analyzeScaling(ad);
 
       return {
@@ -283,11 +310,18 @@ export async function searchScaledAds(
     });
 
     // Filtrar por critérios de escalabilidade
+    // NOTA: spend/impressions frequentemente não estão disponíveis na Ad Library API
+    // para anúncios comuns, então os filtros de spend/impressions são aplicados apenas
+    // quando os dados estão disponíveis.
     let filtered = enrichedAds;
 
-    if (params?.minSpend !== undefined) {
+    if (params?.minSpend !== undefined && params.minSpend > 0) {
       const minSpend = params.minSpend;
-      filtered = filtered.filter((ad) => parseFloat(ad.spend) >= minSpend);
+      filtered = filtered.filter((ad) => {
+        const spendVal = extractNumericValue(ad.spend);
+        // Se spend não está disponível (0), não filtrar — incluir o anúncio
+        return spendVal === 0 || spendVal >= minSpend;
+      });
     }
 
     if (params?.minCTR !== undefined) {
@@ -295,19 +329,13 @@ export async function searchScaledAds(
       filtered = filtered.filter((ad) => (ad.estimatedCTR || 0) >= minCTR);
     }
 
-    if (params?.minROAS !== undefined) {
-      const minROAS = params.minROAS;
-      filtered = filtered.filter((ad) => {
-        const estimatedRevenue = (ad.impressions || 0) / 1000;
-        const spend = parseFloat(ad.spend) || 1;
-        const roas = estimatedRevenue / spend;
-        return roas >= minROAS;
-      });
-    }
-
-    if (params?.minImpressions !== undefined) {
+    if (params?.minImpressions !== undefined && params.minImpressions > 0) {
       const minImpressions = params.minImpressions;
-      filtered = filtered.filter((ad) => ad.impressions >= minImpressions);
+      filtered = filtered.filter((ad) => {
+        const impressionsVal = extractNumericValue(ad.impressions);
+        // Se impressions não está disponível (0), não filtrar — incluir o anúncio
+        return impressionsVal === 0 || impressionsVal >= minImpressions;
+      });
     }
 
     if (params?.minDaysActive !== undefined) {

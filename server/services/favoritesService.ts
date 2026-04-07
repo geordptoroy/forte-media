@@ -40,6 +40,7 @@ export async function addFavorite(
   await db.insert(favoriteAds).values({
     userId,
     adId,
+    pageId: adData.pageId || adId, // pageId é obrigatório no schema; usa adId como fallback
     ...adData,
   });
 

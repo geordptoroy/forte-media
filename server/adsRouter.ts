@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { favoriteAds, userMetaCredentials } from "../drizzle/schema";
+import { favoriteAds } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { searchAdsByKeywords, searchAdsByPages } from "./services/metaAdsService";
+import { getMetaCredentials } from "./metaCredentials";
 
 /**
  * Ads Router - Refactored for Meta ads_archive API
@@ -126,6 +127,7 @@ export const adsRouter = router({
 
   /**
    * Search ads from Meta API by keywords
+   * Usa getMetaCredentials() para obter o token descriptografado corretamente.
    */
   searchByKeywords: protectedProcedure
     .input(
@@ -140,21 +142,18 @@ export const adsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        const db = await getDb();
-        if (!db) throw new Error("Database not available");
+        // Usar getMetaCredentials para obter o token descriptografado
+        const credentials = await getMetaCredentials(ctx.user.id);
 
-        const credentials = await db
-          .select()
-          .from(userMetaCredentials)
-          .where(eq(userMetaCredentials.userId, ctx.user.id));
-
-        if (!credentials.length || !credentials[0].encryptedAccessToken) {
+        if (!credentials || !credentials.accessToken) {
           throw new Error("Meta API credentials not configured. Please add your access token in settings.");
         }
 
-        const accessToken = credentials[0].encryptedAccessToken;
+        if (!credentials.isValid) {
+          throw new Error("Meta API credentials are invalid or expired. Please update your access token in settings.");
+        }
 
-        const result = await searchAdsByKeywords(accessToken, input.keywords, input.countries, {
+        const result = await searchAdsByKeywords(credentials.accessToken, input.keywords, input.countries, {
           adType: input.adType,
           adActiveStatus: input.adActiveStatus,
           limit: input.limit,
@@ -174,6 +173,7 @@ export const adsRouter = router({
 
   /**
    * Search ads from Meta API by page IDs
+   * Usa getMetaCredentials() para obter o token descriptografado corretamente.
    */
   searchByPages: protectedProcedure
     .input(
@@ -188,21 +188,18 @@ export const adsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        const db = await getDb();
-        if (!db) throw new Error("Database not available");
+        // Usar getMetaCredentials para obter o token descriptografado
+        const credentials = await getMetaCredentials(ctx.user.id);
 
-        const credentials = await db
-          .select()
-          .from(userMetaCredentials)
-          .where(eq(userMetaCredentials.userId, ctx.user.id));
-
-        if (!credentials.length || !credentials[0].encryptedAccessToken) {
+        if (!credentials || !credentials.accessToken) {
           throw new Error("Meta API credentials not configured. Please add your access token in settings.");
         }
 
-        const accessToken = credentials[0].encryptedAccessToken;
+        if (!credentials.isValid) {
+          throw new Error("Meta API credentials are invalid or expired. Please update your access token in settings.");
+        }
 
-        const result = await searchAdsByPages(accessToken, input.pageIds, input.countries, {
+        const result = await searchAdsByPages(credentials.accessToken, input.pageIds, input.countries, {
           adType: input.adType,
           adActiveStatus: input.adActiveStatus,
           limit: input.limit,

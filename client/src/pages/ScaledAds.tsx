@@ -23,10 +23,11 @@ export default function ScaledAds() {
 
   const credentialsStatus = trpc.meta.getCredentialsStatus.useQuery();
 
+  // Não passa minSpend pois spend não está disponível na Ad Library API para anúncios comuns.
+  // O filtro de score é aplicado no frontend após receber os dados.
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
     {
       countries: ["BR"],
-      minSpend: filters.score_min ? Number(filters.score_min) * 100 : undefined,
     },
     {
       // Desabilitado manualmente — controlamos a execução via refetch()
@@ -94,19 +95,38 @@ export default function ScaledAds() {
 
       if (result.data?.ads) {
         let filtered: unknown[] = result.data.ads;
+
+        // Filtro por nome do anunciante (page_name — snake_case vindo do backend)
         if (filters.search) {
           const q = filters.search.toLowerCase();
-          filtered = filtered.filter((ad) =>
-            (((ad as Record<string, unknown>).page_name as string) || "").toLowerCase().includes(q)
-          );
+          filtered = filtered.filter((ad) => {
+            const adObj = ad as Record<string, unknown>;
+            const pageName = (adObj.page_name as string) || "";
+            return pageName.toLowerCase().includes(q);
+          });
         }
+
+        // Filtro por tipo de mídia (media_type — snake_case vindo do backend)
         if (filters.media_type) {
           const mt = filters.media_type.toLowerCase();
-          filtered = filtered.filter(
-            (ad) =>
-              (((ad as Record<string, unknown>).mediaType as string) || "").toLowerCase() === mt
-          );
+          filtered = filtered.filter((ad) => {
+            const adObj = ad as Record<string, unknown>;
+            // Suporta tanto snake_case (media_type) quanto camelCase (mediaType)
+            const mediaType = ((adObj.media_type as string) || (adObj.mediaType as string) || "").toLowerCase();
+            return mediaType === mt;
+          });
         }
+
+        // Filtro por score mínimo (scalingScore calculado no backend)
+        if (filters.score_min) {
+          const minScore = Number(filters.score_min);
+          filtered = filtered.filter((ad) => {
+            const adObj = ad as Record<string, unknown>;
+            const score = (adObj.scalingScore as number) || 0;
+            return score >= minScore;
+          });
+        }
+
         setAds(filtered);
         setHasLoaded(true);
         reset();

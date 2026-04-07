@@ -4,6 +4,11 @@ import axios from "axios";
  * Meta Ads Archive API Service
  * Handles all interactions with Meta's ads_archive endpoint
  * Documentation: https://developers.facebook.com/docs/marketing-api/reference/ads-archive
+ *
+ * NOTA IMPORTANTE: Os campos 'spend', 'impressions' e 'media_type' são retornados
+ * pela API apenas para anúncios políticos (POLITICAL_AND_ISSUE_ADS) em países
+ * específicos. Para anúncios comuns (ad_type=ALL), esses campos podem não aparecer
+ * na resposta mesmo que sejam solicitados.
  */
 
 export interface AdsArchiveSearchParams {
@@ -68,8 +73,10 @@ const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 const ADS_ARCHIVE_ENDPOINT = `${META_API_BASE_URL}/ads_archive`;
 
 /**
- * Default fields to request from the ads_archive API
- * Optimized for Brazilian market (common ads don't have spend/impressions)
+ * Default fields to request from the ads_archive API.
+ * Inclui spend, impressions e media_type — esses campos são retornados
+ * quando disponíveis (principalmente para anúncios políticos).
+ * Para anúncios comuns, a API pode não retorná-los mesmo que solicitados.
  */
 const DEFAULT_FIELDS = [
   "id",
@@ -83,6 +90,9 @@ const DEFAULT_FIELDS = [
   "ad_creative_link_titles",
   "ad_creative_link_descriptions",
   "currency",
+  "spend",
+  "impressions",
+  "media_type",
 ];
 
 export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<AdsArchiveResponse> {

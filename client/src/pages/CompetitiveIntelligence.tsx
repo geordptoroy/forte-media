@@ -53,7 +53,7 @@ export default function CompetitiveIntelligence() {
   );
 
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
-    { countries: [country], minSpend: 1000 },
+    { countries: [country] },
     { enabled: false }
   );
 
