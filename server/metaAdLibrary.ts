@@ -4,6 +4,7 @@
  */
 
 import { searchAdsArchive } from "./services/metaAdsService";
+import { validateAdScaling } from "./services/scalingValidationService";
 import { logger } from "./_core/logger";
 
 export interface AdLibrarySearchParams {
@@ -181,12 +182,16 @@ export async function searchScaledAds(
     });
 
     const enrichedAds = result.ads.map((ad) => {
-      const { score, reasons } = analyzeScaling(ad);
+      // Usa a engine de validação centralizada
+      const validation = validateAdScaling(ad);
       return {
         ...ad,
-        daysActive: calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time),
-        scalingScore: score,
-        scalingReasons: reasons,
+        daysActive: validation.rawMetrics.daysActive,
+        scalingScore: validation.scalingScore,
+        scalingReasons: validation.signals.filter(s => s.passed).map(s => s.description),
+        scaleLevel: validation.scaleLevel,
+        isScaled: validation.isScaled,
+        confidence: validation.confidence,
       };
     });
 

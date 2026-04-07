@@ -13,6 +13,7 @@ import { sdk } from "./_core/sdk";
 import { adsRouter } from "./adsRouter";
 import { monitoringRouter } from "./monitoringRouter";
 import { campaignsRouter } from "./campaignsRouter";
+import { scalingValidationRouter } from "./scalingValidationRouter";
 import { searchAdsArchive } from "./services/metaAdsService";
 import { searchScaledAds as searchScaledAdsLibrary } from "./metaAdLibrary";
 import { getCampaignMetrics, getAdAccountMetrics, listCampaigns } from "./metaMarketing";
@@ -73,6 +74,7 @@ export const appRouter = router({
   ads: adsRouter,
   monitoring: monitoringRouter,
   campaigns: campaignsRouter,
+  scalingValidation: scalingValidationRouter,
 
   meta: router({
     setCredentials: protectedProcedure

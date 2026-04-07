@@ -8,18 +8,23 @@ import { EmptyState } from "@/components/EmptyState";
 import DashboardLayout from "@/components/DashboardLayout";
 import { AdCard } from "@/components/ads/AdCard";
 import {
-  Zap,
+  Pickaxe,
   Loader2,
   Search,
-  Filter,
-  TrendingUp,
-  Globe,
   RefreshCcw,
-  Sparkles
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+
+const COUNTRIES = [
+  { code: "BR", label: "Brasil" },
+  { code: "US", label: "EUA" },
+  { code: "PT", label: "Portugal" },
+  { code: "MX", label: "México" },
+  { code: "AR", label: "Argentina" },
+];
 
 export default function Dashboard() {
   const [searchTerms, setSearchTerms] = useState("");
@@ -39,7 +44,7 @@ export default function Dashboard() {
       const result = await searchScaledAdsQuery.refetch();
       if (result.data?.success && result.data?.data) {
         setAds(result.data.data);
-        toast.success(`${result.data.data.length} anúncios escalados minerados`);
+        toast.success(`${result.data.data.length} anúncios minerados`);
       } else {
         toast.error(result.data?.error || "Erro ao buscar anúncios escalados");
       }
@@ -55,73 +60,88 @@ export default function Dashboard() {
   }, [country]);
 
   const filteredAds = ads.filter(ad => (ad.scalingScore || 0) >= minScore);
+  const scaledCount = ads.filter(ad => (ad.scalingScore || 0) >= 70).length;
+  const moderateCount = ads.filter(ad => (ad.scalingScore || 0) >= 40 && (ad.scalingScore || 0) < 70).length;
 
   return (
     <DashboardLayout>
-      <div className="space-y-10 pb-20">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <PageHeader
-            title={
-              <div className="flex items-center gap-3">
-                <Sparkles className="w-8 h-8 text-yellow-500 animate-pulse" />
-                <span>Escala & Mercado</span>
-              </div>
-            }
-            subtitle="Anúncios com maior investimento e tração nas últimas 24h."
-          />
-          
-          <div className="flex items-center gap-3">
-            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
-              {["BR", "US", "PT", "MX"].map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCountry(c)}
-                  className={cn(
-                    "px-4 py-2 rounded-xl text-[10px] font-black transition-all",
-                    country === c ? "bg-white text-black shadow-xl" : "text-gray-500 hover:text-white"
-                  )}
-                >
-                  {c}
-                </button>
-              ))}
+      <div className="space-y-6 pb-16">
+        {/* Header Row */}
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Pickaxe className="w-5 h-5 text-white" />
+              <h1 className="text-lg font-black text-white tracking-tight">Escala & Mercado</h1>
             </div>
-            <Button 
-              onClick={handleSearch} 
-              disabled={isSearching}
-              variant="outline"
-              className="w-12 h-12 rounded-2xl border-white/5 bg-white/5 hover:bg-white/10"
-            >
-              <RefreshCcw className={cn("w-4 h-4", isSearching && "animate-spin")} />
-            </Button>
+            <p className="text-xs text-gray-600 font-medium">
+              Anúncios com maior investimento e tração detectados pela Meta Ad Library API v21.0
+            </p>
           </div>
+
+          {/* Stats row */}
+          {ads.length > 0 && (
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="px-3 py-2 border border-white/[0.06] bg-white/[0.02]">
+                <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Total</p>
+                <p className="text-sm font-black text-white">{ads.length}</p>
+              </div>
+              <div className="px-3 py-2 border border-green-500/20 bg-green-500/[0.04]">
+                <p className="text-[9px] font-black text-green-600 uppercase tracking-widest">Escalados</p>
+                <p className="text-sm font-black text-green-500">{scaledCount}</p>
+              </div>
+              <div className="px-3 py-2 border border-yellow-500/20 bg-yellow-500/[0.04]">
+                <p className="text-[9px] font-black text-yellow-600 uppercase tracking-widest">Moderado</p>
+                <p className="text-sm font-black text-yellow-500">{moderateCount}</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <Card className="bg-white/[0.02] border-white/5 p-2 rounded-[2.5rem] flex flex-col md:flex-row gap-2">
-          <div className="flex-1 relative group">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600 group-focus-within:text-white transition-colors" />
+        {/* Search & Filter Bar */}
+        <div className="flex flex-col md:flex-row gap-0 border border-white/[0.06] bg-black">
+          {/* Country selector */}
+          <div className="flex border-b md:border-b-0 md:border-r border-white/[0.06]">
+            {COUNTRIES.map((c) => (
+              <button
+                key={c.code}
+                onClick={() => setCountry(c.code)}
+                className={cn(
+                  "px-4 py-3 text-[10px] font-black transition-all border-r border-white/[0.06] last:border-r-0",
+                  country === c.code
+                    ? "bg-white text-black"
+                    : "text-gray-600 hover:text-white hover:bg-white/[0.04]"
+                )}
+              >
+                {c.code}
+              </button>
+            ))}
+          </div>
+
+          {/* Search input */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
             <Input
-              placeholder="Filtrar por nicho (ex: cosméticos, dropshipping...)"
+              placeholder="Buscar nicho (ex: cosméticos, dropshipping, suplementos...)"
               value={searchTerms}
               onChange={(e) => setSearchTerms(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="h-16 bg-transparent border-none pl-16 text-lg font-medium focus-visible:ring-0 placeholder:text-gray-700"
+              className="h-12 bg-transparent border-none pl-12 text-sm font-medium focus-visible:ring-0 placeholder:text-gray-700 rounded-none"
             />
           </div>
-          
-          <div className="h-16 w-px bg-white/5 hidden md:block" />
 
-          <div className="flex items-center px-6 gap-4">
-            <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest whitespace-nowrap">Score Mínimo</span>
-            <div className="flex gap-1">
-              {[0, 50, 80].map((s) => (
+          {/* Score filter */}
+          <div className="flex items-center px-4 gap-2 border-t md:border-t-0 md:border-l border-white/[0.06]">
+            <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest whitespace-nowrap">Score</span>
+            <div className="flex gap-0.5">
+              {[0, 40, 70].map((s) => (
                 <button
                   key={s}
                   onClick={() => setMinScore(s)}
                   className={cn(
-                    "w-10 h-10 rounded-xl text-xs font-bold border transition-all",
-                    minScore === s 
-                      ? "bg-white border-white text-black" 
-                      : "bg-transparent border-white/5 text-gray-500 hover:border-white/20"
+                    "w-9 h-9 text-[10px] font-black border transition-all",
+                    minScore === s
+                      ? "bg-white border-white text-black"
+                      : "bg-transparent border-white/[0.06] text-gray-600 hover:border-white/20 hover:text-white"
                   )}
                 >
                   {s}+
@@ -130,47 +150,67 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <Button onClick={handleSearch} disabled={isSearching} className="h-16 px-10 rounded-[2rem] btn-premium">
-            {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sincronizar Escala"}
-          </Button>
-        </Card>
+          {/* Actions */}
+          <div className="flex border-t md:border-t-0 md:border-l border-white/[0.06]">
+            <button
+              onClick={handleSearch}
+              disabled={isSearching}
+              className="flex-1 md:flex-none px-6 h-12 bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Minerar"}
+            </button>
+            <button
+              onClick={handleSearch}
+              disabled={isSearching}
+              className="w-12 h-12 border-l border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all flex items-center justify-center"
+            >
+              <RefreshCcw className={cn("w-3.5 h-3.5", isSearching && "animate-spin")} />
+            </button>
+          </div>
+        </div>
 
-        <div className="min-h-[500px]">
+        {/* Results */}
+        <div className="min-h-[400px]">
           <AnimatePresence mode="wait">
             {isSearching ? (
               <motion.div 
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }} 
                 exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-40 gap-6"
+                className="flex flex-col items-center justify-center py-32 gap-4"
               >
-                <div className="relative">
-                  <div className="w-16 h-16 border-4 border-white/5 rounded-full" />
-                  <div className="absolute inset-0 w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="relative w-10 h-10">
+                  <div className="absolute inset-0 border border-white/10" />
+                  <div className="absolute inset-0 border border-white border-t-transparent animate-spin" />
                 </div>
-                <div className="text-center space-y-2">
-                  <p className="text-sm font-black uppercase tracking-[0.3em] text-white">Analisando Big Data</p>
-                  <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">Meta Ad Library API v21.0</p>
+                <div className="text-center space-y-1">
+                  <p className="text-xs font-black uppercase tracking-[0.3em] text-white">Minerando Dados</p>
+                  <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Meta Ad Library API v21.0</p>
                 </div>
               </motion.div>
             ) : filteredAds.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-white/[0.04]"
+              >
                 {filteredAds.map((ad, i) => (
                   <motion.div
                     key={ad.id || i}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.5, ease: "easeOut" }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.03, duration: 0.3 }}
+                    className="bg-black"
                   >
                     <AdCard ad={ad} />
                   </motion.div>
                 ))}
-              </div>
+              </motion.div>
             ) : (
               <EmptyState
-                icon={Zap}
-                title="Nenhum anúncio escalado"
-                description="Tente ajustar os filtros ou pesquisar por um termo diferente para encontrar criativos em escala."
+                icon={Pickaxe}
+                title="Nenhum anúncio encontrado"
+                description="Ajuste os filtros ou busque por outro termo para encontrar criativos em escala."
               />
             )}
           </AnimatePresence>
