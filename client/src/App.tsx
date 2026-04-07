@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import Escalados from "./pages/Escalados";
 import Settings from "./pages/Settings";
 import AdvancedSearch from "./pages/AdvancedSearch";
 import Performance from "./pages/Performance";
@@ -97,10 +98,13 @@ function Router() {
       <PublicRoute path="/register" component={Register} />
 
       {/* Rotas protegidas unificadas */}
-      {/* Dashboard agora e o centro de Anuncios Escalados */}
+      {/* Escalados - 50 anuncios campeoes atualizados diariamente */}
+      <PrivateRoute path="/escalados" component={Escalados} />
+      
+      {/* Dashboard / Minerador - busca unificada com filtros avancados */}
       <PrivateRoute path="/dashboard" component={Dashboard} />
       
-      {/* Busca Avancada para pesquisa granular */}
+      {/* Busca Avancada (mantida para compatibilidade) */}
       <PrivateRoute path="/search" component={AdvancedSearch} />
       
       {/* Rastreamento estilo Utmify (Monitoramento de anuncios proprios) */}

@@ -19,6 +19,8 @@ export interface AdLibrarySearchParams {
   searchTerms: string[];
   countries: string[];
   adType?: "POLITICAL" | "ISSUE_ADS" | "ALL";
+  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
+  adDeliveryDateMin?: string;
   limit?: number;
   after?: string;
 }
@@ -30,6 +32,11 @@ export interface ScalingAnalysisParams {
   minROAS?: number;
   minImpressions?: number;
   minDaysActive?: number;
+  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
+  adDeliveryDateMin?: string;
+  limit?: number;
+  mediaType?: string;
+  publisherPlatforms?: string[];
 }
 
 export interface AdLibraryAd {
@@ -74,7 +81,7 @@ export async function searchAdLibrary(
   accessToken: string,
   params: AdLibrarySearchParams
 ): Promise<AdLibrarySearchResult> {
-  const { userId, searchTerms, countries, adType, limit, after } = params;
+  const { userId, searchTerms, countries, adType, adActiveStatus, adDeliveryDateMin, limit, after } = params;
   try {
     const rawTerms = searchTerms.join(" ").trim();
     const searchTermsFormatted = rawTerms === "" || rawTerms === "*" ? "." : rawTerms;
@@ -85,6 +92,8 @@ export async function searchAdLibrary(
       adReachedCountries: countries,
       searchTerms: searchTermsFormatted,
       adType: adType === "ALL" ? "ALL" : undefined,
+      adActiveStatus: adActiveStatus || "ALL",
+      adDeliveryDateMin: adDeliveryDateMin,
       limit: limit || 25,
       after: after,
       fields: [
@@ -155,7 +164,9 @@ export async function searchScaledAds(
       searchTerms: params?.searchTerms ? [params.searchTerms] : ["."],
       countries,
       adType: "ALL",
-      limit: 100,
+      adActiveStatus: params?.adActiveStatus || "ALL",
+      adDeliveryDateMin: params?.adDeliveryDateMin,
+      limit: params?.limit || 100,
     });
 
     const enrichedAds = result.ads.map((ad) => {

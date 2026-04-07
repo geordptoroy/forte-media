@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ExternalLink,
   Pickaxe,
+  Trophy,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -32,13 +33,13 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Unified Menu Structure
+// Unified Menu Structure — seção FORTE ADS no topo
 const menuItems = [
   { 
-    section: "MINERADOR",
+    section: "FORTE ADS",
     items: [
-      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Anúncios escalados agora" },
-      { icon: Search, label: "Busca Avançada", href: "/search", description: "Filtros granulares Meta" },
+      { icon: Trophy, label: "Escalados", href: "/escalados", description: "50 campeões do dia" },
+      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Minere criativos em escala" },
     ]
   },
   {
@@ -98,13 +99,20 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
         {menuItems.map((section, idx) => (
           <div key={idx} className="space-y-1">
             {!isCollapsed && (
-              <p className="px-3 text-[9px] font-black text-gray-600 uppercase tracking-[0.25em] mb-2">
+              <p className={cn(
+                "px-3 text-[9px] font-black uppercase tracking-[0.25em] mb-2",
+                // Destaque especial para a seção FORTE ADS
+                section.section === "FORTE ADS"
+                  ? "text-white/50"
+                  : "text-gray-600"
+              )}>
                 {section.section}
               </p>
             )}
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const isActive = location === item.href;
+                const isEscalados = item.href === "/escalados";
                 return (
                   <Link key={item.href} href={item.href}>
                     <a
@@ -113,16 +121,32 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
                         "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150 relative group",
                         isActive
                           ? "bg-white text-black"
+                          : isEscalados
+                          ? "text-yellow-500/70 hover:text-yellow-400 hover:bg-yellow-500/[0.06]"
                           : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
                       )}
                     >
                       <item.icon
-                        className={cn("w-4 h-4 shrink-0", isActive ? "text-black" : "text-gray-500")}
+                        className={cn(
+                          "w-4 h-4 shrink-0",
+                          isActive
+                            ? "text-black"
+                            : isEscalados
+                            ? "text-yellow-500/70"
+                            : "text-gray-500"
+                        )}
                       />
                       {!isCollapsed && (
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs leading-tight">{item.label}</span>
-                          <span className={cn("text-[9px] font-medium truncate", isActive ? "text-black/60" : "text-gray-600")}>
+                          <span className={cn(
+                            "text-[9px] font-medium truncate",
+                            isActive
+                              ? "text-black/60"
+                              : isEscalados
+                              ? "text-yellow-600/60"
+                              : "text-gray-600"
+                          )}>
                             {item.description}
                           </span>
                         </div>

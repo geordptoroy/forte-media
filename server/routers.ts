@@ -170,6 +170,46 @@ export const appRouter = router({
         }
       }),
 
+    // Top Scaled Ads for Escalados page (daily champions)
+    getTopScaledAds: protectedProcedure
+      .input(
+        z.object({
+          countries: z.array(z.string()).default(["BR"]),
+          searchTerms: z.string().optional(),
+          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ALL"),
+          adDeliveryDateMin: z.string().optional(),
+          limit: z.number().max(100).default(50),
+          mediaType: z.string().optional(),
+          publisherPlatforms: z.array(z.string()).optional(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        const creds = await getMetaCredentials(ctx.user.id);
+        if (!creds || !creds.isValid) {
+          return { success: false, error: "Meta credentials not configured." };
+        }
+
+        try {
+          const ads = await searchScaledAdsLibrary(
+            ctx.user.id,
+            creds.accessToken,
+            input.countries,
+            {
+              searchTerms: input.searchTerms,
+              adActiveStatus: input.adActiveStatus,
+              adDeliveryDateMin: input.adDeliveryDateMin,
+              limit: input.limit,
+              mediaType: input.mediaType,
+              publisherPlatforms: input.publisherPlatforms,
+            }
+          );
+          return { success: true, data: ads };
+        } catch (error: any) {
+          logger.error("[Meta] getTopScaledAds error:", error);
+          return { success: false, error: error.message };
+        }
+      }),
+
     // Optimized Scaled Ads Search for Dashboard
     searchScaledAds: protectedProcedure
       .input(

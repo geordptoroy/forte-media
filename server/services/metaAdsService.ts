@@ -16,6 +16,7 @@ export interface AdsArchiveSearchParams {
   adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
   adDeliveryDateMin?: string;
   adDeliveryDateMax?: string;
+  mediaType?: string;
   fields?: string[];
   limit?: number;
   after?: string;
@@ -96,6 +97,9 @@ export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<
   if (searchParams.searchPageIds) queryParams.search_page_ids = JSON.stringify(searchParams.searchPageIds);
   if (searchParams.adType) queryParams.ad_type = searchParams.adType;
   if (searchParams.adActiveStatus) queryParams.ad_active_status = searchParams.adActiveStatus;
+  if (searchParams.adDeliveryDateMin) queryParams.ad_delivery_date_min = searchParams.adDeliveryDateMin;
+  if (searchParams.adDeliveryDateMax) queryParams.ad_delivery_date_max = searchParams.adDeliveryDateMax;
+  if (searchParams.mediaType && searchParams.mediaType !== 'ALL') queryParams.media_type = searchParams.mediaType;
   if (searchParams.after) queryParams.after = searchParams.after;
 
   try {
