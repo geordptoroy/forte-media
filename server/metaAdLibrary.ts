@@ -1,8 +1,15 @@
 /**
- * Meta Ad Library API Service
- * Refactored with real-time event tracing and robust error handling.
+ * Meta Ad Library API Service — v2 (Refatorado)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Servico principal de busca na Meta Ad Library.
+ *
+ * Mudancas v2:
+ *  - Adicionados campos ad_creative_images e ad_creative_videos na requisicao
+ *    para permitir exibicao de thumbnails diretamente da API (sem scraping)
+ *  - Removida funcao analyzeScaling() duplicada — toda logica de escala agora
+ *    passa pelo scalingValidationService centralizado
+ *  - Mapeamento de ad_creative_images e ad_creative_videos no retorno
  */
-
 import { searchAdsArchive } from "./services/metaAdsService";
 import { validateAdScaling } from "./services/scalingValidationService";
 import { logger } from "./_core/logger";
@@ -36,6 +43,8 @@ export interface AdLibraryAd {
   ad_creative_bodies?: string[];
   ad_creative_link_titles?: string[];
   ad_creative_link_descriptions?: string[];
+  ad_creative_images?: Array<{ url: string; width?: number; height?: number }>;
+  ad_creative_videos?: Array<{ url?: string; thumbnail_url?: string }>;
   currency?: string;
   spend?: { range?: string; min?: number; max?: number } | string | null;
   impressions?: { range?: string; min?: number; max?: number } | string | null;
@@ -45,6 +54,10 @@ export interface AdLibraryAd {
   daysActive?: number;
   estimatedCPM?: number;
   estimatedCTR?: number;
+  // Campos adicionados pelo scalingValidationService
+  scaleLevel?: string;
+  isScaled?: boolean;
+  confidence?: string;
 }
 
 export interface AdLibrarySearchResult {
@@ -62,7 +75,6 @@ export async function searchAdLibrary(
   params: AdLibrarySearchParams
 ): Promise<AdLibrarySearchResult> {
   const { userId, searchTerms, countries, adType, limit, after } = params;
-
   try {
     const rawTerms = searchTerms.join(" ").trim();
     const searchTermsFormatted = rawTerms === "" || rawTerms === "*" ? "." : rawTerms;
@@ -76,16 +88,28 @@ export async function searchAdLibrary(
       limit: limit || 25,
       after: after,
       fields: [
-        "id", "page_id", "page_name", "ad_snapshot_url",
-        "ad_delivery_start_time", "ad_delivery_stop_time",
-        "publisher_platforms", "ad_creative_bodies",
-        "ad_creative_link_titles", "ad_creative_link_descriptions",
-        "currency", "spend", "impressions", "media_type",
+        "id",
+        "page_id",
+        "page_name",
+        "ad_snapshot_url",
+        "ad_delivery_start_time",
+        "ad_delivery_stop_time",
+        "publisher_platforms",
+        "ad_creative_bodies",
+        "ad_creative_link_titles",
+        "ad_creative_link_descriptions",
+        // Campos de imagem/video — essenciais para thumbnails sem scraping
+        "ad_creative_images",
+        "ad_creative_videos",
+        "currency",
+        "spend",
+        "impressions",
+        "media_type",
       ],
     });
 
     return {
-      ads: (result.data || []).map((ad) => ({
+      ads: (result.data || []).map((ad: any) => ({
         id: ad.id,
         page_id: ad.page_id,
         page_name: ad.page_name,
@@ -96,10 +120,13 @@ export async function searchAdLibrary(
         ad_creative_bodies: ad.ad_creative_bodies,
         ad_creative_link_titles: ad.ad_creative_link_titles,
         ad_creative_link_descriptions: ad.ad_creative_link_descriptions,
+        // Imagens e videos diretos da API
+        ad_creative_images: ad.ad_creative_images ?? [],
+        ad_creative_videos: ad.ad_creative_videos ?? [],
         currency: ad.currency,
         spend: ad.spend ?? null,
         impressions: ad.impressions ?? null,
-        media_type: (ad as any).media_type as string | undefined,
+        media_type: ad.media_type as string | undefined,
       })),
       paging: result.paging
         ? {
@@ -111,59 +138,9 @@ export async function searchAdLibrary(
         : { cursors: { before: "", after: "" } },
     };
   } catch (error) {
-    logger.error(`[Ad Library] Search error for user ${userId}:`, error);
+    logger.error("[Ad Library] Search error for user " + userId + ":", error);
     throw error;
   }
-}
-
-function calculateDaysActive(startTime?: string, stopTime?: string): number {
-  if (!startTime) return 0;
-  try {
-    const start = new Date(startTime).getTime();
-    const end = stopTime ? new Date(stopTime).getTime() : Date.now();
-    return Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-  } catch {
-    return 0;
-  }
-}
-
-function extractNumericValue(value: any): number {
-  if (!value) return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return parseFloat(value) || 0;
-  if (typeof value === "object") {
-    const min = value.min ?? 0;
-    const max = value.max ?? 0;
-    if (min > 0 || max > 0) return (min + max) / 2;
-    if (value.range) {
-      const parts = value.range.split("-").map((p: string) => parseFloat(p.trim()));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return (parts[0] + parts[1]) / 2;
-      return parseFloat(value.range) || 0;
-    }
-  }
-  return 0;
-}
-
-function analyzeScaling(ad: AdLibraryAd): { score: number; reasons: string[] } {
-  const reasons: string[] = [];
-  let score = 0;
-
-  const spend = extractNumericValue(ad.spend);
-  const impressions = extractNumericValue(ad.impressions);
-  const daysActive = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
-
-  if (spend >= 100) { score += 20; reasons.push(`Gasto significativo: $${spend.toFixed(2)}`); }
-  if (impressions >= 10000) { score += 20; reasons.push(`Alcance elevado: ${impressions.toLocaleString()} impressões`); }
-  
-  if (daysActive >= 30) { score += 20; reasons.push(`Ativo por ${daysActive} dias (consistência alta)`); }
-  else if (daysActive >= 14) { score += 15; reasons.push(`Ativo por ${daysActive} dias (consistência boa)`); }
-  else if (daysActive >= 7) { score += 10; reasons.push(`Ativo por ${daysActive} dias`); }
-
-  if (ad.media_type === "VIDEO") { score += 10; reasons.push("Formato de vídeo (melhor engajamento)"); }
-  if (ad.publisher_platforms && ad.publisher_platforms.length >= 3) { score += 10; reasons.push(`Veiculado em ${ad.publisher_platforms.length} plataformas`); }
-  if (ad.ad_creative_bodies?.length) { score += 5; reasons.push("Criativo com copy definido"); }
-
-  return { score: Math.min(100, score), reasons };
 }
 
 export async function searchScaledAds(
@@ -182,7 +159,6 @@ export async function searchScaledAds(
     });
 
     const enrichedAds = result.ads.map((ad) => {
-      // Usa a engine de validação centralizada
       const validation = validateAdScaling(ad);
       return {
         ...ad,
@@ -197,7 +173,7 @@ export async function searchScaledAds(
 
     return enrichedAds.sort((a, b) => (b.scalingScore || 0) - (a.scalingScore || 0));
   } catch (error) {
-    logger.error(`[Ad Library] Scaled ads search error for user ${userId}:`, error);
+    logger.error("[Ad Library] Scaled ads search error for user " + userId + ":", error);
     throw error;
   }
 }

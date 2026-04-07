@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import DashboardLayout from "@/components/DashboardLayout";
 import { AdCard } from "@/components/ads/AdCard";
+import { RegionSelector } from "@/components/ads/RegionSelector";
 import {
   Search,
   Loader2,
@@ -169,14 +170,6 @@ export default function AdvancedSearch() {
     setAds([]);
   };
 
-  const toggleCountry = (country: string) => {
-    setCountries(prev =>
-      prev.includes(country)
-        ? prev.filter(c => c !== country)
-        : [...prev, country]
-    );
-  };
-
   const togglePlatform = (platform: string) => {
     setPublisherPlatforms(prev =>
       prev.includes(platform)
@@ -185,7 +178,7 @@ export default function AdvancedSearch() {
     );
   };
 
-  const COUNTRIES = ["BR", "US", "PT", "MX", "AR", "CL", "CO"];
+  // COUNTRIES removido — substituído pelo RegionSelector com todos os países da Meta
   const PLATFORMS = ["FACEBOOK", "INSTAGRAM", "AUDIENCE_NETWORK", "MESSENGER"];
   const MEDIA_TYPES = ["IMAGE", "VIDEO", "CAROUSEL"];
   const AD_TYPES: Array<"ALL" | "POLITICAL_AND_ISSUE_ADS" | "HOUSING_ADS" | "CREDIT_ADS" | "EMPLOYMENT_ADS"> = ["ALL", "POLITICAL_AND_ISSUE_ADS", "HOUSING_ADS", "CREDIT_ADS", "EMPLOYMENT_ADS"];
@@ -270,25 +263,13 @@ export default function AdvancedSearch() {
                 className="overflow-hidden"
               >
                 <div className="p-4 space-y-4 border-t border-white/[0.06]">
-                  {/* Countries */}
+                  {/* Countries — RegionSelector com todos os países da Meta Ads Library */}
                   <div>
-                    <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Países</p>
-                    <div className="flex flex-wrap gap-1">
-                      {COUNTRIES.map(country => (
-                        <button
-                          key={country}
-                          onClick={() => toggleCountry(country)}
-                          className={cn(
-                            "px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border transition-all",
-                            countries.includes(country)
-                              ? "bg-white text-black border-white"
-                              : "border-white/[0.06] text-gray-600 hover:border-white/20"
-                          )}
-                        >
-                          {country}
-                        </button>
-                      ))}
-                    </div>
+                    <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Países / Regiões</p>
+                    <RegionSelector
+                      selected={countries}
+                      onChange={setCountries}
+                    />
                   </div>
 
                   {/* Status */}

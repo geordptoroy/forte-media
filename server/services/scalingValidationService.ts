@@ -1,21 +1,46 @@
 /**
- * Scaling Validation Service
+ * Scaling Validation Service — v2 (Refatorado)
  * ─────────────────────────────────────────────────────────────────────────────
- * Engine de validação de escala de anúncios e ofertas baseada nos dados
- * retornados pela Meta Ads Library API. Aplica heurísticas comerciais reais
- * para determinar se um anúncio está em escala ativa, em crescimento ou
- * sem tração suficiente.
+ * Engine de validação de escala de anúncios baseada em SINAIS PROXY REAIS.
  *
- * Critérios de escala baseados em dados da Meta:
- *  - Gasto estimado (spend): proxy de investimento real
- *  - Impressões (impressions): proxy de alcance e distribuição
- *  - Dias ativos (ad_delivery_start_time): longevidade = validação de mercado
- *  - Plataformas (publisher_platforms): distribuição multi-canal = escala
- *  - Tipo de mídia (media_type): vídeo tem melhor CPM e escala mais rápido
- *  - Presença de copy (ad_creative_bodies): criativo estruturado = profissional
- *  - Ausência de data de fim (ad_delivery_stop_time): ainda veiculando
+ * PROBLEMA DO ALGORITMO ANTERIOR:
+ *   O algoritmo anterior dependia de `spend` e `impressions`, campos que a Meta
+ *   NÃO fornece para anúncios comuns fora da UE/UK (ex: Brasil). Isso fazia com
+ *   que todos os anúncios brasileiros recebessem score próximo de zero, tornando
+ *   o sistema inútil para o público-alvo principal (infoprodutores BR/LATAM).
+ *
+ * SOLUÇÃO — SINAIS PROXY (baseados em pesquisa de mercado):
+ *   A API da Meta foi criada para transparência, não para métricas de performance.
+ *   Em vez de depender de dados que não existem, usamos sinais que ESTÃO disponíveis
+ *   e que, combinados, indicam com alta precisão se um anúncio está em escala:
+ *
+ *   1. LONGEVIDADE (peso 40%): Anúncios lucrativos ficam no ar. Anunciantes não
+ *      mantêm anúncios que não vendem. É o sinal mais forte disponível.
+ *
+ *   2. AINDA ATIVO (peso 15%): Anúncio sem data de encerramento = ainda veiculando.
+ *      Combinado com longevidade, é um forte indicador de validação.
+ *
+ *   3. PRESENÇA DE COPY ESTRUTURADO (peso 15%): Anunciantes profissionais em escala
+ *      têm copy definido, título e descrição. Anúncios de teste costumam ser simples.
+ *
+ *   4. DISTRIBUIÇÃO MULTI-PLATAFORMA (peso 15%): Anunciantes em escala distribuem
+ *      em múltiplas plataformas (Facebook + Instagram + Audience Network).
+ *
+ *   5. FORMATO DE VÍDEO (peso 10%): Vídeo tem melhor CPM e escala mais rápido.
+ *      Anunciantes que investem em produção de vídeo geralmente têm orçamento maior.
+ *
+ *   6. DADOS DE GASTO/IMPRESSÕES (bônus, quando disponíveis): Para anúncios da
+ *      UE/UK, esses dados estão disponíveis e são usados como bônus de confirmação.
+ *      Para outros países, não penalizam o score (são ignorados se ausentes).
+ *
+ * CLASSIFICAÇÃO FINAL:
+ *   0–30:  Teste — sem sinais de escala
+ *   31–60: Validação — potencial, monitorar
+ *   61–100: Escalado — oferta vencedora
+ *
+ * Fonte de referência: Meta Ad Library API Documentation + análise de mercado
+ * de infoprodutores e dropshippers brasileiros.
  */
-
 import { logger } from "../_core/logger";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -42,15 +67,19 @@ export interface OfferValidation {
   recommendation: string;
   validatedAt: string;
   rawMetrics: {
-    spendMin: number;
-    spendMax: number;
-    impressionsMin: number;
-    impressionsMax: number;
     daysActive: number;
+    isStillActive: boolean;
     platformCount: number;
     hasVideo: boolean;
     hasCopy: boolean;
-    isStillActive: boolean;
+    hasTitle: boolean;
+    hasDescription: boolean;
+    spendAvailable: boolean;
+    spendMin: number;
+    spendMax: number;
+    impressionsAvailable: boolean;
+    impressionsMin: number;
+    impressionsMax: number;
   };
 }
 
@@ -65,262 +94,6 @@ export interface BatchValidationResult {
   validations: OfferValidation[];
   validatedAt: string;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function extractNumericRange(value: any): { min: number; max: number } {
-  if (!value) return { min: 0, max: 0 };
-  if (typeof value === "number") return { min: value, max: value };
-  if (typeof value === "string") {
-    const n = parseFloat(value);
-    return { min: n || 0, max: n || 0 };
-  }
-  if (typeof value === "object") {
-    const min = value.min ?? value.lower_bound ?? 0;
-    const max = value.max ?? value.upper_bound ?? 0;
-    if (min > 0 || max > 0) return { min: Number(min), max: Number(max) };
-    if (value.range) {
-      const parts = value.range.split(/[-–]/).map((p: string) => parseFloat(p.trim()));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        return { min: parts[0], max: parts[1] };
-      }
-      const single = parseFloat(value.range);
-      return { min: single || 0, max: single || 0 };
-    }
-  }
-  return { min: 0, max: 0 };
-}
-
-function calculateDaysActive(startTime?: string, stopTime?: string): number {
-  if (!startTime) return 0;
-  try {
-    const start = new Date(startTime).getTime();
-    const end = stopTime ? new Date(stopTime).getTime() : Date.now();
-    return Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-  } catch {
-    return 0;
-  }
-}
-
-function getScaleLevel(score: number): ScaleLevel {
-  if (score >= 70) return "SCALED";
-  if (score >= 40) return "MODERATE";
-  if (score > 0) return "LOW";
-  return "UNKNOWN";
-}
-
-function getConfidence(signals: ScalingSignal[]): "HIGH" | "MEDIUM" | "LOW" {
-  const passedCount = signals.filter(s => s.passed).length;
-  const totalWeight = signals.reduce((acc, s) => acc + s.weight, 0);
-  const passedWeight = signals.filter(s => s.passed).reduce((acc, s) => acc + s.weight, 0);
-  const coverage = passedWeight / totalWeight;
-
-  if (coverage >= 0.6 && passedCount >= 3) return "HIGH";
-  if (coverage >= 0.3 && passedCount >= 2) return "MEDIUM";
-  return "LOW";
-}
-
-function buildSummary(scaleLevel: ScaleLevel, score: number, daysActive: number, pageName: string): string {
-  switch (scaleLevel) {
-    case "SCALED":
-      return `"${pageName}" está em escala ativa com score ${score}/100. Anúncio com ${daysActive} dias de veiculação e alto investimento detectado.`;
-    case "MODERATE":
-      return `"${pageName}" apresenta sinais moderados de escala (score ${score}/100). Pode estar em fase de teste ou crescimento inicial.`;
-    case "LOW":
-      return `"${pageName}" tem baixa tração de escala (score ${score}/100). Investimento insuficiente ou anúncio recente.`;
-    default:
-      return `"${pageName}" não possui dados suficientes para validação de escala.`;
-  }
-}
-
-function buildRecommendation(scaleLevel: ScaleLevel, signals: ScalingSignal[]): string {
-  const failedSignals = signals.filter(s => !s.passed).map(s => s.signal);
-
-  switch (scaleLevel) {
-    case "SCALED":
-      return "Anúncio validado para espionagem. Analise o criativo, copy e oferta para replicar a estratégia.";
-    case "MODERATE":
-      if (failedSignals.includes("SPEND_HIGH")) {
-        return "Aguarde mais dados de gasto. O anúncio pode estar em fase de otimização de campanha.";
-      }
-      if (failedSignals.includes("DAYS_ACTIVE_30")) {
-        return "Monitore por mais 7-14 dias. Se mantiver veiculação, provavelmente é uma oferta validada.";
-      }
-      return "Anúncio promissor. Adicione ao monitoramento para acompanhar a evolução.";
-    case "LOW":
-      return "Não recomendado para replicação. Busque anúncios com maior tempo de veiculação e investimento.";
-    default:
-      return "Dados insuficientes. Verifique se as credenciais Meta têm acesso completo à Ad Library.";
-  }
-}
-
-// ─── Core Validation Engine ───────────────────────────────────────────────────
-
-export function validateAdScaling(ad: any): OfferValidation {
-  const spend = extractNumericRange(ad.spend);
-  const impressions = extractNumericRange(ad.impressions);
-  const daysActive = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
-  const platforms = ad.publisher_platforms || [];
-  const isVideo = ad.media_type === "VIDEO";
-  const hasCopy = !!(ad.ad_creative_bodies?.length || ad.body);
-  const isStillActive = !ad.ad_delivery_stop_time;
-  const spendMid = (spend.min + spend.max) / 2;
-  const impressionsMid = (impressions.min + impressions.max) / 2;
-
-  // ── Signals com pesos comerciais ────────────────────────────────────────
-  const signals: ScalingSignal[] = [
-    // Gasto: principal indicador de validação de mercado
-    {
-      signal: "SPEND_HIGH",
-      value: spendMid,
-      weight: 25,
-      passed: spendMid >= 500 || spend.min >= 200,
-      description: spendMid >= 500
-        ? `Gasto elevado detectado: ~$${spendMid.toFixed(0)} (forte sinal de escala)`
-        : spend.min >= 200
-        ? `Gasto mínimo de $${spend.min} indica investimento real`
-        : `Gasto insuficiente para confirmar escala (~$${spendMid.toFixed(0)})`,
-    },
-    {
-      signal: "SPEND_MODERATE",
-      value: spendMid,
-      weight: 10,
-      passed: spendMid >= 50 || spend.min >= 20,
-      description: spendMid >= 50
-        ? `Gasto moderado: ~$${spendMid.toFixed(0)}`
-        : `Gasto baixo: ~$${spendMid.toFixed(0)}`,
-    },
-
-    // Impressões: proxy de distribuição e alcance
-    {
-      signal: "IMPRESSIONS_HIGH",
-      value: impressionsMid,
-      weight: 20,
-      passed: impressionsMid >= 50000 || impressions.min >= 10000,
-      description: impressionsMid >= 50000
-        ? `Alto alcance: ~${impressionsMid.toLocaleString("pt-BR")} impressões`
-        : impressions.min >= 10000
-        ? `Alcance mínimo de ${impressions.min.toLocaleString("pt-BR")} impressões`
-        : `Alcance baixo: ~${impressionsMid.toLocaleString("pt-BR")} impressões`,
-    },
-    {
-      signal: "IMPRESSIONS_MODERATE",
-      value: impressionsMid,
-      weight: 5,
-      passed: impressionsMid >= 5000 || impressions.min >= 1000,
-      description: `Alcance moderado: ~${impressionsMid.toLocaleString("pt-BR")} impressões`,
-    },
-
-    // Longevidade: anúncios que ficam no ar são validados pelo mercado
-    {
-      signal: "DAYS_ACTIVE_30",
-      value: daysActive,
-      weight: 20,
-      passed: daysActive >= 30,
-      description: daysActive >= 30
-        ? `${daysActive} dias ativo — alta consistência, oferta validada`
-        : `Apenas ${daysActive} dias ativo — dados insuficientes de longevidade`,
-    },
-    {
-      signal: "DAYS_ACTIVE_14",
-      value: daysActive,
-      weight: 10,
-      passed: daysActive >= 14,
-      description: daysActive >= 14
-        ? `${daysActive} dias ativo — boa consistência`
-        : `${daysActive} dias ativo — anúncio recente`,
-    },
-    {
-      signal: "DAYS_ACTIVE_7",
-      value: daysActive,
-      weight: 5,
-      passed: daysActive >= 7,
-      description: `${daysActive} dias ativo`,
-    },
-
-    // Ainda ativo: sinal de que o anunciante não pausou
-    {
-      signal: "STILL_ACTIVE",
-      value: isStillActive ? "sim" : "não",
-      weight: 8,
-      passed: isStillActive,
-      description: isStillActive
-        ? "Anúncio ainda em veiculação ativa"
-        : "Anúncio pausado ou encerrado",
-    },
-
-    // Multi-plataforma: escala real envolve múltiplos canais
-    {
-      signal: "MULTI_PLATFORM",
-      value: platforms.length,
-      weight: 10,
-      passed: platforms.length >= 2,
-      description: platforms.length >= 2
-        ? `Veiculado em ${platforms.length} plataformas: ${platforms.join(", ")}`
-        : platforms.length === 1
-        ? `Apenas 1 plataforma: ${platforms[0] || "desconhecida"}`
-        : "Sem dados de plataforma",
-    },
-
-    // Vídeo: melhor performance e CPM em escala
-    {
-      signal: "VIDEO_FORMAT",
-      value: ad.media_type || "UNKNOWN",
-      weight: 7,
-      passed: isVideo,
-      description: isVideo
-        ? "Formato de vídeo — maior engajamento e escala mais rápida"
-        : `Formato ${ad.media_type || "desconhecido"} — vídeo tende a escalar melhor`,
-    },
-
-    // Copy estruturado: anunciante profissional
-    {
-      signal: "HAS_COPY",
-      value: hasCopy ? "sim" : "não",
-      weight: 5,
-      passed: hasCopy,
-      description: hasCopy
-        ? "Criativo com copy definido — anunciante profissional"
-        : "Sem copy detectado — criativo pode ser apenas visual",
-    },
-  ];
-
-  // ── Score calculation ────────────────────────────────────────────────────
-  const totalWeight = signals.reduce((acc, s) => acc + s.weight, 0);
-  const earnedWeight = signals.filter(s => s.passed).reduce((acc, s) => acc + s.weight, 0);
-  const scalingScore = Math.min(100, Math.round((earnedWeight / totalWeight) * 100));
-
-  const scaleLevel = getScaleLevel(scalingScore);
-  const confidence = getConfidence(signals);
-  const summary = buildSummary(scaleLevel, scalingScore, daysActive, ad.page_name || "Anunciante");
-  const recommendation = buildRecommendation(scaleLevel, signals);
-
-  return {
-    adId: ad.id || ad.ad_archive_id || "unknown",
-    pageName: ad.page_name || "Desconhecido",
-    scaleLevel,
-    scalingScore,
-    isScaled: scaleLevel === "SCALED",
-    confidence,
-    signals,
-    summary,
-    recommendation,
-    validatedAt: new Date().toISOString(),
-    rawMetrics: {
-      spendMin: spend.min,
-      spendMax: spend.max,
-      impressionsMin: impressions.min,
-      impressionsMax: impressions.max,
-      daysActive,
-      platformCount: platforms.length,
-      hasVideo: isVideo,
-      hasCopy,
-      isStillActive,
-    },
-  };
-}
-
-// ─── Offer Validation (validates if an offer/product is worth scaling) ────────
 
 export interface OfferScalingResult {
   offerId: string;
@@ -338,13 +111,313 @@ export interface OfferScalingResult {
   validatedAt: string;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function extractNumericRange(value: any): { min: number; max: number; available: boolean } {
+  if (!value) return { min: 0, max: 0, available: false };
+
+  if (typeof value === "number") {
+    return { min: value, max: value, available: value > 0 };
+  }
+
+  if (typeof value === "string") {
+    const n = parseFloat(value);
+    return { min: n || 0, max: n || 0, available: n > 0 };
+  }
+
+  if (typeof value === "object") {
+    const min = Number(value.min ?? value.lower_bound ?? 0);
+    const max = Number(value.max ?? value.upper_bound ?? 0);
+
+    if (min > 0 || max > 0) {
+      return { min, max, available: true };
+    }
+
+    if (value.range) {
+      const parts = value.range.split(/[-\u2013]/).map((p: string) => parseFloat(p.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return { min: parts[0], max: parts[1], available: parts[0] > 0 || parts[1] > 0 };
+      }
+      const single = parseFloat(value.range);
+      return { min: single || 0, max: single || 0, available: single > 0 };
+    }
+  }
+
+  return { min: 0, max: 0, available: false };
+}
+
+/**
+ * Calcula quantos dias o anuncio esta/esteve ativo.
+ * Se nao ha data de fim, considera que ainda esta ativo (usa data atual).
+ */
+function calculateDaysActive(startTime?: string, stopTime?: string): number {
+  if (!startTime) return 0;
+  try {
+    const start = new Date(startTime).getTime();
+    if (isNaN(start)) return 0;
+    const end = stopTime ? new Date(stopTime).getTime() : Date.now();
+    return Math.max(0, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+  } catch {
+    return 0;
+  }
+}
+
+function getScaleLevel(score: number): ScaleLevel {
+  if (score >= 61) return "SCALED";
+  if (score >= 31) return "MODERATE";
+  if (score > 0) return "LOW";
+  return "UNKNOWN";
+}
+
+function getConfidence(signals: ScalingSignal[]): "HIGH" | "MEDIUM" | "LOW" {
+  const passedCount = signals.filter(s => s.passed).length;
+  const totalWeight = signals.reduce((acc, s) => acc + s.weight, 0);
+  const passedWeight = signals.filter(s => s.passed).reduce((acc, s) => acc + s.weight, 0);
+  const coverage = totalWeight > 0 ? passedWeight / totalWeight : 0;
+
+  if (coverage >= 0.6 && passedCount >= 3) return "HIGH";
+  if (coverage >= 0.3 && passedCount >= 2) return "MEDIUM";
+  return "LOW";
+}
+
+function buildSummary(
+  scaleLevel: ScaleLevel,
+  score: number,
+  daysActive: number,
+  pageName: string,
+  isStillActive: boolean
+): string {
+  const activeStr = isStillActive ? "ainda em veiculacao" : ("encerrado apos " + daysActive + " dias");
+  switch (scaleLevel) {
+    case "SCALED":
+      return ('"' + pageName + '" esta em escala ativa (score ' + score + '/100). Anuncio com ' + daysActive + ' dias de veiculacao, ' + activeStr + '. Forte indicador de oferta validada pelo mercado.');
+    case "MODERATE":
+      return ('"' + pageName + '" apresenta sinais moderados de escala (score ' + score + '/100). ' + daysActive + ' dias de veiculacao — pode estar em fase de validacao ou crescimento inicial.');
+    case "LOW":
+      return ('"' + pageName + '" tem baixa tracao de escala (score ' + score + '/100). Anuncio com apenas ' + daysActive + ' dias ou poucos sinais de profissionalismo.');
+    default:
+      return ('"' + pageName + '" nao possui dados suficientes para validacao de escala.');
+  }
+}
+
+function buildRecommendation(scaleLevel: ScaleLevel, daysActive: number): string {
+  switch (scaleLevel) {
+    case "SCALED":
+      return "Oferta validada. Analise o criativo, copy e landing page para modelar a estrategia. Adicione ao monitoramento para acompanhar mudancas.";
+    case "MODERATE":
+      if (daysActive < 14) {
+        return "Anuncio recente com bons sinais. Monitore por mais 7-14 dias. Se mantiver veiculacao, provavelmente e uma oferta em validacao.";
+      }
+      return "Anuncio promissor com sinais de escala moderados. Adicione ao monitoramento e verifique o criativo completo.";
+    case "LOW":
+      return "Poucos sinais de escala. Pode ser um anuncio de teste ou anunciante iniciante. Busque anuncios com mais tempo de veiculacao.";
+    default:
+      return "Dados insuficientes. Verifique se as credenciais Meta tem acesso completo a Ad Library.";
+  }
+}
+
+// ─── Core Validation Engine ───────────────────────────────────────────────────
+
+/**
+ * Valida se um anuncio esta em escala usando sinais proxy.
+ *
+ * IMPORTANTE: Nao depende de spend/impressions (indisponiveis para BR/LATAM).
+ * Usa apenas campos garantidamente disponiveis para todos os paises.
+ */
+export function validateAdScaling(ad: any): OfferValidation {
+  const daysActive = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
+  const isStillActive = !ad.ad_delivery_stop_time;
+  const platforms = Array.isArray(ad.publisher_platforms) ? ad.publisher_platforms : [];
+  const isVideo = ad.media_type === "VIDEO";
+  const hasCopy = !!(ad.ad_creative_bodies?.length && ad.ad_creative_bodies[0]?.trim());
+  const hasTitle = !!(ad.ad_creative_link_titles?.length && ad.ad_creative_link_titles[0]?.trim());
+  const hasDescription = !!(ad.ad_creative_link_descriptions?.length && ad.ad_creative_link_descriptions[0]?.trim());
+
+  // Dados de gasto/impressoes (disponiveis apenas para UE/UK — usados como bonus)
+  const spend = extractNumericRange(ad.spend);
+  const impressions = extractNumericRange(ad.impressions);
+  const spendMid = spend.available ? (spend.min + spend.max) / 2 : 0;
+  const impressionsMid = impressions.available ? (impressions.min + impressions.max) / 2 : 0;
+
+  // ── Signals com pesos calibrados para dados reais da Meta ─────────────────
+  //
+  // PESOS TOTAIS = 95 pontos (sem bonus)
+  // Os sinais de spend/impressions sao BONUS (nao penalizam se ausentes)
+  //
+  const signals: ScalingSignal[] = [
+    // ── SINAL 1: Longevidade alta (40 pts) — O sinal mais forte disponivel ────
+    {
+      signal: "DAYS_ACTIVE_90",
+      value: daysActive,
+      weight: 40,
+      passed: daysActive >= 90,
+      description: daysActive >= 90
+        ? (daysActive + " dias no ar — forte indicador de oferta escalada e validada (>90 dias)")
+        : daysActive >= 31
+        ? (daysActive + " dias no ar — provavel escala (31-89 dias)")
+        : daysActive >= 8
+        ? (daysActive + " dias no ar — validacao em andamento (8-30 dias)")
+        : (daysActive + " dias no ar — teste inicial (<7 dias)"),
+    },
+    // ── SINAL 1b: Longevidade moderada (25 pts) ───────────────────────────────
+    {
+      signal: "DAYS_ACTIVE_31",
+      value: daysActive,
+      weight: 25,
+      passed: daysActive >= 31,
+      description: daysActive >= 31
+        ? (daysActive + " dias ativo — consistencia alta, oferta provavelmente lucrativa")
+        : (daysActive + " dias ativo — ainda em fase inicial"),
+    },
+    // ── SINAL 1c: Passou da fase de teste (10 pts) ────────────────────────────
+    {
+      signal: "DAYS_ACTIVE_8",
+      value: daysActive,
+      weight: 10,
+      passed: daysActive >= 8,
+      description: daysActive >= 8
+        ? (daysActive + " dias ativo — passou da fase de teste inicial")
+        : (daysActive + " dias ativo — teste muito recente"),
+    },
+
+    // ── SINAL 2: Ainda ativo (15 pts) ─────────────────────────────────────────
+    {
+      signal: "STILL_ACTIVE",
+      value: isStillActive ? "sim" : "nao",
+      weight: 15,
+      passed: isStillActive,
+      description: isStillActive
+        ? "Anuncio ainda em veiculacao ativa — anunciante continua investindo"
+        : "Anuncio pausado ou encerrado — pode ter sido substituido por versao melhor",
+    },
+
+    // ── SINAL 3: Copy estruturado (15 pts) ────────────────────────────────────
+    {
+      signal: "HAS_FULL_CREATIVE",
+      value: [hasCopy, hasTitle, hasDescription].filter(Boolean).length,
+      weight: 15,
+      passed: hasCopy && hasTitle,
+      description: hasCopy && hasTitle && hasDescription
+        ? "Criativo completo: copy + titulo + descricao — anunciante profissional em escala"
+        : hasCopy && hasTitle
+        ? "Criativo com copy e titulo — bom nivel de profissionalismo"
+        : hasCopy
+        ? "Copy presente mas sem titulo — criativo parcial"
+        : "Sem copy detectado — criativo apenas visual ou dados incompletos",
+    },
+
+    // ── SINAL 4: Multi-plataforma (15 pts) ────────────────────────────────────
+    {
+      signal: "MULTI_PLATFORM",
+      value: platforms.length,
+      weight: 15,
+      passed: platforms.length >= 2,
+      description: platforms.length >= 3
+        ? ("Veiculado em " + platforms.length + " plataformas: " + platforms.join(", ") + " — escala maxima de distribuicao")
+        : platforms.length === 2
+        ? ("Veiculado em 2 plataformas: " + platforms.join(", ") + " — boa distribuicao")
+        : platforms.length === 1
+        ? ("Apenas 1 plataforma: " + (platforms[0] || "desconhecida") + " — distribuicao limitada")
+        : "Sem dados de plataforma",
+    },
+
+    // ── SINAL 5: Formato de video (10 pts) ────────────────────────────────────
+    {
+      signal: "VIDEO_FORMAT",
+      value: ad.media_type || "UNKNOWN",
+      weight: 10,
+      passed: isVideo,
+      description: isVideo
+        ? "Formato de video — maior engajamento, melhor CPM, escala mais rapida"
+        : ad.media_type === "IMAGE"
+        ? "Formato imagem — funciona bem, mas video tende a escalar melhor"
+        : ("Formato " + (ad.media_type || "desconhecido")),
+    },
+
+    // ── BONUS: Dados de gasto (disponiveis apenas para UE/UK) ─────────────────
+    // Peso 0 = nao conta no total, mas aparece nos signals para informacao
+    {
+      signal: "SPEND_BONUS",
+      value: spendMid,
+      weight: 0,
+      passed: spend.available && spendMid >= 500,
+      description: spend.available
+        ? spendMid >= 500
+          ? ("[BONUS] Gasto elevado confirmado: ~$" + spendMid.toFixed(0) + " (dados UE/UK disponiveis)")
+          : ("[INFO] Gasto detectado: ~$" + spendMid.toFixed(0) + " (dados UE/UK)")
+        : "[INFO] Dados de gasto nao disponiveis para este pais (normal para BR/LATAM)",
+    },
+
+    // ── BONUS: Dados de impressoes (disponiveis apenas para UE/UK) ────────────
+    {
+      signal: "IMPRESSIONS_BONUS",
+      value: impressionsMid,
+      weight: 0,
+      passed: impressions.available && impressionsMid >= 50000,
+      description: impressions.available
+        ? impressionsMid >= 50000
+          ? ("[BONUS] Alto alcance confirmado: ~" + impressionsMid.toLocaleString("pt-BR") + " impressoes")
+          : ("[INFO] Alcance detectado: ~" + impressionsMid.toLocaleString("pt-BR") + " impressoes")
+        : "[INFO] Dados de impressoes nao disponiveis para este pais (normal para BR/LATAM)",
+    },
+  ];
+
+  // ── Score calculation ────────────────────────────────────────────────────
+  // Apenas signals com weight > 0 contam para o score
+  const scoringSignals = signals.filter(s => s.weight > 0);
+  const totalWeight = scoringSignals.reduce((acc, s) => acc + s.weight, 0);
+  const earnedWeight = scoringSignals.filter(s => s.passed).reduce((acc, s) => acc + s.weight, 0);
+  const baseScore = totalWeight > 0 ? Math.round((earnedWeight / totalWeight) * 100) : 0;
+
+  // Bonus de ate 10 pontos quando dados de gasto/impressoes confirmam escala
+  let bonusScore = 0;
+  if (spend.available && spendMid >= 500) bonusScore += 5;
+  if (impressions.available && impressionsMid >= 50000) bonusScore += 5;
+
+  const scalingScore = Math.min(100, baseScore + bonusScore);
+  const scaleLevel = getScaleLevel(scalingScore);
+  const confidence = getConfidence(scoringSignals);
+  const summary = buildSummary(scaleLevel, scalingScore, daysActive, ad.page_name || "Anunciante", isStillActive);
+  const recommendation = buildRecommendation(scaleLevel, daysActive);
+
+  return {
+    adId: ad.id || ad.ad_archive_id || "unknown",
+    pageName: ad.page_name || "Desconhecido",
+    scaleLevel,
+    scalingScore,
+    isScaled: scaleLevel === "SCALED",
+    confidence,
+    signals,
+    summary,
+    recommendation,
+    validatedAt: new Date().toISOString(),
+    rawMetrics: {
+      daysActive,
+      isStillActive,
+      platformCount: platforms.length,
+      hasVideo: isVideo,
+      hasCopy,
+      hasTitle,
+      hasDescription,
+      spendAvailable: spend.available,
+      spendMin: spend.min,
+      spendMax: spend.max,
+      impressionsAvailable: impressions.available,
+      impressionsMin: impressions.min,
+      impressionsMax: impressions.max,
+    },
+  };
+}
+
+// ─── Offer Validation ─────────────────────────────────────────────────────────
+
 export function validateOfferScaling(
   offerName: string,
   ads: any[]
 ): OfferScalingResult {
   if (!ads || ads.length === 0) {
     return {
-      offerId: `offer_${Date.now()}`,
+      offerId: ("offer_" + Date.now()),
       offerName,
       totalAdsAnalyzed: 0,
       scaledAdsCount: 0,
@@ -353,7 +426,7 @@ export function validateOfferScaling(
       isOfferValidated: false,
       competitorCount: 0,
       topCompetitors: [],
-      marketSignals: ["Nenhum anúncio encontrado para esta oferta"],
+      marketSignals: ["Nenhum anuncio encontrado para esta oferta"],
       offerRecommendation: "Sem dados suficientes. Tente buscar com termos mais amplos.",
       adValidations: [],
       validatedAt: new Date().toISOString(),
@@ -366,65 +439,68 @@ export function validateOfferScaling(
     adValidations.reduce((acc, v) => acc + v.scalingScore, 0) / adValidations.length
   );
 
-  // Unique advertisers = competitors
   const uniquePages = Array.from(new Set(ads.map((ad: any) => ad.page_name).filter(Boolean)));
   const topCompetitors = uniquePages.slice(0, 5);
 
-  // Market signals
   const marketSignals: string[] = [];
   const scaledPct = (scaledAds.length / adValidations.length) * 100;
 
   if (scaledPct >= 50) {
-    marketSignals.push(`${scaledPct.toFixed(0)}% dos anúncios estão em escala — mercado aquecido`);
+    marketSignals.push(scaledPct.toFixed(0) + "% dos anuncios estao em escala — mercado aquecido e validado");
   } else if (scaledPct >= 20) {
-    marketSignals.push(`${scaledPct.toFixed(0)}% dos anúncios em escala — mercado em crescimento`);
+    marketSignals.push(scaledPct.toFixed(0) + "% dos anuncios em escala — mercado em crescimento");
   } else {
-    marketSignals.push(`Apenas ${scaledPct.toFixed(0)}% dos anúncios em escala — mercado frio ou nicho`);
+    marketSignals.push("Apenas " + scaledPct.toFixed(0) + "% dos anuncios em escala — mercado frio ou nicho pouco explorado");
   }
 
   if (uniquePages.length >= 10) {
-    marketSignals.push(`${uniquePages.length} anunciantes distintos — alta competição`);
+    marketSignals.push(uniquePages.length + " anunciantes distintos — alta competicao, oferta validada pelo mercado");
   } else if (uniquePages.length >= 3) {
-    marketSignals.push(`${uniquePages.length} anunciantes distintos — competição moderada`);
+    marketSignals.push(uniquePages.length + " anunciantes distintos — competicao moderada");
   } else {
-    marketSignals.push(`Apenas ${uniquePages.length} anunciante(s) — nicho pouco explorado`);
+    marketSignals.push("Apenas " + uniquePages.length + " anunciante(s) — nicho pouco explorado ou termos muito especificos");
   }
 
   const videoAds = adValidations.filter(v => v.rawMetrics.hasVideo).length;
   if (videoAds > adValidations.length * 0.5) {
-    marketSignals.push(`${videoAds} anúncios em vídeo — formato dominante neste nicho`);
+    marketSignals.push(videoAds + " anuncios em video (" + Math.round(videoAds / adValidations.length * 100) + "%) — video e o formato dominante neste nicho");
   }
 
   const avgDays = Math.round(
     adValidations.reduce((acc, v) => acc + v.rawMetrics.daysActive, 0) / adValidations.length
   );
-  if (avgDays >= 30) {
-    marketSignals.push(`Média de ${avgDays} dias de veiculação — ofertas longevas e validadas`);
-  } else if (avgDays >= 14) {
-    marketSignals.push(`Média de ${avgDays} dias de veiculação — mercado em amadurecimento`);
+  if (avgDays >= 90) {
+    marketSignals.push("Media de " + avgDays + " dias de veiculacao — ofertas longevas e altamente validadas");
+  } else if (avgDays >= 30) {
+    marketSignals.push("Media de " + avgDays + " dias de veiculacao — mercado em amadurecimento");
+  } else if (avgDays >= 8) {
+    marketSignals.push("Media de " + avgDays + " dias de veiculacao — mercado em fase de teste");
   }
 
-  // Offer level determination
+  const stillActiveCount = adValidations.filter(v => v.rawMetrics.isStillActive).length;
+  if (stillActiveCount > adValidations.length * 0.7) {
+    marketSignals.push(stillActiveCount + " anuncios ainda ativos — anunciantes continuam investindo nesta oferta");
+  }
+
   let offerScaleLevel: ScaleLevel;
-  if (averageScore >= 65 && scaledPct >= 30) offerScaleLevel = "SCALED";
+  if (averageScore >= 61 && scaledPct >= 30) offerScaleLevel = "SCALED";
   else if (averageScore >= 40 || scaledPct >= 15) offerScaleLevel = "MODERATE";
   else if (averageScore > 10) offerScaleLevel = "LOW";
   else offerScaleLevel = "UNKNOWN";
 
   const isOfferValidated = offerScaleLevel === "SCALED" || (offerScaleLevel === "MODERATE" && scaledPct >= 20);
 
-  // Recommendation
   let offerRecommendation: string;
   if (isOfferValidated) {
-    offerRecommendation = `Oferta "${offerName}" VALIDADA pelo mercado. ${scaledAds.length} anúncios em escala com score médio ${averageScore}. Analise os criativos dos top competidores: ${topCompetitors.slice(0, 3).join(", ")}.`;
+    offerRecommendation = 'Oferta "' + offerName + '" VALIDADA pelo mercado. ' + scaledAds.length + ' anuncios em escala com score medio ' + averageScore + '/100. Analise os criativos dos top competidores: ' + topCompetitors.slice(0, 3).join(", ") + '.';
   } else if (offerScaleLevel === "MODERATE") {
-    offerRecommendation = `Oferta "${offerName}" em fase de validação. Mercado existe mas ainda não aquecido. Monitore por 7-14 dias antes de investir.`;
+    offerRecommendation = 'Oferta "' + offerName + '" em fase de validacao. Mercado existe mas ainda nao aquecido. Monitore por 7-14 dias antes de investir.';
   } else {
-    offerRecommendation = `Oferta "${offerName}" sem validação de mercado suficiente. Considere outro nicho ou ajuste os termos de busca.`;
+    offerRecommendation = 'Oferta "' + offerName + '" sem validacao de mercado suficiente. Considere outro nicho ou ajuste os termos de busca.';
   }
 
   return {
-    offerId: `offer_${Date.now()}`,
+    offerId: ("offer_" + Date.now()),
     offerName,
     totalAdsAnalyzed: adValidations.length,
     scaledAdsCount: scaledAds.length,

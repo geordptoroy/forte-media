@@ -104,8 +104,9 @@ function getCountryLabel(countries?: string[]): string {
 
 function getScaleStatus(score?: number): { label: string; color: string; bg: string; border: string; icon: React.ReactNode } {
   if (score === undefined || score === null) return { label: 'Sem dados', color: 'text-gray-600', bg: 'bg-transparent', border: 'border-white/[0.06]', icon: <AlertCircle className="w-3 h-3" /> };
-  if (score >= 70) return { label: 'Escalado', color: 'text-green-400', bg: 'bg-green-500/[0.06]', border: 'border-green-500/20', icon: <CheckCircle2 className="w-3 h-3" /> };
-  if (score >= 40) return { label: 'Em escala', color: 'text-yellow-400', bg: 'bg-yellow-500/[0.06]', border: 'border-yellow-500/20', icon: <TrendingUp className="w-3 h-3" /> };
+  // Limites alinhados com scalingValidationService v2: 61+ = Escalado, 31+ = Validação, <31 = Baixo
+  if (score >= 61) return { label: 'Escalado', color: 'text-green-400', bg: 'bg-green-500/[0.06]', border: 'border-green-500/20', icon: <CheckCircle2 className="w-3 h-3" /> };
+  if (score >= 31) return { label: 'Validação', color: 'text-yellow-400', bg: 'bg-yellow-500/[0.06]', border: 'border-yellow-500/20', icon: <TrendingUp className="w-3 h-3" /> };
   return { label: 'Baixo', color: 'text-gray-500', bg: 'bg-transparent', border: 'border-white/[0.06]', icon: <XCircle className="w-3 h-3" /> };
 }
 
@@ -117,20 +118,29 @@ function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
   const [extractedImageUrl, setExtractedImageUrl] = useState<string | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
 
-  // Tentar campos diretos primeiro
-  const directImageUrl =
+  // Prioridade 1: imagem/thumbnail direta da API Meta (campos garantidos)
+  // ad_creative_images — imagens de anúncios de imagem
+  // ad_creative_videos[].thumbnail_url — thumbnail de anúncios de vídeo
+  const apiImageUrl =
     ad.ad_creative_images?.[0]?.url ||
+    ad.ad_creative_videos?.[0]?.thumbnail_url ||
     ad.image_url ||
     ad.thumbnail_url ||
-    extractedImageUrl;
+    null;
 
+  // URL final: API direta > extração via proxy
+  const directImageUrl = apiImageUrl || extractedImageUrl;
+
+  // NOTA: z.string().url() no backend rejeita strings vazias.
+  // Usamos um placeholder válido e só ativamos a query quando há URL real.
   const extractThumbnailQuery = trpc.ads.extractThumbnail.useQuery(
-    { snapshotUrl: ad.ad_snapshot_url },
+    { snapshotUrl: ad.ad_snapshot_url || 'https://www.facebook.com/ads/library' },
     { enabled: false }
   );
 
   useEffect(() => {
-    if (!directImageUrl && !imgError && !isExtracting && ad.ad_snapshot_url) {
+    // Só tenta extração via proxy se não há imagem direta da API
+    if (!apiImageUrl && !imgError && !isExtracting && !extractedImageUrl && ad.ad_snapshot_url) {
       setIsExtracting(true);
       extractThumbnailQuery.refetch().then(result => {
         if (result.data?.success && result.data?.imageUrl) {
@@ -141,7 +151,8 @@ function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
         setIsExtracting(false);
       });
     }
-  }, [ad.ad_snapshot_url, directImageUrl, imgError, isExtracting]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ad.id, ad.ad_archive_id]);
 
   if (directImageUrl && !imgError) {
     return (

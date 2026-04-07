@@ -18,12 +18,23 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
+// Países prioritários para o seletor rápido do Dashboard
+// Para seleção completa (240+ países), usar AdvancedSearch com RegionSelector
 const COUNTRIES = [
   { code: "BR", label: "Brasil" },
   { code: "US", label: "EUA" },
   { code: "PT", label: "Portugal" },
   { code: "MX", label: "México" },
   { code: "AR", label: "Argentina" },
+  { code: "CL", label: "Chile" },
+  { code: "CO", label: "Colômbia" },
+  { code: "PE", label: "Peru" },
+  { code: "GB", label: "UK" },
+  { code: "DE", label: "Alemanha" },
+  { code: "ES", label: "Espanha" },
+  { code: "AU", label: "Austrália" },
+  { code: "CA", label: "Canadá" },
+  { code: "IN", label: "Índia" },
 ];
 
 export default function Dashboard() {
