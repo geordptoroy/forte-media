@@ -1,6 +1,10 @@
+import axios from "axios";
+import { logger } from "./_core/logger";
+
 /**
- * Integração com Meta Marketing API
- * Busca métricas de performance de campanhas do usuário\n */
+ * Meta Marketing API Service
+ * Refactored with real-time event tracing and robust error handling.
+ */
 
 export interface CampaignMetrics {
   campaignId: string;
@@ -33,230 +37,269 @@ export interface AdAccountMetrics {
   currency: string;
 }
 
+const META_API_VERSION = "v21.0";
+const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+
 /**
- * Obter métricas de uma campanha específica
+ * Get insights for a specific campaign.
  */
 export async function getCampaignMetrics(
+  userId: number,
   accessToken: string,
   campaignId: string,
   dateStart: string,
   dateStop: string
 ): Promise<CampaignMetrics | null> {
+  const startTime = Date.now();
+
+  // Trace Request
+  logger.traceMeta({
+    userId,
+    timestamp: new Date().toISOString(),
+    type: "request",
+    service: "marketing_api",
+    action: "get_campaign_insights",
+    payload: { campaignId, dateStart, dateStop },
+  });
+
   try {
-    const queryParams = new URLSearchParams({
-      access_token: accessToken,
-      fields: [
-        "id",
-        "name",
-        "spend",
-        "impressions",
-        "clicks",
-        "actions",
-        "action_values",
-        "ctr",
-        "cpc",
-        "cpm",
-      ].join(","),
-      time_range: JSON.stringify({
-        since: dateStart,
-        until: dateStop,
-      }),
+    const response = await axios.get(`${META_API_BASE_URL}/${campaignId}/insights`, {
+      params: {
+        access_token: accessToken,
+        fields: "id,name,spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,currency,date_start,date_stop",
+        time_range: JSON.stringify({ since: dateStart, until: dateStop }),
+      },
+      timeout: 20000,
     });
 
-    const response = await fetch(
-      `https://graph.facebook.com/v19.0/${campaignId}/insights?${queryParams.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const duration = Date.now() - startTime;
+    const data = response.data?.data?.[0];
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("[Marketing API] Campaign metrics error:", error);
+    if (!data) {
+      logger.traceMeta({
+        userId,
+        timestamp: new Date().toISOString(),
+        type: "response",
+        service: "marketing_api",
+        action: "get_campaign_insights",
+        payload: { empty: true },
+        duration,
+      });
       return null;
     }
 
-    const data = (await response.json()) as {
-      data?: Array<{
-        campaign_id: string;
-        campaign_name: string;
-        spend: string;
-        impressions: string;
-        clicks: string;
-        actions?: Array<{ action_type: string; value: string }>;
-        action_values?: Array<{ action_type: string; value: string }>;
-        ctr: string;
-        cpc: string;
-        cpm: string;
-        currency: string;
-        date_start: string;
-        date_stop: string;
-      }>;
-    };
+    const conversions = data.actions?.reduce((sum: number, a: any) => sum + parseInt(a.value || "0"), 0) || 0;
+    const conversionValue = data.action_values?.reduce((sum: number, a: any) => sum + parseFloat(a.value || "0"), 0) || 0;
+    const spend = parseFloat(data.spend || "0");
 
-    if (!data.data || data.data.length === 0) {
-      return null;
-    }
-
-    const metric = data.data[0];
-    const conversions = metric.actions?.reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0;
-    const conversionValue =
-      metric.action_values?.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0) || 0;
-
-    return {
-      campaignId: metric.campaign_id,
-      campaignName: metric.campaign_name,
-      spend: parseFloat(metric.spend),
-      impressions: parseInt(metric.impressions),
-      clicks: parseInt(metric.clicks),
+    const result: CampaignMetrics = {
+      campaignId: data.campaign_id || data.id,
+      campaignName: data.campaign_name || data.name,
+      spend,
+      impressions: parseInt(data.impressions || "0"),
+      clicks: parseInt(data.clicks || "0"),
       conversions,
       conversionValue,
-      roas: conversionValue > 0 ? conversionValue / parseFloat(metric.spend) : 0,
-      ctr: parseFloat(metric.ctr),
-      cpc: parseFloat(metric.cpc),
-      cpm: parseFloat(metric.cpm),
-      currency: metric.currency,
-      dateStart: metric.date_start,
-      dateStop: metric.date_stop,
+      roas: spend > 0 ? conversionValue / spend : 0,
+      ctr: parseFloat(data.ctr || "0"),
+      cpc: parseFloat(data.cpc || "0"),
+      cpm: parseFloat(data.cpm || "0"),
+      currency: data.currency || "USD",
+      dateStart: data.date_start,
+      dateStop: data.date_stop,
     };
-  } catch (error) {
-    console.error("[Marketing API] Campaign metrics error:", error);
-    throw error;
+
+    // Trace Response
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "response",
+      service: "marketing_api",
+      action: "get_campaign_insights",
+      payload: { spend: result.spend, roas: result.roas },
+      duration,
+    });
+
+    return result;
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    const metaError = error.response?.data?.error;
+    const errorMessage = metaError?.message || error.message || "Unknown error";
+
+    // Trace Error
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "error",
+      service: "marketing_api",
+      action: "get_campaign_insights",
+      payload: { error: errorMessage, code: metaError?.code },
+      duration,
+    });
+
+    return null;
   }
 }
 
 /**
- * Obter métricas de uma conta de anúncios
+ * Get insights for an ad account.
  */
 export async function getAdAccountMetrics(
+  userId: number,
   accessToken: string,
   adAccountId: string,
   dateStart: string,
   dateStop: string
 ): Promise<AdAccountMetrics | null> {
+  const startTime = Date.now();
+
+  // Trace Request
+  logger.traceMeta({
+    userId,
+    timestamp: new Date().toISOString(),
+    type: "request",
+    service: "marketing_api",
+    action: "get_account_insights",
+    payload: { adAccountId, dateStart, dateStop },
+  });
+
   try {
-    const queryParams = new URLSearchParams({
-      access_token: accessToken,
-      fields: [
-        "spend",
-        "impressions",
-        "clicks",
-        "actions",
-        "action_values",
-        "ctr",
-        "cpc",
-        "cpm",
-        "currency",
-      ].join(","),
-      time_range: JSON.stringify({
-        since: dateStart,
-        until: dateStop,
-      }),
+    const response = await axios.get(`${META_API_BASE_URL}/${adAccountId}/insights`, {
+      params: {
+        access_token: accessToken,
+        fields: "spend,impressions,clicks,actions,action_values,ctr,cpc,cpm,currency",
+        time_range: JSON.stringify({ since: dateStart, until: dateStop }),
+      },
+      timeout: 20000,
     });
 
-    const response = await fetch(
-      `https://graph.facebook.com/v19.0/${adAccountId}/insights?${queryParams.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const duration = Date.now() - startTime;
+    const data = response.data?.data?.[0];
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("[Marketing API] Ad account metrics error:", error);
+    if (!data) {
+      logger.traceMeta({
+        userId,
+        timestamp: new Date().toISOString(),
+        type: "response",
+        service: "marketing_api",
+        action: "get_account_insights",
+        payload: { empty: true },
+        duration,
+      });
       return null;
     }
 
-    const data = (await response.json()) as {
-      data?: Array<{
-        spend: string;
-        impressions: string;
-        clicks: string;
-        actions?: Array<{ action_type: string; value: string }>;
-        action_values?: Array<{ action_type: string; value: string }>;
-        ctr: string;
-        cpc: string;
-        cpm: string;
-        currency: string;
-      }>;
-    };
+    const conversions = data.actions?.reduce((sum: number, a: any) => sum + parseInt(a.value || "0"), 0) || 0;
+    const conversionValue = data.action_values?.reduce((sum: number, a: any) => sum + parseFloat(a.value || "0"), 0) || 0;
+    const totalSpend = parseFloat(data.spend || "0");
 
-    if (!data.data || data.data.length === 0) {
-      return null;
-    }
-
-    const metric = data.data[0];
-    const conversions = metric.actions?.reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0;
-    const conversionValue =
-      metric.action_values?.reduce((sum, a) => sum + parseFloat(a.value || "0"), 0) || 0;
-    const totalSpend = parseFloat(metric.spend);
-
-    return {
+    const result: AdAccountMetrics = {
       accountId: adAccountId,
       totalSpend,
-      totalImpressions: parseInt(metric.impressions),
-      totalClicks: parseInt(metric.clicks),
+      totalImpressions: parseInt(data.impressions || "0"),
+      totalClicks: parseInt(data.clicks || "0"),
       totalConversions: conversions,
       totalConversionValue: conversionValue,
       averageRoas: totalSpend > 0 ? conversionValue / totalSpend : 0,
-      averageCtr: parseFloat(metric.ctr),
-      averageCpc: parseFloat(metric.cpc),
-      averageCpm: parseFloat(metric.cpm),
-      currency: metric.currency,
+      averageCtr: parseFloat(data.ctr || "0"),
+      averageCpc: parseFloat(data.cpc || "0"),
+      averageCpm: parseFloat(data.cpm || "0"),
+      currency: data.currency || "USD",
     };
-  } catch (error) {
-    console.error("[Marketing API] Ad account metrics error:", error);
-    throw error;
+
+    // Trace Response
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "response",
+      service: "marketing_api",
+      action: "get_account_insights",
+      payload: { totalSpend: result.totalSpend, totalConversions: result.totalConversions },
+      duration,
+    });
+
+    return result;
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    const metaError = error.response?.data?.error;
+    const errorMessage = metaError?.message || error.message || "Unknown error";
+
+    // Trace Error
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "error",
+      service: "marketing_api",
+      action: "get_account_insights",
+      payload: { error: errorMessage, code: metaError?.code },
+      duration,
+    });
+
+    return null;
   }
 }
 
 /**
- * Listar todas as campanhas de uma conta de anúncios
+ * List all campaigns for an ad account.
  */
 export async function listCampaigns(
+  userId: number,
   accessToken: string,
   adAccountId: string
 ): Promise<Array<{ id: string; name: string; status: string }>> {
+  const startTime = Date.now();
+
+  // Trace Request
+  logger.traceMeta({
+    userId,
+    timestamp: new Date().toISOString(),
+    type: "request",
+    service: "marketing_api",
+    action: "list_campaigns",
+    payload: { adAccountId },
+  });
+
   try {
-    const queryParams = new URLSearchParams({
-      access_token: accessToken,
-      fields: "id,name,status",
-      limit: "100",
+    const response = await axios.get(`${META_API_BASE_URL}/${adAccountId}/campaigns`, {
+      params: {
+        access_token: accessToken,
+        fields: "id,name,status",
+        limit: 100,
+      },
+      timeout: 20000,
     });
 
-    const response = await fetch(
-      `https://graph.facebook.com/v19.0/${adAccountId}/campaigns?${queryParams.toString()}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const duration = Date.now() - startTime;
+    const campaigns = response.data?.data || [];
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("[Marketing API] List campaigns error:", error);
-      return [];
-    }
+    // Trace Response
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "response",
+      service: "marketing_api",
+      action: "list_campaigns",
+      payload: { count: campaigns.length },
+      duration,
+    });
 
-    const data = (await response.json()) as {
-      data?: Array<{
-        id: string;
-        name: string;
-        status: string;
-      }>;
-    };
+    return campaigns;
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    const metaError = error.response?.data?.error;
+    const errorMessage = metaError?.message || error.message || "Unknown error";
 
-    return data.data || [];
-  } catch (error) {
-    console.error("[Marketing API] List campaigns error:", error);
-    throw error;
+    // Trace Error
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "error",
+      service: "marketing_api",
+      action: "list_campaigns",
+      payload: { error: errorMessage, code: metaError?.code },
+      duration,
+    });
+
+    return [];
   }
 }

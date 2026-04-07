@@ -84,7 +84,8 @@ export default function ScaledAds() {
       // Verificar se há erro na resposta
       if (result.data?.error) {
         setApiError(result.data.error);
-        setIsPermissionError(result.data.isPermissionError ?? false);
+        // Detectar erro de permissão baseado na mensagem
+        setIsPermissionError(result.data.error.toLowerCase().includes("permission") || result.data.error.includes("OAuth"));
         setAds([]);
         setHasLoaded(true);
         if (!silent) {

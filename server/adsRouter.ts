@@ -153,7 +153,7 @@ export const adsRouter = router({
           throw new Error("Meta API credentials are invalid or expired. Please update your access token in settings.");
         }
 
-        const result = await searchAdsByKeywords(credentials.accessToken, input.keywords, input.countries, {
+        const result = await searchAdsByKeywords(ctx.user.id, credentials.accessToken, input.keywords, input.countries, {
           adType: input.adType,
           adActiveStatus: input.adActiveStatus,
           limit: input.limit,
@@ -199,7 +199,7 @@ export const adsRouter = router({
           throw new Error("Meta API credentials are invalid or expired. Please update your access token in settings.");
         }
 
-        const result = await searchAdsByPages(credentials.accessToken, input.pageIds, input.countries, {
+        const result = await searchAdsByPages(ctx.user.id, credentials.accessToken, input.pageIds, input.countries, {
           adType: input.adType,
           adActiveStatus: input.adActiveStatus,
           limit: input.limit,

@@ -57,7 +57,11 @@ export default function Performance() {
   });
 
   const getCampaignMetricsQuery = trpc.meta.getCampaignMetrics.useQuery(
-    { campaignId: selectedCampaign || "" },
+    { 
+      campaignId: selectedCampaign || "",
+      dateStart: "2024-01-01",
+      dateStop: new Date().toISOString().split('T')[0]
+    },
     { enabled: !!selectedCampaign && !!credentialsStatus.data?.hasCredentials }
   );
 

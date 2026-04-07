@@ -1,28 +1,24 @@
 import axios from "axios";
+import { logger } from "../_core/logger";
 
 /**
  * Meta Ads Archive API Service
- * Handles all interactions with Meta's ads_archive endpoint
- * Documentation: https://developers.facebook.com/docs/marketing-api/reference/ads-archive
- *
- * NOTA IMPORTANTE: Os campos 'spend', 'impressions' e 'media_type' são retornados
- * pela API apenas para anúncios políticos (POLITICAL_AND_ISSUE_ADS) em países
- * específicos. Para anúncios comuns (ad_type=ALL), esses campos podem não aparecer
- * na resposta mesmo que sejam solicitados.
+ * Refactored with real-time event tracing and robust error handling.
  */
 
 export interface AdsArchiveSearchParams {
+  userId: number; // Added for event tracing
   accessToken: string;
-  adReachedCountries: string[]; // ISO-3166-1 Alpha-2 codes (e.g., ['BR', 'US'])
+  adReachedCountries: string[];
   searchTerms?: string;
-  searchPageIds?: string[]; // Up to 10 page IDs
+  searchPageIds?: string[];
   adType?: "ALL" | "POLITICAL_AND_ISSUE_ADS" | "CREDIT_ADS" | "EMPLOYMENT_ADS" | "HOUSING_ADS";
   adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
-  adDeliveryDateMin?: string; // YYYY-MM-DD
-  adDeliveryDateMax?: string; // YYYY-MM-DD
+  adDeliveryDateMin?: string;
+  adDeliveryDateMax?: string;
   fields?: string[];
-  limit?: number; // 1-1000, default 100
-  after?: string; // Pagination cursor
+  limit?: number;
+  after?: string;
 }
 
 export interface AdsArchiveResponse {
@@ -47,146 +43,105 @@ export interface AdRecord {
   ad_creative_link_titles?: string[];
   ad_creative_link_descriptions?: string[];
   currency?: string;
-  spend?: {
-    min?: number;
-    max?: number;
-    range?: string;
-  };
-  impressions?: {
-    min?: number;
-    max?: number;
-    range?: string;
-  };
-  demographic_distribution?: Record<string, number>;
-  region_distribution?: Record<string, number>;
-  beneficiary_payers?: Array<{
-    beneficiary?: string;
-    payer?: string;
-  }>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delivery_by_region?: Record<string, any>;
+  spend?: { min?: number; max?: number; range?: string };
+  impressions?: { min?: number; max?: number; range?: string };
+  media_type?: string;
 }
 
-// Versão da Graph API — atualizada para v21.0
 const META_API_VERSION = "v21.0";
 const META_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 const ADS_ARCHIVE_ENDPOINT = `${META_API_BASE_URL}/ads_archive`;
 
-/**
- * Default fields to request from the ads_archive API.
- * Inclui spend, impressions e media_type — esses campos são retornados
- * quando disponíveis (principalmente para anúncios políticos).
- * Para anúncios comuns, a API pode não retorná-los mesmo que solicitados.
- */
 const DEFAULT_FIELDS = [
-  "id",
-  "page_id",
-  "page_name",
-  "ad_snapshot_url",
-  "ad_delivery_start_time",
-  "ad_delivery_stop_time",
-  "publisher_platforms",
-  "ad_creative_bodies",
-  "ad_creative_link_titles",
-  "ad_creative_link_descriptions",
-  "currency",
-  "spend",
-  "impressions",
-  "media_type",
+  "id", "page_id", "page_name", "ad_snapshot_url",
+  "ad_delivery_start_time", "ad_delivery_stop_time",
+  "publisher_platforms", "ad_creative_bodies",
+  "ad_creative_link_titles", "ad_creative_link_descriptions",
+  "currency", "spend", "impressions", "media_type",
 ];
 
 export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<AdsArchiveResponse> {
-  if (!params.accessToken) {
-    throw new Error("Access token is required");
-  }
+  const startTime = Date.now();
+  const { userId, accessToken, ...searchParams } = params;
 
-  if (!params.adReachedCountries || params.adReachedCountries.length === 0) {
-    throw new Error("At least one country code (ad_reached_countries) is required");
-  }
+  if (!accessToken) throw new Error("Access token is required");
+  if (!searchParams.adReachedCountries?.length) throw new Error("At least one country is required");
 
-  // Normaliza searchTerms: string vazia ou "*" são substituídos por "." (curinga genérico válido)
-  const normalizedSearchTerms = params.searchTerms?.trim();
-  const effectiveSearchTerms =
-    normalizedSearchTerms === "" || normalizedSearchTerms === "*"
-      ? "."
-      : normalizedSearchTerms;
+  const normalizedSearchTerms = searchParams.searchTerms?.trim();
+  const effectiveSearchTerms = (normalizedSearchTerms === "" || normalizedSearchTerms === "*") ? "." : normalizedSearchTerms;
 
-  if (!effectiveSearchTerms && (!params.searchPageIds || params.searchPageIds.length === 0)) {
-    throw new Error("Either search_terms or search_page_ids must be provided");
-  }
+  // Trace Request
+  logger.traceMeta({
+    userId,
+    timestamp: new Date().toISOString(),
+    type: "request",
+    service: "ad_library",
+    action: "search_ads",
+    payload: { countries: searchParams.adReachedCountries, terms: effectiveSearchTerms },
+  });
 
-  if (params.searchPageIds && params.searchPageIds.length > 10) {
-    throw new Error("Maximum 10 page IDs allowed in search_page_ids");
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const queryParams: Record<string, any> = {
-    access_token: params.accessToken,
-    ad_reached_countries: JSON.stringify(params.adReachedCountries),
-    fields: (params.fields || DEFAULT_FIELDS).join(","),
-    limit: params.limit || 100,
+    access_token: accessToken,
+    ad_reached_countries: JSON.stringify(searchParams.adReachedCountries),
+    fields: (searchParams.fields || DEFAULT_FIELDS).join(","),
+    limit: searchParams.limit || 100,
   };
 
-  if (effectiveSearchTerms) {
-    queryParams.search_terms = effectiveSearchTerms;
-  }
-
-  if (params.searchPageIds) {
-    queryParams.search_page_ids = JSON.stringify(params.searchPageIds);
-  }
-
-  if (params.adType) {
-    queryParams.ad_type = params.adType;
-  }
-
-  if (params.adActiveStatus) {
-    queryParams.ad_active_status = params.adActiveStatus;
-  }
-
-  if (params.adDeliveryDateMin) {
-    queryParams.ad_delivery_date_min = params.adDeliveryDateMin;
-  }
-
-  if (params.adDeliveryDateMax) {
-    queryParams.ad_delivery_date_max = params.adDeliveryDateMax;
-  }
-
-  if (params.after) {
-    queryParams.after = params.after;
-  }
+  if (effectiveSearchTerms) queryParams.search_terms = effectiveSearchTerms;
+  if (searchParams.searchPageIds) queryParams.search_page_ids = JSON.stringify(searchParams.searchPageIds);
+  if (searchParams.adType) queryParams.ad_type = searchParams.adType;
+  if (searchParams.adActiveStatus) queryParams.ad_active_status = searchParams.adActiveStatus;
+  if (searchParams.after) queryParams.after = searchParams.after;
 
   try {
     const response = await axios.get<AdsArchiveResponse>(ADS_ARCHIVE_ENDPOINT, {
       params: queryParams,
-      timeout: 30000, // 30 seconds timeout
+      timeout: 30000,
+    });
+
+    const duration = Date.now() - startTime;
+
+    // Trace Response
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "response",
+      service: "ad_library",
+      action: "search_ads",
+      payload: { count: response.data.data?.length || 0 },
+      duration,
     });
 
     return response.data;
-  } catch (error: unknown) {
-    if (
-      axios.isAxiosError(error) &&
-      error.response?.data?.error
-    ) {
-      const metaError = error.response.data.error as { message?: string; code?: number; type?: string };
-      const msg = metaError.message || JSON.stringify(metaError);
-      console.error("[Meta Ads] Graph API error:", metaError);
-      throw new Error(`Meta API Error (${metaError.code ?? "?"}): ${msg}`);
-    }
-    const errMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to search ads archive: ${errMsg}`);
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    const metaError = error.response?.data?.error;
+    const errorMessage = metaError?.message || error.message || "Unknown error";
+
+    // Trace Error
+    logger.traceMeta({
+      userId,
+      timestamp: new Date().toISOString(),
+      type: "error",
+      service: "ad_library",
+      action: "search_ads",
+      payload: { error: errorMessage, code: metaError?.code },
+      duration,
+    });
+
+    throw new Error(`Meta API Error: ${errorMessage}`);
   }
 }
 
-/**
- * Search ads by keywords
- */
 export async function searchAdsByKeywords(
+  userId: number,
   accessToken: string,
   keywords: string,
   countries: string[] = ["BR"],
   options?: Partial<AdsArchiveSearchParams>
 ): Promise<AdsArchiveResponse> {
   return searchAdsArchive({
+    userId,
     accessToken,
     adReachedCountries: countries,
     searchTerms: keywords,
@@ -194,37 +149,18 @@ export async function searchAdsByKeywords(
   });
 }
 
-/**
- * Search ads from specific Facebook pages
- */
 export async function searchAdsByPages(
+  userId: number,
   accessToken: string,
   pageIds: string[],
   countries: string[] = ["BR"],
   options?: Partial<AdsArchiveSearchParams>
 ): Promise<AdsArchiveResponse> {
   return searchAdsArchive({
+    userId,
     accessToken,
     adReachedCountries: countries,
     searchPageIds: pageIds,
     ...options,
   });
-}
-
-/**
- * Validate if an access token is valid
- */
-export async function validateAccessToken(accessToken: string): Promise<boolean> {
-  try {
-    const response = await axios.get(`${META_API_BASE_URL}/me`, {
-      params: {
-        access_token: accessToken,
-        fields: "id,name",
-      },
-      timeout: 10000,
-    });
-    return !!(response.data?.id);
-  } catch {
-    return false;
-  }
 }

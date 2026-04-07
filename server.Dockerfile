@@ -29,8 +29,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=4000
 
-# Instalar utilitários de rede para o entrypoint (nc)
-RUN apk add --no-cache netcat-openbsd
+# Instalar utilitários de rede para o entrypoint e healthcheck
+RUN apk add --no-cache netcat-openbsd wget
 
 # Copiar apenas o necessário da etapa anterior
 COPY --from=builder /app/package.json ./package.json
