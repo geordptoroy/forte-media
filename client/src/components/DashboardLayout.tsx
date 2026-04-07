@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
+import { MetaEventTracker } from "./ads/MetaEventTracker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -204,6 +205,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="max-w-7xl mx-auto">{children}</div>
         </div>
       </main>
+      <MetaEventTracker />
     </div>
   );
 }
