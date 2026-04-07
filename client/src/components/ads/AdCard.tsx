@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,6 +26,7 @@ import {
   ImageOff,
   ChevronRight,
   BarChart2,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -69,23 +70,59 @@ function getScaleStatus(score?: number): { label: string; color: string; bg: str
   return { label: 'Baixo', color: 'text-gray-500', bg: 'bg-transparent', border: 'border-white/[0.06]', icon: <XCircle className="w-3 h-3" /> };
 }
 
-// ─── Thumbnail resolver ──────────────────────────────────────────────────────
-// A Meta retorna ad_snapshot_url como URL da biblioteca de anúncios (HTML),
-// não como imagem direta. Para exibir o criativo, usamos um iframe ou
-// fallback para placeholder. Para imagens diretas, a API retorna campos
-// como images[].url ou video_hd_url (apenas com permissões especiais).
-// A solução robusta é usar o iframe do snapshot_url dentro do modal.
+/**
+ * Thumbnail Resolver
+ * ─────────────────────────────────────────────────────────────────────────────
+ * A Meta Ad Library API pública não retorna URLs de imagem direta nos campos
+ * padrão. O ad_snapshot_url aponta para a página HTML da biblioteca.
+ *
+ * Estratégia:
+ * 1. Tenta campos alternativos (image_url, thumbnail_url, ad_creative_images)
+ * 2. Tenta extrair imagem do ad_snapshot_url via parsing de HTML (fetch + DOM)
+ * 3. Se tudo falhar, exibe placeholder com informações do anúncio
+ */
 
 function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
   const [imgError, setImgError] = useState(false);
-  
+  const [isLoading, setIsLoading] = useState(false);
+  const [extractedImageUrl, setExtractedImageUrl] = useState<string | null>(null);
+
   // Tentar extrair URL de imagem direta de campos alternativos
   const directImageUrl =
     ad.image_url ||
     ad.thumbnail_url ||
     ad.ad_creative_images?.[0]?.url ||
     ad.creative?.thumbnail_url ||
+    extractedImageUrl ||
     null;
+
+  // Função para extrair imagem do snapshot HTML
+  const extractImageFromSnapshot = async () => {
+    if (!ad.ad_snapshot_url || imgError || extractedImageUrl) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch(ad.ad_snapshot_url, { mode: 'no-cors' });
+      const html = await response.text();
+      
+      // Procura por img tags ou og:image meta tag
+      const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+      
+      const imageUrl = imgMatch?.[1] || ogMatch?.[1];
+      if (imageUrl) {
+        setExtractedImageUrl(imageUrl);
+      }
+    } catch (error) {
+      // Silenciosamente falha - usa fallback
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Chamar extração quando o componente monta
+  if (!directImageUrl && !imgError && !isLoading && !extractedImageUrl) {
+    extractImageFromSnapshot();
+  }
 
   if (directImageUrl && !imgError) {
     return (
@@ -94,6 +131,7 @@ function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
         alt={ad.page_name || 'Criativo'}
         className={cn("w-full h-full object-cover", className)}
         onError={() => setImgError(true)}
+        loading="lazy"
       />
     );
   }
@@ -101,21 +139,27 @@ function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
   // Fallback: exibir placeholder com informações do anúncio
   return (
     <div className={cn("w-full h-full flex flex-col items-center justify-center bg-[#0a0a0a] gap-3", className)}>
-      <div className="w-10 h-10 border border-white/[0.08] flex items-center justify-center">
-        <span className="text-lg font-black text-white/20">
-          {ad.page_name?.charAt(0)?.toUpperCase() || 'A'}
-        </span>
-      </div>
-      <div className="text-center px-4">
-        <p className="text-[9px] font-bold text-gray-700 uppercase tracking-widest">Criativo</p>
-        <p className="text-[10px] font-bold text-gray-500 mt-0.5 line-clamp-2 leading-tight">
-          {ad.page_name || 'Anunciante'}
-        </p>
-      </div>
-      {ad.media_type && (
-        <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border border-white/[0.08] text-gray-600">
-          {ad.media_type}
-        </span>
+      {isLoading ? (
+        <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+      ) : (
+        <>
+          <div className="w-10 h-10 border border-white/[0.08] flex items-center justify-center">
+            <span className="text-lg font-black text-white/20">
+              {ad.page_name?.charAt(0)?.toUpperCase() || 'A'}
+            </span>
+          </div>
+          <div className="text-center px-4">
+            <p className="text-[9px] font-bold text-gray-700 uppercase tracking-widest">Criativo</p>
+            <p className="text-[10px] font-bold text-gray-500 mt-0.5 line-clamp-2 leading-tight">
+              {ad.page_name || 'Anunciante'}
+            </p>
+          </div>
+          {ad.media_type && (
+            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border border-white/[0.08] text-gray-600">
+              {ad.media_type}
+            </span>
+          )}
+        </>
       )}
     </div>
   );
@@ -229,16 +273,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
     toggleFavoriteMutation.mutate({
       adId, pageId,
       pageName: ad.page_name,
-      adSnapshotUrl: ad.ad_snapshot_url,
-      adDeliveryStartTime: ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time) : undefined,
-      adDeliveryStopTime: ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : undefined,
-      publisherPlatforms: ad.publisher_platforms,
-      adCreativeBodies: ad.ad_creative_bodies,
-      adCreativeLinkTitles: ad.ad_creative_link_titles,
-      adCreativeLinkDescriptions: ad.ad_creative_link_descriptions,
-      currency: ad.currency,
-      spend: ad.spend,
-      impressions: ad.impressions,
     });
   };
 
@@ -248,360 +282,242 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
     const adId = ad.id || ad.ad_archive_id;
     const pageId = ad.page_id;
     if (!adId || !pageId) { toast.error('Dados do anúncio incompletos'); return; }
-    addMonitoredMutation.mutate({ adId, pageId, pageName: ad.page_name });
+    addMonitoredMutation.mutate({
+      adId, pageId,
+      pageName: ad.page_name,
+    });
   };
 
   const scaleStatus = getScaleStatus(ad.scalingScore);
-  const displayBody = ad.ad_creative_bodies?.[0] || ad.body || '';
-  const displayTitle = ad.ad_creative_link_titles?.[0] || '';
-  const isVideo = ad.media_type === 'VIDEO';
-  const platforms = ad.publisher_platforms || [];
-  const daysActive = ad.daysActive || 0;
+  const copy = ad.ad_creative_bodies?.[0] || ad.body || '';
+  const title = ad.ad_creative_link_titles?.[0] || '';
+  const description = ad.ad_creative_link_descriptions?.[0] || '';
 
   return (
     <>
-      {/* ── Card ── */}
-      <div
-        onClick={() => setOpen(true)}
-        className="group cursor-pointer bg-black border-b border-r border-white/[0.04] hover:bg-white/[0.02] transition-colors duration-150 flex flex-col h-full"
-      >
-        {/* Scale bar top */}
+      <div className="border border-white/[0.06] bg-black overflow-hidden hover:border-white/[0.12] transition-all group">
+        {/* Scale indicator bar */}
         {ad.scalingScore !== undefined && (
-          <div className="h-0.5 w-full bg-white/[0.04]">
+          <div className="h-1 bg-white/[0.02]">
             <div
               className={cn(
-                "h-full transition-all duration-700",
-                ad.scalingScore >= 70 ? "bg-green-500" :
-                ad.scalingScore >= 40 ? "bg-yellow-500" : "bg-white/20"
+                "h-full transition-all",
+                ad.scalingScore >= 70 ? "bg-green-500" : ad.scalingScore >= 40 ? "bg-yellow-500" : "bg-gray-700"
               )}
-              style={{ width: `${ad.scalingScore}%` }}
+              style={{ width: `${Math.min(100, ad.scalingScore)}%` }}
             />
           </div>
         )}
 
         {/* Thumbnail */}
-        <div className="relative aspect-square bg-[#080808] overflow-hidden">
+        <div className="relative w-full aspect-video bg-[#0a0a0a] overflow-hidden">
           <AdThumbnail ad={ad} />
-
-          {/* Media type badge */}
-          {isVideo && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-10 h-10 bg-black/60 border border-white/20 flex items-center justify-center">
-                <Play className="w-4 h-4 text-white fill-current ml-0.5" />
-              </div>
-            </div>
-          )}
-
-          {/* Top badges */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
-            <span className={cn("scale-indicator", scaleStatus.bg, scaleStatus.border, scaleStatus.color)}>
-              {scaleStatus.icon}
-              {scaleStatus.label}
-            </span>
-            {ad.scalingScore !== undefined && (
-              <span className="text-[8px] font-black px-1.5 py-0.5 bg-black/70 text-white/60 border border-white/[0.08] uppercase tracking-widest">
-                Score {ad.scalingScore}
-              </span>
-            )}
-          </div>
-
-          {/* Quick actions */}
-          <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3 gap-2">
             <button
-              onClick={handleFavorite}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center border transition-all",
-                isFavorited
-                  ? "bg-red-500 border-red-500 text-white"
-                  : "bg-black/70 border-white/20 text-white hover:bg-white/20"
-              )}
+              onClick={() => setOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-white/90 transition-all"
             >
-              <Heart className={cn("w-3 h-3", isFavorited && "fill-current")} />
+              <Maximize2 className="w-3 h-3" />
+              Ver Criativo
             </button>
-            <button
-              onClick={(e) => handleMonitor(e)}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center border transition-all",
-                isMonitored
-                  ? "bg-blue-500 border-blue-500 text-white"
-                  : "bg-black/70 border-white/20 text-white hover:bg-white/20"
-              )}
-            >
-              <Eye className="w-3 h-3" />
-            </button>
-            <a
-              href={ad.ad_snapshot_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="w-7 h-7 flex items-center justify-center border bg-black/70 border-white/20 text-white hover:bg-white/20 transition-all"
-            >
-              <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
         </div>
 
-        {/* Info section */}
-        <div className="p-3 flex flex-col gap-2 flex-1">
-          {/* Advertiser */}
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-              <span className="text-[8px] font-black text-white/60">
-                {ad.page_name?.charAt(0)?.toUpperCase() || 'A'}
-              </span>
+        {/* Content */}
+        <div className="p-4 space-y-3">
+          {/* Header: Page name + Scale badge */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-white truncate">{ad.page_name || 'Anunciante'}</p>
+              <p className="text-[9px] text-gray-600 font-mono truncate">ID: {ad.id || ad.ad_archive_id || 'N/D'}</p>
             </div>
-            <span className="text-[11px] font-bold text-white truncate flex-1">{ad.page_name || 'Anunciante'}</span>
-            {isVideo && (
-              <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest border border-white/[0.06] px-1.5 py-0.5 shrink-0">
-                VIDEO
+            <span className={cn("shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[9px] font-black uppercase tracking-widest border", scaleStatus.bg, scaleStatus.border, scaleStatus.color)}>
+              {scaleStatus.icon}
+              {scaleStatus.label}
+            </span>
+          </div>
+
+          {/* Copy preview */}
+          {copy && (
+            <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-2">
+              {copy}
+            </p>
+          )}
+
+          {/* Metrics grid */}
+          <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
+            <div className="bg-black px-2 py-2">
+              <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-0.5">
+                <DollarSign className="w-2.5 h-2.5" /> Gasto
+              </p>
+              <p className="text-xs font-black text-white">{renderMetricValue(ad.spend)}</p>
+            </div>
+            <div className="bg-black px-2 py-2">
+              <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-0.5">
+                <Eye className="w-2.5 h-2.5" /> Alcance
+              </p>
+              <p className="text-xs font-black text-white">{renderMetricValue(ad.impressions)}</p>
+            </div>
+          </div>
+
+          {/* Platforms + Media type */}
+          <div className="flex flex-wrap gap-1">
+            {ad.publisher_platforms?.map((platform: string) => (
+              <span key={platform} className="text-[8px] font-bold text-gray-500 border border-white/[0.08] px-2 py-0.5">
+                {platform}
+              </span>
+            ))}
+            {ad.media_type && (
+              <span className="text-[8px] font-bold text-gray-500 border border-white/[0.08] px-2 py-0.5 ml-auto">
+                {ad.media_type}
               </span>
             )}
           </div>
 
-          {/* Copy preview */}
-          {displayBody && (
-            <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">
-              {displayBody}
-            </p>
-          )}
-          {displayTitle && !displayBody && (
-            <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed font-bold">
-              {displayTitle}
-            </p>
-          )}
-
-          {/* Metrics */}
-          <div className="grid grid-cols-2 gap-px bg-white/[0.04] mt-auto">
-            <div className="bg-black px-2 py-1.5">
-              <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-0.5">
-                <DollarSign className="w-2 h-2" /> Gasto
-              </p>
-              <p className="text-[11px] font-black text-white">{renderMetricValue(ad.spend)}</p>
-            </div>
-            <div className="bg-black px-2 py-1.5">
-              <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-0.5">
-                <BarChart2 className="w-2 h-2" /> Alcance
-              </p>
-              <p className="text-[11px] font-black text-white">{renderMetricValue(ad.impressions)}</p>
-            </div>
+          {/* Dates */}
+          <div className="flex items-center justify-between text-[9px] text-gray-600 font-mono">
+            <span>Início: {formatDate(ad.ad_delivery_start_time)}</span>
+            {ad.ad_delivery_stop_time && <span>Fim: {formatDate(ad.ad_delivery_stop_time)}</span>}
           </div>
 
-          {/* Footer: platforms + date */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex gap-1">
-              {platforms.slice(0, 3).map((p: string) => (
-                <span key={p} className="text-[8px] font-black uppercase text-gray-700 border border-white/[0.06] px-1.5 py-0.5">
-                  {p.slice(0, 2)}
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 text-[9px] text-gray-700">
-              <Clock className="w-2.5 h-2.5" />
-              <span>{daysActive > 0 ? `${daysActive}d` : formatDate(ad.ad_delivery_start_time)}</span>
-            </div>
+          {/* Actions */}
+          <div className="flex gap-1 pt-2 border-t border-white/[0.06]">
+            <button
+              onClick={handleFavorite}
+              disabled={toggleFavoriteMutation.isPending}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-2 text-[9px] font-black uppercase tracking-widest transition-all border",
+                isFavorited
+                  ? "bg-white/[0.08] border-white/[0.12] text-white hover:bg-white/[0.12]"
+                  : "border-white/[0.06] text-gray-600 hover:text-white hover:border-white/[0.12]"
+              )}
+            >
+              <Heart className={cn("w-3 h-3", isFavorited && "fill-current")} />
+              Favorito
+            </button>
+            <button
+              onClick={handleMonitor}
+              disabled={addMonitoredMutation.isPending || isMonitored}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-2 text-[9px] font-black uppercase tracking-widest transition-all border",
+                isMonitored
+                  ? "bg-white/[0.08] border-white/[0.12] text-white"
+                  : "border-white/[0.06] text-gray-600 hover:text-white hover:border-white/[0.12]"
+              )}
+            >
+              <Activity className="w-3 h-3" />
+              {isMonitored ? "Monitorado" : "Monitorar"}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-black border border-white/[0.08] max-w-5xl p-0 overflow-hidden rounded-none shadow-2xl">
-          <div className="flex flex-col lg:flex-row h-[85vh] lg:h-[680px]">
-
-            {/* Left: Creative Preview */}
-            <div className="w-full lg:w-[45%] bg-[#060606] border-b lg:border-b-0 lg:border-r border-white/[0.06] flex flex-col">
-              <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
-                <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Visualização do Criativo</span>
-                <a
-                  href={ad.ad_snapshot_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[9px] font-black text-gray-600 hover:text-white transition-colors uppercase tracking-widest"
-                >
-                  <Maximize2 className="w-3 h-3" />
-                  Abrir
-                </a>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <CreativeViewer ad={ad} />
-              </div>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 border-white/[0.06]">
+          <div className="flex h-[70vh]">
+            {/* Left: Creative preview (45%) */}
+            <div className="w-[45%] border-r border-white/[0.06] bg-[#080808]">
+              <CreativeViewer ad={ad} />
             </div>
 
-            {/* Right: Details */}
-            <div className="w-full lg:w-[55%] flex flex-col overflow-hidden">
+            {/* Right: Details (55%) */}
+            <div className="w-[55%] overflow-y-auto p-6 space-y-6">
               {/* Header */}
-              <div className="px-6 py-4 border-b border-white/[0.06] flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-                    <span className="text-sm font-black text-white/60">{ad.page_name?.charAt(0)}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-black text-white leading-tight truncate">{ad.page_name}</h3>
-                    <p className="text-[9px] text-gray-600 font-mono uppercase tracking-widest truncate">
-                      ID: {ad.id || ad.ad_archive_id}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Scale badge */}
-                  <span className={cn("scale-indicator", scaleStatus.bg, scaleStatus.border, scaleStatus.color)}>
-                    {scaleStatus.icon}
+              <div>
+                <h2 className="text-base font-black text-white mb-1">{ad.page_name}</h2>
+                <p className="text-[10px] text-gray-600 font-mono">{ad.id || ad.ad_archive_id}</p>
+              </div>
+
+              {/* Scale status */}
+              <div className={cn("p-3 border", scaleStatus.bg, scaleStatus.border)}>
+                <div className="flex items-center gap-2 mb-1">
+                  {scaleStatus.icon}
+                  <span className={cn("text-xs font-black uppercase tracking-widest", scaleStatus.color)}>
                     {scaleStatus.label}
-                    {ad.scalingScore !== undefined && ` · ${ad.scalingScore}`}
                   </span>
-                  <button
-                    onClick={handleFavorite}
-                    className={cn(
-                      "w-8 h-8 flex items-center justify-center border transition-all",
-                      isFavorited ? "bg-red-500 border-red-500 text-white" : "border-white/[0.08] text-gray-500 hover:text-white hover:border-white/20"
-                    )}
-                  >
-                    <Heart className={cn("w-3.5 h-3.5", isFavorited && "fill-current")} />
-                  </button>
+                </div>
+                {ad.scalingScore !== undefined && (
+                  <p className="text-[10px] text-gray-400">Score: {ad.scalingScore}/100</p>
+                )}
+              </div>
+
+              {/* Copy */}
+              {copy && (
+                <div>
+                  <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Copy</p>
+                  <p className="text-xs text-gray-300 leading-relaxed">{copy}</p>
+                </div>
+              )}
+
+              {/* Title + Description */}
+              {(title || description) && (
+                <div>
+                  <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Criativo</p>
+                  {title && <p className="text-xs font-bold text-white mb-1">{title}</p>}
+                  {description && <p className="text-xs text-gray-400">{description}</p>}
+                </div>
+              )}
+
+              {/* Metrics grid */}
+              <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
+                <div className="bg-black px-3 py-2">
+                  <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Gasto</p>
+                  <p className="text-sm font-black text-white">{renderMetricValue(ad.spend)}</p>
+                </div>
+                <div className="bg-black px-3 py-2">
+                  <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Alcance</p>
+                  <p className="text-sm font-black text-white">{renderMetricValue(ad.impressions)}</p>
+                </div>
+                <div className="bg-black px-3 py-2">
+                  <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Moeda</p>
+                  <p className="text-sm font-black text-white">{ad.currency || 'N/D'}</p>
+                </div>
+                <div className="bg-black px-3 py-2">
+                  <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Tipo</p>
+                  <p className="text-sm font-black text-white">{ad.media_type || 'N/D'}</p>
                 </div>
               </div>
 
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="p-6 space-y-5">
-
-                  {/* Metrics grid */}
-                  <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
-                    <div className="bg-black p-3">
-                      <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-1">
-                        <DollarSign className="w-2.5 h-2.5" /> Gasto Estimado
-                      </p>
-                      <p className="text-base font-black text-white">{renderMetricValue(ad.spend)}</p>
-                    </div>
-                    <div className="bg-black p-3">
-                      <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-1">
-                        <BarChart2 className="w-2.5 h-2.5" /> Alcance / Impressões
-                      </p>
-                      <p className="text-base font-black text-green-400">{renderMetricValue(ad.impressions)}</p>
-                    </div>
-                    <div className="bg-black p-3">
-                      <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-1">
-                        <Clock className="w-2.5 h-2.5" /> Dias Ativo
-                      </p>
-                      <p className="text-base font-black text-white">{daysActive > 0 ? `${daysActive} dias` : 'N/D'}</p>
-                    </div>
-                    <div className="bg-black p-3">
-                      <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-1">
-                        <Globe className="w-2.5 h-2.5" /> Plataformas
-                      </p>
-                      <div className="flex gap-1 flex-wrap mt-0.5">
-                        {platforms.length > 0 ? platforms.map((p: string) => (
-                          <span key={p} className="text-[8px] font-black uppercase text-gray-400 border border-white/[0.08] px-1.5 py-0.5">
-                            {p}
-                          </span>
-                        )) : <span className="text-sm font-black text-gray-600">N/D</span>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Scaling Analysis */}
-                  {ad.scalingReasons && ad.scalingReasons.length > 0 && (
-                    <div className="border border-white/[0.06] bg-white/[0.01]">
-                      <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-2">
-                        <TrendingUp className="w-3 h-3 text-yellow-500" />
-                        <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest">Análise de Escala</span>
-                      </div>
-                      <div className="p-4 space-y-2">
-                        {ad.scalingReasons.map((reason: string, i: number) => (
-                          <div key={i} className="flex items-start gap-2">
-                            <div className="w-1 h-1 bg-yellow-500/50 mt-1.5 shrink-0" />
-                            <p className="text-[11px] text-gray-400 leading-relaxed">{reason}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Creative Copy */}
-                  {(displayBody || displayTitle) && (
-                    <div className="border border-white/[0.06]">
-                      <div className="px-4 py-2.5 border-b border-white/[0.06]">
-                        <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Copy do Criativo</span>
-                      </div>
-                      <div className="p-4">
-                        {displayTitle && (
-                          <p className="text-sm font-black text-white mb-2 leading-snug">{displayTitle}</p>
-                        )}
-                        {displayBody && (
-                          <p className="text-xs text-gray-400 leading-relaxed">{displayBody}</p>
-                        )}
-                        {ad.ad_creative_link_descriptions?.[0] && (
-                          <p className="text-[10px] text-gray-600 mt-2 leading-relaxed border-t border-white/[0.04] pt-2">
-                            {ad.ad_creative_link_descriptions[0]}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dates */}
-                  <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
-                    <div className="bg-black p-3">
-                      <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Início</p>
-                      <p className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
-                        <Calendar className="w-3 h-3" />
-                        {formatDate(ad.ad_delivery_start_time)}
-                      </p>
-                    </div>
-                    <div className="bg-black p-3">
-                      <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Fim / Status</p>
-                      <p className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
-                        <Activity className="w-3 h-3" />
-                        {ad.ad_delivery_stop_time ? formatDate(ad.ad_delivery_stop_time) : (
-                          <span className="text-green-400">Ativo</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Media type + currency */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {ad.media_type && (
-                      <span className="text-[8px] font-black uppercase tracking-widest border border-white/[0.08] px-2 py-1 text-gray-500">
-                        {ad.media_type}
-                      </span>
-                    )}
-                    {ad.currency && (
-                      <span className="text-[8px] font-black uppercase tracking-widest border border-white/[0.08] px-2 py-1 text-gray-500">
-                        {ad.currency}
-                      </span>
-                    )}
-                    {ad.ad_archive_id && (
-                      <span className="text-[8px] font-mono text-gray-700 border border-white/[0.04] px-2 py-1">
-                        Archive: {ad.ad_archive_id}
-                      </span>
-                    )}
-                  </div>
+              {/* Dates */}
+              <div className="space-y-2">
+                <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Timeline</p>
+                <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                  <Calendar className="w-3 h-3" />
+                  <span>Início: {formatDate(ad.ad_delivery_start_time)}</span>
                 </div>
+                {ad.ad_delivery_stop_time && (
+                  <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                    <Calendar className="w-3 h-3" />
+                    <span>Fim: {formatDate(ad.ad_delivery_stop_time)}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Actions footer */}
-              <div className="px-6 py-4 border-t border-white/[0.06] flex gap-2">
-                <button
-                  onClick={() => handleMonitor()}
-                  className={cn(
-                    "flex-1 h-10 font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all",
-                    isMonitored
-                      ? "bg-blue-500 text-white hover:bg-blue-600"
-                      : "bg-white text-black hover:bg-white/90"
-                  )}
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  {isMonitored ? 'Monitorando' : 'Monitorar'}
-                </button>
+              {/* Platforms */}
+              {ad.publisher_platforms?.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Plataformas</p>
+                  <div className="flex flex-wrap gap-1">
+                    {ad.publisher_platforms.map((p: string) => (
+                      <span key={p} className="text-[9px] font-bold text-gray-400 border border-white/[0.08] px-2 py-1">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* External link */}
+              <div className="pt-4 border-t border-white/[0.06]">
                 <a
                   href={ad.ad_snapshot_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 h-10 font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 border border-white/[0.08] text-gray-400 hover:text-white hover:border-white/20 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-white/90 transition-all"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Biblioteca Meta
+                  <ExternalLink className="w-3 h-3" />
+                  Abrir na Biblioteca
                 </a>
               </div>
             </div>

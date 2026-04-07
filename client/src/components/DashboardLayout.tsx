@@ -39,7 +39,6 @@ const menuItems = [
     items: [
       { icon: Pickaxe, label: "Escala & Mercado", href: "/dashboard", description: "Anúncios escalados agora" },
       { icon: Search, label: "Busca Avançada", href: "/search", description: "Filtros granulares Meta" },
-      { icon: ShieldCheck, label: "Validar Oferta", href: "/offer-validation", description: "Oferta escalada no mercado?" },
     ]
   },
   {

@@ -15,7 +15,6 @@ import Performance from "./pages/Performance";
 import Reports from "./pages/Reports";
 import Favorites from "./pages/Favorites";
 import Monitoring from "./pages/Monitoring";
-import OfferValidation from "./pages/OfferValidation";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { useEffect, type ComponentType } from "react";
 
@@ -114,9 +113,6 @@ function Router() {
       <PrivateRoute path="/favorites" component={Favorites} />
       <PrivateRoute path="/reports" component={Reports} />
       
-      {/* Validação de Oferta / Escala */}
-      <PrivateRoute path="/offer-validation" component={OfferValidation} />
-
       {/* Configuracoes */}
       <PrivateRoute path="/settings" component={Settings} />
 
