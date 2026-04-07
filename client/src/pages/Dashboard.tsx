@@ -71,7 +71,7 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Pickaxe className="w-5 h-5 text-white" />
-              <h1 className="text-lg font-black text-white tracking-tight">Escala & Mercado</h1>
+              <h1 className="text-lg font-black text-white tracking-tight">Minerador</h1>
             </div>
             <p className="text-xs text-gray-600 font-medium">
               Anúncios com maior investimento e tração detectados pela Meta Ad Library API v21.0

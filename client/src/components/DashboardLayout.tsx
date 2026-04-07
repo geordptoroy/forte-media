@@ -37,7 +37,7 @@ const menuItems = [
   { 
     section: "MINERADOR",
     items: [
-      { icon: Pickaxe, label: "Escala & Mercado", href: "/dashboard", description: "Anúncios escalados agora" },
+      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Anúncios escalados agora" },
       { icon: Search, label: "Busca Avançada", href: "/search", description: "Filtros granulares Meta" },
     ]
   },

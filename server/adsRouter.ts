@@ -4,6 +4,7 @@ import { getDb } from "./db";
 import { favoriteAds } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { searchAdsByKeywords, searchAdsByPages } from "./services/metaAdsService";
+import { extractImageFromSnapshotCached } from "./services/imageProxyService";
 import { getMetaCredentials } from "./metaCredentials";
 
 /**
@@ -280,6 +281,29 @@ export const adsRouter = router({
           success: false,
           error: error instanceof Error ? error.message : "Failed to search ads",
           data: [],
+        };
+      }
+    }),
+
+  /**
+   * Extract image from Meta Ad Library snapshot URL
+   * Server-side extraction to bypass CORS restrictions
+   */
+  extractThumbnail: protectedProcedure
+    .input(
+      z.object({
+        snapshotUrl: z.string().url("Invalid snapshot URL"),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const result = await extractImageFromSnapshotCached(input.snapshotUrl);
+        return result;
+      } catch (error) {
+        console.error("[Ads] extractThumbnail error:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to extract thumbnail",
         };
       }
     }),

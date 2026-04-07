@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -71,21 +71,18 @@ function getScaleStatus(score?: number): { label: string; color: string; bg: str
 }
 
 /**
- * Thumbnail Resolver
+ * Thumbnail Resolver com Proxy de Imagem
  * ─────────────────────────────────────────────────────────────────────────────
- * A Meta Ad Library API pública não retorna URLs de imagem direta nos campos
- * padrão. O ad_snapshot_url aponta para a página HTML da biblioteca.
- *
- * Estratégia:
- * 1. Tenta campos alternativos (image_url, thumbnail_url, ad_creative_images)
- * 2. Tenta extrair imagem do ad_snapshot_url via parsing de HTML (fetch + DOM)
- * 3. Se tudo falhar, exibe placeholder com informações do anúncio
+ * 1. Tenta campos diretos (image_url, thumbnail_url)
+ * 2. Chama backend para extrair imagem do ad_snapshot_url
+ * 3. Exibe loading state durante extração
+ * 4. Fallback com placeholder se falhar
  */
 
 function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
   const [imgError, setImgError] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [extractedImageUrl, setExtractedImageUrl] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   // Tentar extrair URL de imagem direta de campos alternativos
   const directImageUrl =
@@ -96,33 +93,26 @@ function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
     extractedImageUrl ||
     null;
 
-  // Função para extrair imagem do snapshot HTML
-  const extractImageFromSnapshot = async () => {
-    if (!ad.ad_snapshot_url || imgError || extractedImageUrl) return;
-    setIsLoading(true);
-    try {
-      const response = await fetch(ad.ad_snapshot_url, { mode: 'no-cors' });
-      const html = await response.text();
-      
-      // Procura por img tags ou og:image meta tag
-      const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
-      
-      const imageUrl = imgMatch?.[1] || ogMatch?.[1];
-      if (imageUrl) {
-        setExtractedImageUrl(imageUrl);
-      }
-    } catch (error) {
-      // Silenciosamente falha - usa fallback
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Usar o endpoint de proxy de imagem do backend
+  const extractThumbnailQuery = trpc.ads.extractThumbnail.useQuery(
+    { snapshotUrl: ad.ad_snapshot_url },
+    { enabled: false }
+  );
 
-  // Chamar extração quando o componente monta
-  if (!directImageUrl && !imgError && !isLoading && !extractedImageUrl) {
-    extractImageFromSnapshot();
-  }
+  // Chamar extração quando o componente monta e não há imagem direta
+  useEffect(() => {
+    if (!directImageUrl && !imgError && !isExtracting && ad.ad_snapshot_url) {
+      setIsExtracting(true);
+      extractThumbnailQuery.refetch().then(result => {
+        if (result.data?.success && result.data?.imageUrl) {
+          setExtractedImageUrl(result.data.imageUrl);
+        }
+        setIsExtracting(false);
+      }).catch(() => {
+        setIsExtracting(false);
+      });
+    }
+  }, [ad.ad_snapshot_url, directImageUrl, imgError, isExtracting]);
 
   if (directImageUrl && !imgError) {
     return (
@@ -139,7 +129,7 @@ function AdThumbnail({ ad, className }: { ad: any; className?: string }) {
   // Fallback: exibir placeholder com informações do anúncio
   return (
     <div className={cn("w-full h-full flex flex-col items-center justify-center bg-[#0a0a0a] gap-3", className)}>
-      {isLoading ? (
+      {isExtracting ? (
         <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
       ) : (
         <>
