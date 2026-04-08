@@ -18,11 +18,12 @@ import {
   AlertCircle,
   ImageOff,
   Loader2,
-  Play,
   Image as ImageIcon,
   Video,
   Layers,
   Monitor,
+  MoreHorizontal,
+  Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -77,7 +78,7 @@ function getScaleStatus(score?: number): {
   if (score === undefined || score === null) {
     return {
       label: 'Analisando',
-      color: 'text-gray-600',
+      color: 'text-gray-500',
       bg: 'bg-transparent',
       border: 'border-white/[0.06]',
       icon: <AlertCircle className="w-3 h-3" />,
@@ -129,34 +130,49 @@ function getMediaTypeIcon(mediaType?: string) {
 
 function getPlatformLabel(platform: string): string {
   const labels: Record<string, string> = {
-    'facebook': 'FB',
-    'FACEBOOK': 'FB',
-    'instagram': 'IG',
-    'INSTAGRAM': 'IG',
-    'audience_network': 'AN',
-    'AUDIENCE_NETWORK': 'AN',
-    'messenger': 'MSG',
-    'MESSENGER': 'MSG',
-    'threads': 'THR',
-    'THREADS': 'THR',
-    'whatsapp': 'WA',
-    'WHATSAPP': 'WA',
+    'facebook': 'Facebook',
+    'FACEBOOK': 'Facebook',
+    'instagram': 'Instagram',
+    'INSTAGRAM': 'Instagram',
+    'audience_network': 'Audience Network',
+    'AUDIENCE_NETWORK': 'Audience Network',
+    'messenger': 'Messenger',
+    'MESSENGER': 'Messenger',
+    'threads': 'Threads',
+    'THREADS': 'Threads',
+    'whatsapp': 'WhatsApp',
+    'WHATSAPP': 'WhatsApp',
   };
-  return labels[platform] || platform.substring(0, 3).toUpperCase();
+  return labels[platform] || platform;
 }
 
-// ─── Thumbnail Component ─────────────────────────────────────────────────────
-// A Meta Ad Library API NÃO fornece imagens para anúncios comuns.
-// Apenas anúncios políticos/UE têm ad_creative_images/videos.
-// Para anúncios comuns, usamos o ad_snapshot_url via iframe.
+// ─── Avatar Placeholder ──────────────────────────────────────────────────────
 
-function AdThumbnail({ ad, onOpenModal }: { ad: any; onOpenModal: () => void }) {
+function PageAvatar({ name }: { name?: string }) {
+  const initial = name?.charAt(0)?.toUpperCase() || 'A';
+  const colors = [
+    'bg-blue-600', 'bg-purple-600', 'bg-green-600',
+    'bg-orange-600', 'bg-pink-600', 'bg-teal-600',
+  ];
+  const colorIndex = (name?.charCodeAt(0) || 0) % colors.length;
+  return (
+    <div className={cn(
+      "w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-white text-sm font-black",
+      colors[colorIndex]
+    )}>
+      {initial}
+    </div>
+  );
+}
+
+// ─── Ad Preview (iframe estilo biblioteca Meta) ──────────────────────────────
+
+function AdPreviewFrame({ ad }: { ad: any }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeError, setIframeError] = useState(false);
   const snapshotUrl = ad.ad_snapshot_url;
-  const mediaType = ad.media_type?.toUpperCase();
 
-  // Verificar se há imagem direta (apenas para anúncios políticos/UE)
+  // Imagem direta (anúncios políticos/UE)
   const directImageUrl =
     ad.ad_creative_images?.[0]?.url ||
     ad.ad_creative_videos?.[0]?.thumbnail_url ||
@@ -164,91 +180,45 @@ function AdThumbnail({ ad, onOpenModal }: { ad: any; onOpenModal: () => void }) 
 
   if (directImageUrl) {
     return (
-      <div className="relative w-full h-full">
-        <img
-          src={directImageUrl}
-          alt={ad.page_name || 'Criativo'}
-          className="w-full h-full object-cover"
-          loading="lazy"
-          onError={() => {}}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3">
-          <button
-            onClick={onOpenModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-white/90 transition-all"
-          >
-            <Maximize2 className="w-3 h-3" />
-            Ver Criativo
-          </button>
-        </div>
-      </div>
+      <img
+        src={directImageUrl}
+        alt={ad.page_name || 'Criativo'}
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
     );
   }
 
-  // Para anúncios comuns: usar iframe do snapshot
   if (snapshotUrl && !iframeError) {
     return (
-      <div className="relative w-full h-full bg-[#0a0a0a]">
+      <div className="relative w-full h-full bg-white">
         {!iframeLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10 bg-[#0a0a0a]">
-            <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
-            <p className="text-[9px] text-gray-700 font-bold uppercase tracking-widest">Carregando preview</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10 bg-gray-50">
+            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+            <p className="text-[10px] text-gray-400 font-medium">Carregando anúncio...</p>
           </div>
         )}
         <iframe
           src={snapshotUrl}
           className={cn(
-            "w-full h-full border-0 transition-opacity duration-500 pointer-events-none",
+            "w-full h-full border-0 transition-opacity duration-500",
             iframeLoaded ? "opacity-100" : "opacity-0"
           )}
           onLoad={() => setIframeLoaded(true)}
           onError={() => setIframeError(true)}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          title={`Preview: ${ad.page_name}`}
+          title={`Anúncio: ${ad.page_name}`}
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3">
-          <button
-            onClick={onOpenModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-white/90 transition-all"
-          >
-            <Maximize2 className="w-3 h-3" />
-            Ver Criativo
-          </button>
-        </div>
       </div>
     );
   }
 
-  // Fallback: placeholder visual
+  // Fallback
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#0a0a0a] to-[#050505] gap-3 group">
-      <div className="w-12 h-12 border border-white/[0.08] flex items-center justify-center bg-white/[0.02]">
-        <span className="text-xl font-black text-white/30">
-          {ad.page_name?.charAt(0)?.toUpperCase() || 'A'}
-        </span>
-      </div>
-      <div className="text-center px-4">
-        <p className="text-[9px] font-bold text-gray-700 uppercase tracking-widest">Criativo</p>
-        <p className="text-[10px] font-bold text-gray-500 mt-0.5 line-clamp-2 leading-tight">
-          {ad.page_name || 'Anunciante'}
-        </p>
-      </div>
-      {mediaType && (
-        <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border border-white/[0.08] text-gray-600 bg-white/[0.02] flex items-center gap-1">
-          {getMediaTypeIcon(mediaType)}
-          {mediaType}
-        </span>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-3">
-        <button
-          onClick={onOpenModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black text-[9px] font-black uppercase tracking-widest hover:bg-white/90 transition-all"
-        >
-          <Maximize2 className="w-3 h-3" />
-          Ver Criativo
-        </button>
-      </div>
+    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100 gap-3">
+      <ImageOff className="w-8 h-8 text-gray-400" />
+      <p className="text-xs text-gray-500 font-medium">Preview não disponível</p>
     </div>
   );
 }
@@ -260,7 +230,6 @@ function CreativeViewer({ ad }: { ad: any }) {
   const [iframeError, setIframeError] = useState(false);
   const snapshotUrl = ad.ad_snapshot_url;
 
-  // Imagem direta (apenas anúncios políticos/UE)
   const directImageUrl =
     ad.ad_creative_images?.[0]?.url ||
     ad.ad_creative_videos?.[0]?.thumbnail_url ||
@@ -323,7 +292,6 @@ function CreativeViewer({ ad }: { ad: any }) {
         </div>
       )}
 
-      {/* Botão sempre visível para abrir na biblioteca */}
       <div className="p-3 border-t border-white/[0.06] bg-black">
         <a
           href={snapshotUrl}
@@ -335,6 +303,32 @@ function CreativeViewer({ ad }: { ad: any }) {
           Abrir na Biblioteca Meta
         </a>
       </div>
+    </div>
+  );
+}
+
+// ─── Metric Item ─────────────────────────────────────────────────────────────
+
+function MetricItem({
+  icon,
+  label,
+  value,
+  valueClass,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  valueClass?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="flex items-center gap-1 text-[9px] font-semibold text-gray-500 uppercase tracking-wider">
+        {icon}
+        {label}
+      </span>
+      <span className={cn("text-[11px] font-bold text-white leading-tight", valueClass)}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -359,7 +353,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
     },
   });
 
-
   const handleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const adId = ad.id || ad.ad_archive_id;
@@ -368,124 +361,243 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
     toggleFavoriteMutation.mutate({ adId, pageId, pageName: ad.page_name });
   };
 
-
   const scaleStatus = getScaleStatus(ad.scalingScore);
   const copy = ad.ad_creative_bodies?.[0] || ad.body || '';
   const title = ad.ad_creative_link_titles?.[0] || '';
   const description = ad.ad_creative_link_descriptions?.[0] || '';
+  const linkCaption = ad.ad_creative_link_captions?.[0] || '';
   const daysActive = ad.daysActive ?? calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
   const isStillActive = !ad.ad_delivery_stop_time;
   const platforms = ad.publisher_platforms || [];
   const mediaType = ad.media_type;
+  const adId = ad.id || ad.ad_archive_id;
+  const snapshotUrl = ad.ad_snapshot_url;
 
   return (
     <>
-      <div className="border border-white/[0.06] bg-black overflow-hidden hover:border-white/[0.12] transition-all group cursor-pointer" onClick={() => setOpen(true)}>
-        {/* Barra de score */}
-        <div className="h-0.5 bg-white/[0.02]">
-          {ad.scalingScore !== undefined && (
+      {/* ── Card principal estilo Biblioteca Meta ── */}
+      <div
+        className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
+        onClick={() => setOpen(true)}
+      >
+        {/* Barra de score no topo (sutil) */}
+        {ad.scalingScore !== undefined && (
+          <div className="h-0.5 bg-gray-100">
             <div
               className={cn("h-full transition-all", scaleStatus.barColor)}
               style={{ width: `${Math.min(100, ad.scalingScore || 0)}%` }}
             />
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Thumbnail / Preview */}
-        <div className="relative w-full aspect-video bg-[#0a0a0a] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-          <AdThumbnail ad={ad} onOpenModal={() => setOpen(true)} />
-        </div>
-
-        {/* Conteúdo */}
-        <div className="p-3 space-y-2.5">
-          {/* Header: Nome + Badge de escala */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-black text-white truncate">{ad.page_name || 'Anunciante'}</p>
-              <p className="text-[9px] text-gray-700 font-mono truncate">ID: {ad.id || ad.ad_archive_id || '—'}</p>
+        {/* ── Cabeçalho estilo post do Facebook ── */}
+        <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <PageAvatar name={ad.page_name} />
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-gray-900 leading-tight truncate">
+                {ad.page_name || 'Anunciante'}
+              </p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[11px] text-gray-500 font-medium">Patrocinado</span>
+                <span className="text-gray-400">·</span>
+                <Globe className="w-3 h-3 text-gray-400" />
+              </div>
+              {adId && (
+                <p className="text-[9px] text-gray-400 font-mono mt-0.5 truncate">
+                  Identificação da biblioteca: {adId}
+                </p>
+              )}
             </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Badge de escala */}
             <span className={cn(
-              "shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border",
+              "inline-flex items-center gap-1 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-full border",
               scaleStatus.bg, scaleStatus.border, scaleStatus.color
             )}>
               {scaleStatus.icon}
               {scaleStatus.label}
             </span>
-          </div>
-
-          {/* Copy preview */}
-          {copy && (
-            <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-2">
-              {copy}
-            </p>
-          )}
-
-          {/* Métricas rastreáveis: Dias ativos + Status + Plataformas */}
-          <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
-            {/* Dias ativos */}
-            <div className="bg-black px-2 py-1.5">
-              <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-0.5">
-                <Clock className="w-2.5 h-2.5" /> Dias Ativo
-              </p>
-              <p className="text-xs font-black text-white">{daysActive > 0 ? `${daysActive}d` : '—'}</p>
-            </div>
-            {/* Status */}
-            <div className="bg-black px-2 py-1.5">
-              <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-1 mb-0.5">
-                <Activity className="w-2.5 h-2.5" /> Status
-              </p>
-              <p className={cn("text-xs font-black", isStillActive ? "text-green-400" : "text-gray-500")}>
-                {isStillActive ? 'Ativo' : 'Inativo'}
-              </p>
-            </div>
-          </div>
-
-          {/* Plataformas + Tipo de mídia */}
-          <div className="flex flex-wrap gap-1 items-center">
-            {platforms.slice(0, 4).map((platform: string) => (
-              <span key={platform} className="text-[8px] font-bold text-gray-500 border border-white/[0.08] px-1.5 py-0.5 bg-white/[0.02]">
-                {getPlatformLabel(platform)}
-              </span>
-            ))}
-            {mediaType && (
-              <span className="text-[8px] font-bold text-gray-500 border border-white/[0.08] px-1.5 py-0.5 bg-white/[0.02] ml-auto flex items-center gap-0.5">
-                {getMediaTypeIcon(mediaType)}
-                {mediaType}
-              </span>
-            )}
-          </div>
-
-          {/* Data de início */}
-          <div className="flex items-center justify-between text-[9px] text-gray-700 font-mono">
-            <span className="flex items-center gap-1">
-              <Calendar className="w-2.5 h-2.5" />
-              {formatDateShort(ad.ad_delivery_start_time)}
-            </span>
-            {ad.ad_delivery_stop_time && (
-              <span className="text-gray-800">→ {formatDateShort(ad.ad_delivery_stop_time)}</span>
-            )}
-          </div>
-
-          {/* Ações */}
-          <div className="flex gap-1 pt-1 border-t border-white/[0.06]" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={handleFavorite}
-              disabled={toggleFavoriteMutation.isPending}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all border",
-                isFavorited
-                  ? "bg-white/[0.08] border-white/[0.12] text-white hover:bg-white/[0.12]"
-                  : "border-white/[0.06] text-gray-600 hover:text-white hover:border-white/[0.12]"
-              )}
+              className="p-1 rounded-full hover:bg-gray-100 transition-colors text-gray-500"
+              onClick={(e) => e.stopPropagation()}
             >
-              <Heart className={cn("w-3 h-3", isFavorited && "fill-current")} />
-              {isFavorited ? 'Salvo' : 'Salvar'}
+              <MoreHorizontal className="w-4 h-4" />
             </button>
           </div>
         </div>
+
+        {/* ── Copy do anúncio ── */}
+        {copy && (
+          <div className="px-3 pb-2">
+            <p className="text-[12px] text-gray-800 leading-relaxed line-clamp-3">
+              {copy}
+            </p>
+          </div>
+        )}
+
+        {/* ── Iframe do criativo (estilo biblioteca Meta) ── */}
+        <div
+          className="relative w-full bg-gray-100 overflow-hidden"
+          style={{ minHeight: '280px', maxHeight: '420px', height: '360px' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <AdPreviewFrame ad={ad} />
+
+          {/* Overlay hover para expandir */}
+          <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+            <button
+              onClick={() => setOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 text-gray-900 text-[10px] font-bold rounded-md shadow-md hover:bg-white transition-all"
+            >
+              <Maximize2 className="w-3 h-3" />
+              Expandir
+            </button>
+          </div>
+        </div>
+
+        {/* ── Rodapé do criativo (link/CTA estilo Facebook) ── */}
+        {(linkCaption || title || description) && (
+          <div className="border-t border-gray-100 bg-gray-50 px-3 py-2 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              {linkCaption && (
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider truncate">{linkCaption}</p>
+              )}
+              {title && (
+                <p className="text-[12px] font-bold text-gray-900 truncate leading-tight">{title}</p>
+              )}
+              {description && (
+                <p className="text-[11px] text-gray-500 truncate">{description}</p>
+              )}
+            </div>
+            {snapshotUrl && (
+              <a
+                href={snapshotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="shrink-0 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 text-[11px] font-bold rounded-md transition-colors whitespace-nowrap"
+              >
+                Saiba mais
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* ── Métricas rastreadas (separador visual) ── */}
+        <div className="border-t border-gray-100 bg-gray-50/80 px-3 pt-2.5 pb-1">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+            <Activity className="w-3 h-3" />
+            Métricas rastreadas
+          </p>
+
+          {/* Grid de métricas */}
+          <div className="grid grid-cols-3 gap-x-3 gap-y-2 mb-2">
+            {/* Dias ativo */}
+            <MetricItem
+              icon={<Clock className="w-2.5 h-2.5" />}
+              label="Dias ativo"
+              value={daysActive > 0 ? `${daysActive}d` : '—'}
+            />
+
+            {/* Status */}
+            <MetricItem
+              icon={<Activity className="w-2.5 h-2.5" />}
+              label="Status"
+              value={isStillActive ? 'Ativo' : 'Inativo'}
+              valueClass={isStillActive ? 'text-green-600' : 'text-gray-400'}
+            />
+
+            {/* Formato */}
+            <MetricItem
+              icon={getMediaTypeIcon(mediaType)}
+              label="Formato"
+              value={
+                <span className="flex items-center gap-0.5">
+                  {mediaType || '—'}
+                </span>
+              }
+            />
+
+            {/* Início */}
+            <MetricItem
+              icon={<Calendar className="w-2.5 h-2.5" />}
+              label="Início"
+              value={formatDateShort(ad.ad_delivery_start_time)}
+            />
+
+            {/* Fim / Em veiculação */}
+            <MetricItem
+              icon={<Calendar className="w-2.5 h-2.5" />}
+              label="Fim"
+              value={ad.ad_delivery_stop_time ? formatDateShort(ad.ad_delivery_stop_time) : 'Em veiculação'}
+              valueClass={!ad.ad_delivery_stop_time ? 'text-green-600' : undefined}
+            />
+
+            {/* Plataformas */}
+            <MetricItem
+              icon={<Globe className="w-2.5 h-2.5" />}
+              label="Plataformas"
+              value={platforms.length > 0 ? `${platforms.length} plat.` : '—'}
+            />
+          </div>
+
+          {/* Tags de plataformas */}
+          {platforms.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {platforms.slice(0, 4).map((platform: string) => (
+                <span
+                  key={platform}
+                  className="text-[8px] font-bold text-gray-500 border border-gray-200 px-1.5 py-0.5 bg-white rounded-sm"
+                >
+                  {getPlatformLabel(platform)}
+                </span>
+              ))}
+              {platforms.length > 4 && (
+                <span className="text-[8px] font-bold text-gray-400 px-1 py-0.5">
+                  +{platforms.length - 4}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Ações ── */}
+        <div
+          className="px-3 pb-3 pt-1 flex gap-2 border-t border-gray-100"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={handleFavorite}
+            disabled={toggleFavoriteMutation.isPending}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold rounded-md transition-all border",
+              isFavorited
+                ? "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                : "border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 bg-white"
+            )}
+          >
+            <Heart className={cn("w-3.5 h-3.5", isFavorited && "fill-current")} />
+            {isFavorited ? 'Salvo' : 'Salvar'}
+          </button>
+
+          {snapshotUrl && (
+            <a
+              href={snapshotUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-md border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 bg-white transition-all"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Biblioteca
+            </a>
+          )}
+        </div>
       </div>
 
-      {/* Modal com detalhes completos */}
+      {/* ── Modal com detalhes completos ── */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 border-white/[0.06] bg-black">
           <div className="flex h-[80vh]">
@@ -497,13 +609,16 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
             {/* Direita: Detalhes (50%) */}
             <div className="w-1/2 overflow-y-auto p-5 space-y-5">
               {/* Header */}
-              <div>
-                <h2 className="text-sm font-black text-white mb-0.5">{ad.page_name || 'Anunciante'}</h2>
-                <p className="text-[9px] text-gray-600 font-mono">{ad.id || ad.ad_archive_id}</p>
+              <div className="flex items-center gap-3">
+                <PageAvatar name={ad.page_name} />
+                <div>
+                  <h2 className="text-sm font-black text-white mb-0.5">{ad.page_name || 'Anunciante'}</h2>
+                  <p className="text-[9px] text-gray-600 font-mono">{adId}</p>
+                </div>
               </div>
 
               {/* Status de escala */}
-              <div className={cn("p-3 border", scaleStatus.bg, scaleStatus.border)}>
+              <div className={cn("p-3 border rounded-lg", scaleStatus.bg, scaleStatus.border)}>
                 <div className="flex items-center gap-2 mb-1">
                   {scaleStatus.icon}
                   <span className={cn("text-xs font-black uppercase tracking-widest", scaleStatus.color)}>
@@ -513,11 +628,10 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                     <span className="text-[10px] text-gray-500 ml-auto">Score: {ad.scalingScore}/100</span>
                   )}
                 </div>
-                {/* Barra de progresso do score */}
                 {ad.scalingScore !== undefined && (
-                  <div className="h-1 bg-white/[0.04] mt-2">
+                  <div className="h-1 bg-white/[0.04] mt-2 rounded-full overflow-hidden">
                     <div
-                      className={cn("h-full", scaleStatus.barColor)}
+                      className={cn("h-full rounded-full", scaleStatus.barColor)}
                       style={{ width: `${Math.min(100, ad.scalingScore)}%` }}
                     />
                   </div>
@@ -559,7 +673,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
               {/* Métricas rastreáveis */}
               <div>
                 <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Dados Rastreáveis</p>
-                <div className="grid grid-cols-2 gap-px bg-white/[0.04]">
+                <div className="grid grid-cols-2 gap-px bg-white/[0.04] rounded-lg overflow-hidden">
                   <div className="bg-black px-3 py-2">
                     <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">Dias Ativo</p>
                     <p className="text-sm font-black text-white">{daysActive > 0 ? `${daysActive} dias` : '—'}</p>
@@ -612,7 +726,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                   <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-2">Plataformas</p>
                   <div className="flex flex-wrap gap-1">
                     {platforms.map((p: string) => (
-                      <span key={p} className="text-[9px] font-bold text-gray-400 border border-white/[0.08] px-2 py-1 bg-white/[0.02]">
+                      <span key={p} className="text-[9px] font-bold text-gray-400 border border-white/[0.08] px-2 py-1 bg-white/[0.02] rounded-sm">
                         {p}
                       </span>
                     ))}
