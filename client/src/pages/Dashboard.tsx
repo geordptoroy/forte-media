@@ -248,7 +248,7 @@ export default function Dashboard() {
             <div className="flex items-start gap-3">
               <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-1 whitespace-nowrap">País / Região</span>
               <div className="flex-1">
-                <RegionSelector selectedCountries={countries} onCountriesChange={setCountries} />
+                <RegionSelector selected={countries} onChange={setCountries} />
               </div>
             </div>
           </div>
