@@ -1,23 +1,21 @@
-# 🚀 FORTE MEDIA v2 - Intelligence & Performance Dashboard
+# 🚀 FORTE MEDIA v3 - Intelligence & Performance Dashboard
 
-Uma plataforma profissional de inteligência competitiva e análise de performance para anúncios do Meta (Facebook/Instagram), desenvolvida com a stack moderna (tRPC + Drizzle + React 19).
+Uma plataforma profissional de inteligência competitiva focada em anúncios do Meta (Facebook/Instagram), simplificada para máxima performance e facilidade de uso.
 
-Este projeto foi otimizado para rodar exclusivamente via **Docker**, garantindo um ambiente isolado, seguro e de fácil implantação.
-
----
-
-## 🛠️ Pré-requisitos
-
-Antes de começar, certifique-se de ter instalado em sua máquina:
-
-*   **Docker** (v20.10+)
-*   **Docker Compose** (v2.0+)
-*   **OpenSSL** (para geração de certificados HTTPS locais)
-*   **Git**
+Esta versão foi radicalmente reestruturada para focar no que realmente importa: **Mineração de Criativos** e **Anúncios Escalados**, com configuração simplificada via variáveis de ambiente.
 
 ---
 
-## 🚀 Como Iniciar (Comando Único)
+## 🛠️ Funcionalidades Principais
+
+*   **🏆 Escalados:** Exibição diária dos 50 anúncios com maior tração e escala detectados pelo nosso algoritmo na Meta Ad Library.
+*   **⛏️ Minerador:** Busca poderosa por nichos e palavras-chave para encontrar criativos validados em qualquer região do mundo.
+*   **📊 Algoritmo de Score v4:** Sistema inteligente que analisa longevidade (>60 dias), volume de criativos e sinais de investimento para classificar o nível de escala de cada anúncio.
+*   **🔒 Configuração Simplificada:** Sem necessidade de configurar credenciais na interface. Tudo é gerido via `META_ACCESS_TOKEN` no servidor.
+
+---
+
+## 🚀 Como Iniciar (Docker)
 
 A plataforma está totalmente automatizada. Para iniciar tudo (Base de Dados, Backend, Frontend, SSL e Migrations), basta um comando:
 
@@ -32,42 +30,25 @@ make up
 ```
 *Ou simplesmente:* `docker compose up -d --build`
 
-### O que acontece automaticamente:
-1.  **SSL:** Certificados autoassinados são gerados dentro do container Nginx.
-2.  **Base de Dados:** O MySQL é configurado e o script aguarda a prontidão TCP.
-3.  **Migrations:** O backend executa `db:push` automaticamente antes de iniciar o servidor.
-4.  **Ambiente:** O ficheiro `.env` é criado automaticamente se não existir.
-
 Aceda em: **https://localhost**
-
----
-
-## 📁 Estrutura do Projeto (Docker)
-
-O projeto é dividido em microserviços gerenciados pelo Docker:
-
-| Serviço | Descrição | Porta Interna |
-| :--- | :--- | :--- |
-| **Nginx** | Proxy reverso com suporte a HTTPS e compressão Gzip. | 80 / 443 |
-| **Frontend** | Aplicação React + Vite servida de forma otimizada. | 80 (via Nginx) |
-| **Backend** | API Node.js (Express) compilada com esbuild. | 4000 |
-| **MySQL** | Banco de dados relacional para persistência. | 3306 |
 
 ---
 
 ## ⚙️ Configuração de Ambiente (.env)
 
-Após a primeira execução, um arquivo `.env` será criado na raiz. Você **deve** preencher as seguintes variáveis para o funcionamento das integrações:
+Para que a mineração funcione, você **deve** configurar o seu Access Token da Meta no arquivo `.env` na raiz do projeto:
 
 ```env
-# Configurações da Meta API
-VITE_APP_ID=seu_app_id
+# --- META API (CONFIGURAÇÃO GLOBAL) ---
+# Obtenha o User Access Token em https://developers.facebook.com/tools/explorer/
+# Necessário permissão: ads_read
+META_ACCESS_TOKEN=seu_access_token_aqui
 
-# Segurança
+# --- SEGURANÇA ---
 JWT_SECRET=uma_chave_secreta_longa
 ENCRYPTION_KEY=chave_de_32_caracteres_exatos
 
-# Banco de Dados (Docker)
+# --- BANCO DE DADOS (DOCKER) ---
 DB_USER=forte_user
 DB_PASSWORD=forte_password
 DB_NAME=forte_media
@@ -75,33 +56,23 @@ DB_NAME=forte_media
 
 ---
 
-## 🛠️ Comandos Úteis do Docker
+## 📁 Estrutura Simplificada
 
-Se preferir gerenciar os contêineres manualmente:
+O projeto foi limpo para manter apenas o essencial:
 
-*   **Iniciar tudo:** `docker-compose up -d`
-*   **Reconstruir imagens:** `docker-compose up -d --build`
-*   **Parar serviços:** `docker-compose down`
-*   **Ver logs em tempo real:** `docker-compose logs -f`
-*   **Acessar terminal do backend:** `docker-compose exec backend sh`
-*   **Rodar migrations manualmente:** `docker-compose exec backend pnpm db:push`
-
----
-
-## 🔒 Segurança e HTTPS
-
-O projeto utiliza **HTTPS por padrão** via Nginx. Os certificados autoassinados são gerados automaticamente na pasta `nginx/certs/`. 
-
-> **Nota:** Ao acessar `https://localhost` pela primeira vez, seu navegador exibirá um aviso de "Conexão não segura" devido ao certificado ser autoassinado. Você pode clicar em "Avançado" e "Prosseguir" com segurança para o ambiente de desenvolvimento.
+| Página | Descrição |
+| :--- | :--- |
+| **Escalados** | Os 50 campeões do dia (atualizado às 00:00). |
+| **Minerador** | Busca livre por nichos com filtro de score em tempo real. |
+| **Configurações** | Gestão de perfil e segurança da conta. |
 
 ---
 
-## 🧪 Testes
+## 🛠️ Comandos Úteis
 
-Para rodar a suíte de testes (53 testes passando):
-```bash
-docker-compose exec backend pnpm test
-```
+*   **Logs em tempo real:** `docker-compose logs -f`
+*   **Reiniciar serviços:** `docker-compose restart`
+*   **Limpar tudo:** `docker-compose down -v`
 
 ---
 
@@ -111,4 +82,4 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ---
 
-**Status:** ✅ Pronto para Produção | **Versão:** 2.0.0 | **Stack:** React 19 + tRPC + Drizzle
+**Status:** ✅ Reestruturação Radical Concluída | **Versão:** 3.0.0 | **Stack:** React 19 + tRPC + Drizzle
