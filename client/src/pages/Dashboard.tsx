@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
@@ -44,7 +44,8 @@ const SCORE_OPTIONS = [
 
 export default function Dashboard() {
   const [keywords, setKeywords] = useState("");
-  const [ads, setAds] = useState<any[]>([]);
+  // rawAds: todos os anúncios retornados pela API (sem filtro de score)
+  const [rawAds, setRawAds] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [minScore, setMinScore] = useState(0);
@@ -70,7 +71,7 @@ export default function Dashboard() {
     { enabled: false }
   );
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     setIsSearching(true);
     try {
       const result = await searchScaledAdsQuery.refetch();
@@ -85,7 +86,9 @@ export default function Dashboard() {
           });
         }
 
-        setAds(results);
+        // Armazena os resultados brutos sem aplicar filtro de score
+        // O filtro de score é aplicado de forma reativa no useMemo abaixo
+        setRawAds(results);
         toast.success(`${results.length} anúncios minerados`);
       } else {
         toast.error(result.data?.error || "Erro ao buscar anúncios");
@@ -96,17 +99,18 @@ export default function Dashboard() {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [searchScaledAdsQuery, minDaysActive]);
 
   // Filtragem e ordenação derivativa (memoizada para performance)
+  // Reage imediatamente quando minScore ou rawAds mudam — sem necessidade de nova busca
   const displayedAds = useMemo(() => {
-    let filtered = [...ads];
-    
+    let filtered = [...rawAds];
+
     // Filtrar por score mínimo se selecionado
     if (minScore > 0) {
       filtered = filtered.filter(ad => (ad.scalingScore || 0) >= minScore);
     }
-    
+
     // A ordenação já vem correta do backend, mas garantimos aqui também
     return filtered.sort((a, b) => {
       const scoreA = a.scalingScore || 0;
@@ -114,11 +118,12 @@ export default function Dashboard() {
       if (scoreB !== scoreA) return scoreB - scoreA;
       return (b.id || "").localeCompare(a.id || "");
     });
-  }, [ads, minScore]);
+  }, [rawAds, minScore]);
 
   // Busca automática ao mudar país
   useEffect(() => {
     handleSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countries]);
 
   const handleResetFilters = () => {
@@ -148,9 +153,9 @@ export default function Dashboard() {
     publisherPlatforms.length > 0 ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 
-  // Stats baseadas nos anúncios carregados
-  const scaledCount = ads.filter(ad => (ad.scalingScore || 0) >= 61).length;
-  const moderateCount = ads.filter(ad => (ad.scalingScore || 0) >= 31 && (ad.scalingScore || 0) < 61).length;
+  // Stats baseadas nos anúncios brutos (não filtrados por score)
+  const scaledCount = rawAds.filter(ad => (ad.scalingScore || 0) >= 61).length;
+  const moderateCount = rawAds.filter(ad => (ad.scalingScore || 0) >= 31 && (ad.scalingScore || 0) < 61).length;
 
   return (
     <DashboardLayout>
@@ -168,11 +173,11 @@ export default function Dashboard() {
           </div>
 
           {/* Stats row */}
-          {ads.length > 0 && (
+          {rawAds.length > 0 && (
             <div className="flex items-center gap-3 shrink-0">
               <div className="px-3 py-2 border border-white/[0.06] bg-white/[0.02]">
                 <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Total</p>
-                <p className="text-sm font-black text-white">{ads.length}</p>
+                <p className="text-sm font-black text-white">{rawAds.length}</p>
               </div>
               <div className="px-3 py-2 border border-green-500/20 bg-green-500/[0.04]">
                 <p className="text-[9px] font-black text-green-600 uppercase tracking-widest">Escalados</p>
@@ -182,6 +187,13 @@ export default function Dashboard() {
                 <p className="text-[9px] font-black text-yellow-600 uppercase tracking-widest">Validação</p>
                 <p className="text-sm font-black text-yellow-500">{moderateCount}</p>
               </div>
+              {/* Indicador de filtro de score ativo */}
+              {minScore > 0 && (
+                <div className="px-3 py-2 border border-white/20 bg-white/[0.04]">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Exibindo</p>
+                  <p className="text-sm font-black text-white">{displayedAds.length}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -202,7 +214,7 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Score filter */}
+            {/* Score filter — filtra os resultados já carregados em tempo real */}
             <div className="flex items-center px-4 gap-2 border-b md:border-b-0 md:border-r border-white/[0.06] h-12">
               <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest whitespace-nowrap">Score</span>
               <div className="flex gap-0.5">
@@ -415,10 +427,24 @@ export default function Dashboard() {
                   description={
                     isSearching
                       ? "Minerando anúncios na Meta API..."
+                      : minScore > 0
+                      ? `Nenhum anúncio com score ≥ ${minScore} nos resultados actuais. Tente reduzir o filtro de score ou refazer a busca.`
                       : "Tente ajustar seus filtros ou termos de busca para encontrar mais resultados."
                   }
-                  actionLabel={activeFiltersCount > 0 ? "Limpar Filtros" : "Tentar Novamente"}
-                  onAction={activeFiltersCount > 0 ? handleResetFilters : handleSearch}
+                  actionLabel={
+                    minScore > 0
+                      ? "Remover Filtro de Score"
+                      : activeFiltersCount > 0
+                      ? "Limpar Filtros"
+                      : "Tentar Novamente"
+                  }
+                  onAction={
+                    minScore > 0
+                      ? () => setMinScore(0)
+                      : activeFiltersCount > 0
+                      ? handleResetFilters
+                      : handleSearch
+                  }
                 />
               </div>
             )}

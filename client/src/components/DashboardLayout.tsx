@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -58,6 +58,12 @@ const menuItems = [
   }
 ];
 
+// Conjunto de hrefs que são botões de navegação — cliques neles NÃO expandem a sidebar
+const NAV_HREFS = new Set([
+  ...menuItems.flatMap(s => s.items.map(i => i.href)),
+  "/settings",
+]);
+
 interface SidebarContentProps {
   location: string;
   user: { name?: string | null; email?: string | null } | null;
@@ -68,24 +74,84 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, toggleCollapse }: SidebarContentProps) {
-  return (
-    <div className="flex flex-col h-full bg-black border-r border-white/[0.06] relative group/sidebar">
-      {/* Collapse Toggle Button (Desktop) */}
-      <button 
-        onClick={toggleCollapse}
-        className="absolute -right-3 top-20 w-6 h-6 bg-white flex items-center justify-center border border-gray-200 text-black z-50 opacity-0 group-hover/sidebar:opacity-100 transition-opacity hidden lg:flex shadow-xl"
-      >
-        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-      </button>
+  const [isHovered, setIsHovered] = useState(false);
 
-      {/* Logo */}
-      <div className={cn("px-6 py-6 flex items-center gap-3 shrink-0 border-b border-white/[0.06]", isCollapsed && "px-4 justify-center")}>
-        <div className="w-7 h-7 bg-white flex items-center justify-center">
+  // Handler de clique na sidebar: expande se estiver colapsada e o clique não foi num ícone de navegação
+  const handleSidebarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isCollapsed) return;
+
+    // Verifica se o clique foi num link de navegação (ícone de aba)
+    const target = e.target as HTMLElement;
+    const navLink = target.closest("a[data-nav-link]");
+    const logoutBtn = target.closest("button[data-logout]");
+    const collapseBtn = target.closest("button[data-collapse-btn]");
+
+    // Se clicou num link de nav, botão de logout ou botão de colapso, não expande
+    if (navLink || logoutBtn || collapseBtn) return;
+
+    // Qualquer outro clique na sidebar expande
+    toggleCollapse();
+  };
+
+  return (
+    <div
+      className="flex flex-col h-full bg-black border-r border-white/[0.06] relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={handleSidebarClick}
+    >
+      {/* Logo area — ao passar o rato mostra a seta de expandir/colapsar */}
+      <div
+        className={cn(
+          "px-6 py-6 flex items-center gap-3 shrink-0 border-b border-white/[0.06] relative",
+          isCollapsed && "px-4 justify-center"
+        )}
+      >
+        {/* Botão de colapso — aparece sobre a logo ao passar o rato (apenas desktop) */}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.button
+              key="collapse-btn"
+              data-collapse-btn
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapse();
+              }}
+              className={cn(
+                "absolute inset-0 w-full h-full bg-black/80 backdrop-blur-sm",
+                "hidden lg:flex items-center justify-center z-10",
+                "cursor-pointer group/collapse-btn border-b border-white/[0.06]"
+              )}
+              title={isCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-white flex items-center justify-center shadow-xl">
+                  {isCollapsed
+                    ? <ChevronRight className="w-3.5 h-3.5 text-black" />
+                    : <ChevronLeft className="w-3.5 h-3.5 text-black" />
+                  }
+                </div>
+                {!isCollapsed && (
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/60">
+                    Colapsar
+                  </span>
+                )}
+              </div>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Logo */}
+        <div className="w-7 h-7 bg-white flex items-center justify-center shrink-0">
           <span className="text-black font-black text-[10px] tracking-tighter">FM</span>
         </div>
         {!isCollapsed && (
-          <motion.span 
-            initial={{ opacity: 0 }} 
+          <motion.span
+            initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="font-black text-base tracking-tighter text-white"
           >
@@ -101,7 +167,6 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
             {!isCollapsed && (
               <p className={cn(
                 "px-3 text-[9px] font-black uppercase tracking-[0.25em] mb-2",
-                // Destaque especial para a seção FORTE ADS
                 section.section === "FORTE ADS"
                   ? "text-white/50"
                   : "text-gray-600"
@@ -116,6 +181,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
                 return (
                   <Link key={item.href} href={item.href}>
                     <a
+                      data-nav-link
                       onClick={onNavigate}
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150 relative group",
@@ -167,6 +233,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
       <div className={cn("p-4 border-t border-white/[0.06] space-y-1 shrink-0", isCollapsed && "px-3")}>
         <Link href="/settings">
           <a
+            data-nav-link
             onClick={onNavigate}
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150",
@@ -181,6 +248,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
         </Link>
 
         <button
+          data-logout
           onClick={onLogout}
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-500/70 hover:bg-red-500/[0.06] hover:text-red-400 transition-all duration-150",
@@ -239,7 +307,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans selection:bg-white selection:text-black">
       {/* Desktop Sidebar */}
-      <aside 
+      <aside
         className={cn(
           "hidden lg:flex border-r border-white/[0.06] bg-black flex-col z-50 shrink-0 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-16" : "w-64"
@@ -310,9 +378,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
 
             {/* Quick Link to Meta Library */}
-            <Button 
-              variant="outline" 
-              asChild 
+            <Button
+              variant="outline"
+              asChild
               className="hidden sm:flex h-8 border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] text-[9px] font-black uppercase tracking-widest rounded-none px-3"
             >
               <a href="https://www.facebook.com/ads/library" target="_blank" rel="noopener noreferrer">
@@ -336,7 +404,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
