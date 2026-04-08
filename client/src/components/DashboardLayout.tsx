@@ -132,7 +132,6 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const isActive = location === item.href;
-                const isEscalados = item.href === "/escalados";
                 return (
                   <Link key={item.href} href={item.href}>
                     <a
@@ -142,19 +141,13 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
                         "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150 relative group",
                         isActive
                           ? "bg-white text-black"
-                          : isEscalados
-                          ? "text-yellow-500/70 hover:text-yellow-400 hover:bg-yellow-500/[0.06]"
                           : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
                       )}
                     >
                       <item.icon
                         className={cn(
                           "w-4 h-4 shrink-0",
-                          isActive
-                            ? "text-black"
-                            : isEscalados
-                            ? "text-yellow-500/70"
-                            : "text-gray-500"
+                          isActive ? "text-black" : "text-gray-500"
                         )}
                       />
                       {!isCollapsed && (
@@ -162,11 +155,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
                           <span className="text-xs leading-tight">{item.label}</span>
                           <span className={cn(
                             "text-[9px] font-medium truncate",
-                            isActive
-                              ? "text-black/60"
-                              : isEscalados
-                              ? "text-yellow-600/60"
-                              : "text-gray-600"
+                            isActive ? "text-black/60" : "text-gray-600"
                           )}>
                             {item.description}
                           </span>

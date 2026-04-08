@@ -37,6 +37,7 @@ export const ENV = {
   databaseUrl: process.env.DATABASE_URL || "",
 
   // External APIs
+  metaAccessToken: process.env.META_ACCESS_TOKEN || "",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL || "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY || "",
 

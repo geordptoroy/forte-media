@@ -41,6 +41,8 @@ services:
       dockerfile: server.Dockerfile
     container_name: forte-media-backend
     restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -49,6 +51,7 @@ services:
       DATABASE_URL: mysql://${DB_USER:-forte_user}:${DB_PASSWORD:-forte_password}@db:3306/${DB_NAME:-forte_media}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-chars-long}
       SESSION_SECRET: ${SESSION_SECRET:-your-session-secret-change-in-production}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-strict}
       COOKIE_HTTP_ONLY: ${COOKIE_HTTP_ONLY:-true}
@@ -121,11 +124,15 @@ services:
   ngrok:
     image: ngrok/ngrok:latest
     container_name: forte-media-ngrok
-    restart: always
+    restart: unless-stopped
+    profiles:
+      - tunnel
     ports:
       - "4040:4040"
+    env_file:
+      - .env
     environment:
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
     command:
       - "http"
       - "nginx:80"

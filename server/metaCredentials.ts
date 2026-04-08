@@ -4,9 +4,34 @@
  * Agora as credenciais são lidas exclusivamente do META_ACCESS_TOKEN no .env.
  */
 
+import { ENV } from "./_core/env";
+
 export interface MetaCredentialsConfig {
   accessToken: string;
   permissions: string[];
+}
+
+export const META_TOKEN_MISSING_ERROR =
+  "Meta Access Token não configurado no servidor. Verifique a variável META_ACCESS_TOKEN no backend.";
+
+const INVALID_META_TOKEN_PLACEHOLDERS = new Set([
+  "seu_access_token_aqui",
+  "your_access_token_here",
+  "meta_access_token_here",
+]);
+
+function sanitizeAccessToken(token?: string | null): string | null {
+  const normalized = token?.trim();
+
+  if (!normalized || INVALID_META_TOKEN_PLACEHOLDERS.has(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+export function getServerMetaAccessToken(): string | null {
+  return sanitizeAccessToken(ENV.metaAccessToken || process.env.META_ACCESS_TOKEN);
 }
 
 /**
@@ -15,8 +40,8 @@ export interface MetaCredentialsConfig {
 export async function getMetaCredentials(
   _userId: number // Mantido para compatibilidade de assinatura
 ): Promise<(MetaCredentialsConfig & { isValid: boolean }) | null> {
-  const accessToken = process.env.META_ACCESS_TOKEN;
-  
+  const accessToken = getServerMetaAccessToken();
+
   if (!accessToken) {
     return null;
   }
@@ -28,17 +53,12 @@ export async function getMetaCredentials(
   };
 }
 
-/**
- * Funções legadas mantidas como no-op para evitar quebra de código
- */
-export async function storeMetaCredentials(_userId: number, _config: any): Promise<void> {
-  // No-op: Credenciais agora são via .env
-}
+export async function requireMetaCredentials(userId: number): Promise<MetaCredentialsConfig & { isValid: boolean }> {
+  const credentials = await getMetaCredentials(userId);
 
-export async function deleteMetaCredentials(_userId: number): Promise<void> {
-  // No-op: Credenciais agora são via .env
-}
+  if (!credentials?.isValid) {
+    throw new Error(META_TOKEN_MISSING_ERROR);
+  }
 
-export async function validateMetaToken(_accessToken: string): Promise<{ valid: boolean; permissions: string[] }> {
-  return { valid: true, permissions: [] };
+  return credentials;
 }

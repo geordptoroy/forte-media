@@ -5,6 +5,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import {
   getMetaCredentials,
+  META_TOKEN_MISSING_ERROR,
+  requireMetaCredentials,
 } from "./metaCredentials";
 import { sdk } from "./_core/sdk";
 import { adsRouter } from "./adsRouter";
@@ -95,11 +97,8 @@ export const appRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const creds = await getMetaCredentials(ctx.user.id);
-        if (!creds || !creds.isValid) {
-          return { success: false, error: "Meta Access Token não configurado no servidor." };
-        }
         try {
+          const creds = await requireMetaCredentials(ctx.user.id);
           const ads = await searchScaledAdsLibrary(
             ctx.user.id,
             creds.accessToken,
@@ -115,7 +114,7 @@ export const appRouter = router({
           return { success: true, data: ads };
         } catch (error: any) {
           logger.error("[Meta] searchByKeywords error:", error);
-          return { success: false, error: error.message };
+          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR };
         }
       }),
 
@@ -133,11 +132,8 @@ export const appRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const creds = await getMetaCredentials(ctx.user.id);
-        if (!creds || !creds.isValid) {
-          return { success: false, error: "Meta Access Token não configurado no servidor." };
-        }
         try {
+          const creds = await requireMetaCredentials(ctx.user.id);
           const ads = await searchScaledAdsLibrary(
             ctx.user.id,
             creds.accessToken,
@@ -154,7 +150,7 @@ export const appRouter = router({
           return { success: true, data: ads.filter(ad => (ad.scalingScore || 0) >= 30) };
         } catch (error: any) {
           logger.error("[Meta] getTopScaledAds error:", error);
-          return { success: false, error: error.message };
+          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR };
         }
       }),
 
@@ -172,11 +168,8 @@ export const appRouter = router({
         })
       )
       .query(async ({ ctx, input }) => {
-        const creds = await getMetaCredentials(ctx.user.id);
-        if (!creds || !creds.isValid) {
-          return { success: false, error: "Meta Access Token não configurado no servidor." };
-        }
         try {
+          const creds = await requireMetaCredentials(ctx.user.id);
           const ads = await searchScaledAdsLibrary(
             ctx.user.id,
             creds.accessToken,
@@ -193,7 +186,7 @@ export const appRouter = router({
           return { success: true, data: ads };
         } catch (error: any) {
           logger.error("[Meta] searchScaledAds error:", error);
-          return { success: false, error: error.message };
+          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR };
         }
       }),
   }),

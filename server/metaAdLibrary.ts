@@ -99,7 +99,6 @@ export async function searchAdLibrary(
       limit: limit || 25,
       after: after,
       mediaType: params.mediaType,
-      publisherPlatforms: params.publisherPlatforms,
       fields: [
         "id",
         "page_id",

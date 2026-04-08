@@ -344,7 +344,6 @@ function CreativeViewer({ ad }: { ad: any }) {
 export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }) => {
   const [open, setOpen] = useState(false);
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
-  const [isMonitored, setIsMonitored] = useState(false);
 
   const toggleFavoriteMutation = trpc.ads.toggleFavorite.useMutation({
     onSuccess: (data) => {
@@ -360,19 +359,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
     },
   });
 
-  const addMonitoredMutation = trpc.monitoring.addMonitored.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        setIsMonitored(true);
-        toast.success('Monitoramento ativado');
-      } else {
-        toast.error(data.error || 'Erro ao ativar monitoramento');
-      }
-    },
-    onError: (error) => {
-      toast.error(error.message || 'Erro ao ativar monitoramento');
-    },
-  });
 
   const handleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -382,14 +368,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
     toggleFavoriteMutation.mutate({ adId, pageId, pageName: ad.page_name });
   };
 
-  const handleMonitor = async (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (isMonitored) { toast.info('Anúncio já está em monitoramento'); return; }
-    const adId = ad.id || ad.ad_archive_id;
-    const pageId = ad.page_id;
-    if (!adId || !pageId) { toast.error('Dados do anúncio incompletos'); return; }
-    addMonitoredMutation.mutate({ adId, pageId, pageName: ad.page_name });
-  };
 
   const scaleStatus = getScaleStatus(ad.scalingScore);
   const copy = ad.ad_creative_bodies?.[0] || ad.body || '';
@@ -502,19 +480,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
             >
               <Heart className={cn("w-3 h-3", isFavorited && "fill-current")} />
               {isFavorited ? 'Salvo' : 'Salvar'}
-            </button>
-            <button
-              onClick={handleMonitor}
-              disabled={addMonitoredMutation.isPending || isMonitored}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all border",
-                isMonitored
-                  ? "bg-white/[0.08] border-white/[0.12] text-white"
-                  : "border-white/[0.06] text-gray-600 hover:text-white hover:border-white/[0.12]"
-              )}
-            >
-              <Activity className="w-3 h-3" />
-              {isMonitored ? 'Monitorado' : 'Monitorar'}
             </button>
           </div>
         </div>
