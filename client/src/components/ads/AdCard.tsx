@@ -25,8 +25,6 @@ interface AdCardProps {
   initialIsFavorited?: boolean;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
 function formatDateShort(dateStr?: string): string {
   if (!dateStr) return '—';
   try {
@@ -61,8 +59,6 @@ function getMediaTypeIcon(mediaType?: string) {
       return <Monitor className="w-3 h-3" />;
   }
 }
-
-// ─── Ad Preview (Iframe com tratamento de erro) ──────────────────────────────
 
 function AdPreviewFrame({ ad }: { ad: any }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -121,8 +117,6 @@ function AdPreviewFrame({ ad }: { ad: any }) {
   );
 }
 
-// ─── Metric Item ─────────────────────────────────────────────────────────────
-
 function MetricItem({
   icon,
   label,
@@ -146,8 +140,6 @@ function MetricItem({
     </div>
   );
 }
-
-// ─── Main Component ──────────────────────────────────────────────────────────
 
 export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }) => {
   const [open, setOpen] = useState(false);
@@ -185,16 +177,12 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
 
   return (
     <>
-      {/* ── Card ── */}
       <div
         className="group relative bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/[0.05] hover:border-white/[0.15] transition-all duration-500 flex flex-col shadow-2xl cursor-pointer"
         onClick={() => setOpen(true)}
       >
-        {/* Thumbnail / Preview */}
         <div className="relative aspect-[4/3] bg-zinc-950 overflow-hidden">
           <AdPreviewFrame ad={ad} />
-
-          {/* Overlay top */}
           <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between z-10">
             <div className="flex items-center gap-1.5 px-2 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-full">
               {getMediaTypeIcon(mediaType)}
@@ -211,33 +199,16 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
           </div>
         </div>
 
-        {/* Card Body */}
         <div className="p-4 flex-1 flex flex-col gap-3">
-          {/* Page Name */}
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-zinc-800 border border-white/[0.06] flex items-center justify-center text-[10px] font-black text-white shrink-0">
               {ad.page_name?.charAt(0)?.toUpperCase() || '?'}
             </div>
             <p className="text-xs font-black text-white truncate">{ad.page_name || 'Pagina Desconhecida'}</p>
           </div>
-
-          {/* Copy Preview */}
           {copy && (
             <p className="text-[11px] text-zinc-500 leading-relaxed line-clamp-2">{copy}</p>
           )}
-
-          {/* Platforms */}
-          {platforms.length > 0 && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {platforms.slice(0, 3).map((p: string) => (
-                <span key={p} className="px-1.5 py-0.5 bg-zinc-900 border border-white/[0.04] rounded text-[8px] font-black text-zinc-500 uppercase tracking-widest">
-                  {p}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Metrics */}
           <div className="grid grid-cols-3 gap-2 mt-auto">
             <MetricItem
               icon={<Clock className="w-2.5 h-2.5" />}
@@ -260,11 +231,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div
-          className="px-4 pb-4 pt-1 flex gap-2 z-10"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="px-4 pb-4 pt-1 flex gap-2 z-10" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={handleFavorite}
             disabled={toggleFavoriteMutation.isPending}
@@ -292,11 +259,9 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
         </div>
       </div>
 
-      {/* ── Modal de Detalhes ── */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] p-0 border-white/[0.1] bg-black shadow-[0_0_50px_rgba(0,0,0,1)]">
           <div className="flex h-[85vh]">
-            {/* Esquerda: Criativo */}
             <div className="w-3/5 border-r border-white/[0.05] bg-zinc-950 flex flex-col relative">
               <div className="absolute top-4 left-4 z-20">
                 <span className="px-3 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-black text-white uppercase tracking-widest">
@@ -307,10 +272,7 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                 <AdPreviewFrame ad={ad} />
               </div>
             </div>
-
-            {/* Direita: Dados */}
             <div className="w-2/5 overflow-y-auto p-8 space-y-8 bg-[#050505]">
-              {/* Page Info */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-zinc-800 to-black border border-white/10 flex items-center justify-center text-xl font-black text-white">
                   {ad.page_name?.charAt(0).toUpperCase()}
@@ -320,8 +282,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                   <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest">Meta ID: {adId}</p>
                 </div>
               </div>
-
-              {/* Copy */}
               {copy && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Creative Copy</p>
@@ -330,8 +290,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                   </div>
                 </div>
               )}
-
-              {/* Data Grid */}
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Dados de Veiculacao</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -355,8 +313,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                   </div>
                 </div>
               </div>
-
-              {/* Timeline */}
               <div className="space-y-3">
                 <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Timeline</p>
                 <div className="flex items-center gap-4 text-xs text-zinc-400">
@@ -374,8 +330,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                   </div>
                 </div>
               </div>
-
-              {/* Paises */}
               {ad.ad_reached_countries && ad.ad_reached_countries.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Paises Alcancados</p>
@@ -389,8 +343,6 @@ export const AdCard: React.FC<AdCardProps> = ({ ad, initialIsFavorited = false }
                   </div>
                 </div>
               )}
-
-              {/* External Link */}
               <a
                 href={snapshotUrl}
                 target="_blank"

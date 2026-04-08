@@ -22,13 +22,14 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Unified Menu Structure — Apenas Escalados e Minerador
+// Unified Menu Structure
 const menuItems = [
   { 
     section: "FORTE ADS",
     items: [
-      { icon: Trophy, label: "Escalados", href: "/escalados", description: "50 campeões do dia" },
-      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Minere criativos em escala" },
+      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Busca global de anúncios" },
+      { icon: Trophy, label: "Escalados", href: "/escalados", description: "Seus anúncios salvos" },
+      { icon: Settings, label: "Configurações", href: "/settings", description: "Ajustes e Chaves API" },
     ]
   }
 ];
