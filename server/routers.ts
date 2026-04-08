@@ -143,6 +143,8 @@ export const appRouter = router({
           adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ACTIVE"),
           limit: z.number().max(100).default(50),
           after: z.string().optional(),
+          mediaType: z.string().optional(),
+          publisherPlatforms: z.array(z.string()).optional(),
         })
       )
       .query(async ({ ctx, input }) => {
@@ -150,20 +152,20 @@ export const appRouter = router({
         if (!creds || !creds.isValid) {
           return { success: false, error: "Meta credentials not configured or invalid." };
         }
-
         try {
-          const result = await searchAdsArchive({
-            userId: ctx.user.id,
-            accessToken: creds.accessToken,
-            adReachedCountries: input.countries,
-            searchTerms: input.keywords,
-            adType: input.adType,
-            adActiveStatus: input.adActiveStatus,
-            limit: input.limit,
-            after: input.after,
-          });
-
-          return { success: true, data: result.data, paging: result.paging };
+          const ads = await searchScaledAdsLibrary(
+            ctx.user.id,
+            creds.accessToken,
+            input.countries,
+            {
+              searchTerms: input.keywords,
+              adActiveStatus: input.adActiveStatus,
+              limit: input.limit,
+              mediaType: input.mediaType,
+              publisherPlatforms: input.publisherPlatforms,
+            }
+          );
+          return { success: true, data: ads };
         } catch (error: any) {
           logger.error("[Meta] searchByKeywords error:", error);
           return { success: false, error: error.message };
@@ -171,7 +173,7 @@ export const appRouter = router({
       }),
 
     // Top Scaled Ads for Escalados page (daily champions)
-    getTopScaledAds: protectedProcedure
+     getTopScaledAds: protectedProcedure
       .input(
         z.object({
           countries: z.array(z.string()).default(["BR"]),
@@ -188,7 +190,6 @@ export const appRouter = router({
         if (!creds || !creds.isValid) {
           return { success: false, error: "Meta credentials not configured." };
         }
-
         try {
           const ads = await searchScaledAdsLibrary(
             ctx.user.id,
@@ -203,7 +204,8 @@ export const appRouter = router({
               publisherPlatforms: input.publisherPlatforms,
             }
           );
-          return { success: true, data: ads };
+          // Para Escalados, filtramos apenas o que tem score relevante
+          return { success: true, data: ads.filter(ad => (ad.scalingScore || 0) >= 30) };
         } catch (error: any) {
           logger.error("[Meta] getTopScaledAds error:", error);
           return { success: false, error: error.message };
@@ -216,6 +218,11 @@ export const appRouter = router({
         z.object({
           countries: z.array(z.string()).default(["BR"]),
           searchTerms: z.string().optional(),
+          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ALL"),
+          adDeliveryDateMin: z.string().optional(),
+          limit: z.number().max(100).default(50),
+          mediaType: z.string().optional(),
+          publisherPlatforms: z.array(z.string()).optional(),
         })
       )
       .query(async ({ ctx, input }) => {
@@ -223,13 +230,19 @@ export const appRouter = router({
         if (!creds || !creds.isValid) {
           return { success: false, error: "Meta credentials not configured." };
         }
-
         try {
           const ads = await searchScaledAdsLibrary(
             ctx.user.id,
             creds.accessToken,
             input.countries,
-            { searchTerms: input.searchTerms }
+            {
+              searchTerms: input.searchTerms,
+              adActiveStatus: input.adActiveStatus,
+              adDeliveryDateMin: input.adDeliveryDateMin,
+              limit: input.limit,
+              mediaType: input.mediaType,
+              publisherPlatforms: input.publisherPlatforms,
+            }
           );
           return { success: true, data: ads };
         } catch (error: any) {

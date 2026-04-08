@@ -203,7 +203,7 @@ function AdThumbnail({ ad, onOpenModal }: { ad: any; onOpenModal: () => void }) 
           )}
           onLoad={() => setIframeLoaded(true)}
           onError={() => setIframeError(true)}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           title={`Preview: ${ad.page_name}`}
           loading="lazy"
         />

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
@@ -21,18 +21,6 @@ import { cn } from "@/lib/utils";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function extractNumericValue(value: any): number {
-  if (!value) return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "string") return parseFloat(value) || 0;
-  if (typeof value === "object") {
-    const min = value.min ?? value.lower_bound ?? 0;
-    const max = value.max ?? value.upper_bound ?? 0;
-    return (Number(min) + Number(max)) / 2 || 0;
-  }
-  return 0;
-}
-
 function calculateDaysActive(startTime?: string, stopTime?: string): number {
   if (!startTime) return 0;
   try {
@@ -42,16 +30,6 @@ function calculateDaysActive(startTime?: string, stopTime?: string): number {
   } catch {
     return 0;
   }
-}
-
-// Ordenação com leve aleatoriedade para diversidade de resultados
-function sortWithDiversity(ads: any[]): any[] {
-  // Ordenar por score decrescente com leve fator aleatório (±5 pontos)
-  return [...ads].sort((a, b) => {
-    const scoreA = (a.scalingScore || 0) + (Math.random() * 10 - 5);
-    const scoreB = (b.scalingScore || 0) + (Math.random() * 10 - 5);
-    return scoreB - scoreA;
-  });
 }
 
 const PLATFORMS = ["FACEBOOK", "INSTAGRAM", "AUDIENCE_NETWORK", "MESSENGER"];
@@ -67,7 +45,6 @@ const SCORE_OPTIONS = [
 export default function Dashboard() {
   const [keywords, setKeywords] = useState("");
   const [ads, setAds] = useState<any[]>([]);
-  const [displayedAds, setDisplayedAds] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [minScore, setMinScore] = useState(0);
@@ -80,21 +57,15 @@ export default function Dashboard() {
   const [publisherPlatforms, setPublisherPlatforms] = useState<string[]>([]);
   const [limit, setLimit] = useState("50");
 
+  // Query unificada que agora suporta todos os filtros no backend
   const searchScaledAdsQuery = trpc.meta.searchScaledAds.useQuery(
     {
       countries,
       searchTerms: keywords || undefined,
-    },
-    { enabled: false }
-  );
-
-  const searchByKeywordsQuery = trpc.meta.searchByKeywords.useQuery(
-    {
-      keywords: keywords || ".",
-      countries,
-      adType: "ALL",
       adActiveStatus,
       limit: parseInt(limit),
+      mediaType: mediaType || undefined,
+      publisherPlatforms: publisherPlatforms.length > 0 ? publisherPlatforms : undefined,
     },
     { enabled: false }
   );
@@ -102,95 +73,47 @@ export default function Dashboard() {
   const handleSearch = async () => {
     setIsSearching(true);
     try {
-      let result;
+      const result = await searchScaledAdsQuery.refetch();
+      if (result.data?.success && result.data?.data) {
+        let results = result.data.data;
 
-      // Se tem keywords, usar busca por keywords para mais variedade
-      // Se não tem keywords, usar searchScaledAds para anúncios em escala
-      if (keywords.trim()) {
-        result = await searchByKeywordsQuery.refetch();
-        if (result.data?.success && result.data?.data) {
-          let filtered: any[] = result.data.data as any[];
-
-          // Aplicar filtros client-side
-          if (mediaType) {
-            filtered = filtered.filter((ad: any) => ad.media_type === mediaType);
-          }
-
-          if (minDaysActive) {
-            filtered = filtered.filter((ad: any) => {
-              const days = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
-              return days >= parseInt(minDaysActive);
-            });
-          }
-
-          if (publisherPlatforms.length > 0) {
-            filtered = filtered.filter((ad: any) => {
-              const adPlatforms = ad.publisher_platforms || [];
-              return publisherPlatforms.some(p => adPlatforms.includes(p));
-            });
-          }
-
-          // Adicionar scalingScore para anúncios sem ele
-          filtered = filtered.map((ad: any) => ({
-            ...ad,
-            scalingScore: ad.scalingScore ?? Math.floor(Math.random() * 60 + 10),
-          }));
-
-          setAds(filtered);
-          toast.success(`${filtered.length} anúncios encontrados`);
-        } else {
-          toast.error(result.data?.error || "Erro ao buscar anúncios");
+        // Filtro client-side adicional para dias ativos (não suportado nativamente pela API Meta)
+        if (minDaysActive) {
+          results = results.filter((ad: any) => {
+            const days = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
+            return days >= parseInt(minDaysActive);
+          });
         }
+
+        setAds(results);
+        toast.success(`${results.length} anúncios minerados`);
       } else {
-        result = await searchScaledAdsQuery.refetch();
-        if (result.data?.success && result.data?.data) {
-          let filtered = result.data.data;
-
-          // Aplicar filtros client-side
-          if (mediaType) {
-            filtered = filtered.filter((ad: any) => ad.media_type === mediaType);
-          }
-
-          if (minDaysActive) {
-            filtered = filtered.filter((ad: any) => {
-              const days = calculateDaysActive(ad.ad_delivery_start_time, ad.ad_delivery_stop_time);
-              return days >= parseInt(minDaysActive);
-            });
-          }
-
-          if (publisherPlatforms.length > 0) {
-            filtered = filtered.filter((ad: any) => {
-              const adPlatforms = ad.publisher_platforms || [];
-              return publisherPlatforms.some(p => adPlatforms.includes(p));
-            });
-          }
-
-          if (adActiveStatus !== "ALL") {
-            filtered = filtered.filter((ad: any) => {
-              const isActive = !ad.ad_delivery_stop_time;
-              return adActiveStatus === "ACTIVE" ? isActive : !isActive;
-            });
-          }
-
-          setAds(filtered);
-          toast.success(`${filtered.length} anúncios minerados`);
-        } else {
-          toast.error(result.data?.error || "Erro ao buscar anúncios escalados");
-        }
+        toast.error(result.data?.error || "Erro ao buscar anúncios");
       }
-    } catch {
+    } catch (error) {
+      console.error("Search error:", error);
       toast.error("Erro na conexão com a Meta API");
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Atualizar exibição quando score ou ads mudam
-  useEffect(() => {
-    // Mostrar TODOS os anúncios, ordenados por score (com diversidade)
-    // O filtro de score apenas reordena/destaca, não remove anúncios
-    const sorted = sortWithDiversity(ads);
-    setDisplayedAds(sorted);
+  // Filtragem e ordenação derivativa (memoizada para performance)
+  const displayedAds = useMemo(() => {
+    let filtered = [...ads];
+    
+    // Filtrar por score mínimo se selecionado
+    if (minScore > 0) {
+      filtered = filtered.filter(ad => (ad.scalingScore || 0) >= minScore);
+    }
+    
+    // A ordenação já vem correta do backend, mas garantimos aqui também
+    return filtered.sort((a, b) => {
+      const scoreA = a.scalingScore || 0;
+      const scoreB = b.scalingScore || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return (b.id || "").localeCompare(a.id || "");
+    });
   }, [ads, minScore]);
 
   // Busca automática ao mudar país
@@ -225,17 +148,9 @@ export default function Dashboard() {
     publisherPlatforms.length > 0 ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 
-  // Contagens para stats (baseadas em todos os anúncios, não filtrados por score)
+  // Stats baseadas nos anúncios carregados
   const scaledCount = ads.filter(ad => (ad.scalingScore || 0) >= 61).length;
   const moderateCount = ads.filter(ad => (ad.scalingScore || 0) >= 31 && (ad.scalingScore || 0) < 61).length;
-
-  // Destacar anúncios baseado no score selecionado (não filtrar, apenas reordenar)
-  const highlightedAds = minScore > 0
-    ? [
-        ...displayedAds.filter(ad => (ad.scalingScore || 0) >= minScore),
-        ...displayedAds.filter(ad => (ad.scalingScore || 0) < minScore),
-      ]
-    : displayedAds;
 
   return (
     <DashboardLayout>
@@ -333,7 +248,7 @@ export default function Dashboard() {
             <div className="flex items-start gap-3">
               <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-1 whitespace-nowrap">País / Região</span>
               <div className="flex-1">
-                <RegionSelector selected={countries} onChange={setCountries} />
+                <RegionSelector selectedCountries={countries} onCountriesChange={setCountries} />
               </div>
             </div>
           </div>
@@ -476,65 +391,36 @@ export default function Dashboard() {
           </AnimatePresence>
         </div>
 
-        {/* Score info banner when score filter is active */}
-        {minScore > 0 && ads.length > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2 border border-white/[0.06] bg-white/[0.02]">
-            <div className={cn(
-              "w-2 h-2",
-              minScore >= 70 ? "bg-green-500" : "bg-yellow-500"
-            )} />
-            <p className="text-[10px] text-gray-500 font-medium">
-              Mostrando todos os {ads.length} anúncios — os com score {minScore}+ aparecem primeiro.
-              <span className="text-gray-700 ml-1">
-                ({ads.filter(ad => (ad.scalingScore || 0) >= minScore).length} com score {minScore}+)
-              </span>
-            </p>
-          </div>
-        )}
-
-        {/* Results */}
-        <div className="min-h-[400px]">
-          <AnimatePresence mode="wait">
-            {isSearching ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex flex-col items-center justify-center py-32 gap-4"
-              >
-                <div className="relative w-10 h-10">
-                  <div className="absolute inset-0 border border-white/10" />
-                  <div className="absolute inset-0 border border-white border-t-transparent animate-spin" />
-                </div>
-                <div className="text-center space-y-1">
-                  <p className="text-xs font-black uppercase tracking-[0.3em] text-white">Minerando Dados</p>
-                  <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">Meta Ad Library API v21.0</p>
-                </div>
-              </motion.div>
-            ) : highlightedAds.length > 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-white/[0.04]"
-              >
-                {highlightedAds.map((ad, i) => (
-                  <motion.div
-                    key={ad.id || i}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: i * 0.02, duration: 0.3 }}
-                    className="bg-black"
-                  >
-                    <AdCard ad={ad} />
-                  </motion.div>
-                ))}
-              </motion.div>
+        {/* Results Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <AnimatePresence mode="popLayout">
+            {displayedAds.length > 0 ? (
+              displayedAds.map((ad, idx) => (
+                <motion.div
+                  key={ad.id || idx}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <AdCard ad={ad} />
+                </motion.div>
+              ))
             ) : (
-              <EmptyState
-                icon={Pickaxe}
-                title="Nenhum anúncio encontrado"
-                description="Ajuste os filtros ou busque por outro termo para encontrar criativos em escala."
-              />
+              <div className="col-span-full py-12">
+                <EmptyState
+                  icon={Search}
+                  title="Nenhum anúncio encontrado"
+                  description={
+                    isSearching
+                      ? "Minerando anúncios na Meta API..."
+                      : "Tente ajustar seus filtros ou termos de busca para encontrar mais resultados."
+                  }
+                  actionLabel={activeFiltersCount > 0 ? "Limpar Filtros" : "Tentar Novamente"}
+                  onAction={activeFiltersCount > 0 ? handleResetFilters : handleSearch}
+                />
+              </div>
             )}
           </AnimatePresence>
         </div>

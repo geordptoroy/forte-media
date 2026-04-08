@@ -23,6 +23,8 @@ export interface AdLibrarySearchParams {
   adDeliveryDateMin?: string;
   limit?: number;
   after?: string;
+  mediaType?: string;
+  publisherPlatforms?: string[];
 }
 
 export interface ScalingAnalysisParams {
@@ -96,6 +98,8 @@ export async function searchAdLibrary(
       adDeliveryDateMin: adDeliveryDateMin,
       limit: limit || 25,
       after: after,
+      mediaType: params.mediaType,
+      publisherPlatforms: params.publisherPlatforms,
       fields: [
         "id",
         "page_id",
@@ -167,6 +171,8 @@ export async function searchScaledAds(
       adActiveStatus: params?.adActiveStatus || "ALL",
       adDeliveryDateMin: params?.adDeliveryDateMin,
       limit: params?.limit || 100,
+      mediaType: params?.mediaType,
+      publisherPlatforms: params?.publisherPlatforms,
     });
 
     const enrichedAds = result.ads.map((ad) => {
@@ -182,7 +188,13 @@ export async function searchScaledAds(
       };
     });
 
-    return enrichedAds.sort((a, b) => (b.scalingScore || 0) - (a.scalingScore || 0));
+    // Ordenacao estavel por score e ID
+    return enrichedAds.sort((a, b) => {
+      const scoreA = a.scalingScore || 0;
+      const scoreB = b.scalingScore || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return (b.id || "").localeCompare(a.id || "");
+    });
   } catch (error) {
     logger.error("[Ad Library] Scaled ads search error for user " + userId + ":", error);
     throw error;

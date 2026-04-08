@@ -369,12 +369,25 @@ export function validateAdScaling(ad: any): OfferValidation {
   const earnedWeight = scoringSignals.filter(s => s.passed).reduce((acc, s) => acc + s.weight, 0);
   const baseScore = totalWeight > 0 ? Math.round((earnedWeight / totalWeight) * 100) : 0;
 
-  // Bonus de ate 10 pontos quando dados de gasto/impressoes confirmam escala
+  // ── BONUS: Dados de gasto/impressoes (confirmacao direta) ────────────────
+  // Se os dados existem e sao altos, o score deve refletir isso fortemente.
   let bonusScore = 0;
-  if (spend.available && spendMid >= 500) bonusScore += 5;
-  if (impressions.available && impressionsMid >= 50000) bonusScore += 5;
+  if (spend.available) {
+    if (spendMid >= 5000) bonusScore += 15;
+    else if (spendMid >= 1000) bonusScore += 10;
+    else if (spendMid >= 100) bonusScore += 5;
+  }
+  if (impressions.available) {
+    if (impressionsMid >= 100000) bonusScore += 15;
+    else if (impressionsMid >= 50000) bonusScore += 10;
+    else if (impressionsMid >= 10000) bonusScore += 5;
+  }
 
-  const scalingScore = Math.min(100, baseScore + bonusScore);
+  // Penalidade leve para anuncios inativos recentes (para priorizar escala ATUAL)
+  let penalty = 0;
+  if (!isStillActive && daysActive < 30) penalty = 10;
+
+  const scalingScore = Math.max(0, Math.min(100, baseScore + bonusScore - penalty));
   const scaleLevel = getScaleLevel(scalingScore);
   const confidence = getConfidence(scoringSignals);
   const summary = buildSummary(scaleLevel, scalingScore, daysActive, ad.page_name || "Anunciante", isStillActive);

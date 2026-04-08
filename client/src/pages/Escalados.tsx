@@ -117,16 +117,25 @@ export default function Escalados() {
   );
 
   const loadAds = useCallback(async (forceRefresh = false) => {
-    // Verificar cache
+    // Verificar cache - agora incluímos todos os filtros na chave de cache para evitar dados inconsistentes
+    const currentFiltersHash = JSON.stringify({
+      period,
+      countries,
+      keywords,
+      adActiveStatus,
+      mediaType,
+      publisherPlatforms
+    });
+
     if (!forceRefresh) {
       try {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
-          const entry: CacheEntry = JSON.parse(cached);
+          const entry: CacheEntry & { filtersHash?: string } = JSON.parse(cached);
           const isExpired = Date.now() - entry.timestamp > CACHE_TTL_MS;
-          const isSamePeriod = entry.period === period;
-          const isSameCountries = JSON.stringify(entry.countries) === JSON.stringify(countries);
-          if (!isExpired && isSamePeriod && isSameCountries) {
+          const isSameFilters = entry.filtersHash === currentFiltersHash;
+          
+          if (!isExpired && isSameFilters) {
             setAds(entry.ads);
             setLastUpdated(new Date(entry.timestamp));
             return;
@@ -148,11 +157,12 @@ export default function Escalados() {
 
         // Salvar no cache
         try {
-          const entry: CacheEntry = {
+          const entry: CacheEntry & { filtersHash: string } = {
             ads: newAds,
             timestamp: now.getTime(),
             period,
             countries,
+            filtersHash: currentFiltersHash
           };
           localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
         } catch {
@@ -168,7 +178,7 @@ export default function Escalados() {
     } finally {
       setIsLoading(false);
     }
-  }, [period, countries, keywords, adActiveStatus, mediaType, publisherPlatforms]);
+  }, [period, countries, keywords, adActiveStatus, mediaType, publisherPlatforms, getTopScaledAdsQuery]);
 
   // Carregar ao montar e quando período/países mudam
   useEffect(() => {
