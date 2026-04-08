@@ -5,18 +5,11 @@ import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
-import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Escalados from "./pages/Escalados";
 import Settings from "./pages/Settings";
-import AdvancedSearch from "./pages/AdvancedSearch";
-import Performance from "./pages/Performance";
-import Reports from "./pages/Reports";
-import Favorites from "./pages/Favorites";
-import Monitoring from "./pages/Monitoring";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
 import { useEffect, type ComponentType } from "react";
 
 /**
@@ -89,9 +82,19 @@ function PublicRoute({
 function Router() {
   return (
     <Switch>
-      {/* Rota publica principal */}
-      <Route path="/" component={Home} />
-      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      {/* Redirecionar raiz para login ou dashboard */}
+      <Route path="/">
+        {() => {
+          const { isAuthenticated, loading } = useAuth();
+          const [, setLocation] = useLocation();
+          useEffect(() => {
+            if (!loading) {
+              setLocation(isAuthenticated ? "/dashboard" : "/login");
+            }
+          }, [isAuthenticated, loading, setLocation]);
+          return <LoadingScreen />;
+        }}
+      </Route>
 
       {/* Rotas de autenticacao */}
       <PublicRoute path="/login" component={Login} />
@@ -103,19 +106,6 @@ function Router() {
       
       {/* Dashboard / Minerador - busca unificada com filtros avancados */}
       <PrivateRoute path="/dashboard" component={Dashboard} />
-      
-      {/* Busca Avancada (mantida para compatibilidade) */}
-      <PrivateRoute path="/search" component={AdvancedSearch} />
-      
-      {/* Rastreamento estilo Utmify (Monitoramento de anuncios proprios) */}
-      <PrivateRoute path="/monitoring" component={Monitoring} />
-      
-      {/* Performance da conta conectada */}
-      <PrivateRoute path="/performance" component={Performance} />
-      
-      {/* Biblioteca e Favoritos */}
-      <PrivateRoute path="/favorites" component={Favorites} />
-      <PrivateRoute path="/reports" component={Reports} />
       
       {/* Configuracoes */}
       <PrivateRoute path="/settings" component={Settings} />

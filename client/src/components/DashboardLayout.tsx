@@ -1,23 +1,12 @@
-import { ReactNode, useState, useEffect, useRef } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  LayoutDashboard,
-  Search,
-  BarChart3,
-  FileText,
-  TrendingUp,
-  Heart,
-  Eye,
   Settings,
   LogOut,
-  Zap,
   Menu,
   Bell,
   ChevronLeft,
   ChevronRight,
-  Target,
-  ShieldCheck,
-
   Pickaxe,
   Trophy,
 } from "lucide-react";
@@ -33,7 +22,7 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Unified Menu Structure — seção FORTE ADS no topo
+// Unified Menu Structure — Apenas Escalados e Minerador
 const menuItems = [
   { 
     section: "FORTE ADS",
@@ -41,28 +30,8 @@ const menuItems = [
       { icon: Trophy, label: "Escalados", href: "/escalados", description: "50 campeões do dia" },
       { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Minere criativos em escala" },
     ]
-  },
-  {
-    section: "RASTREAMENTO",
-    items: [
-      { icon: Target, label: "Meus Anúncios", href: "/monitoring", description: "Rastreio estilo Utmify" },
-      { icon: BarChart3, label: "Performance", href: "/performance", description: "Métricas da sua conta" },
-    ]
-  },
-  {
-    section: "BIBLIOTECA",
-    items: [
-      { icon: Heart, label: "Favoritos", href: "/favorites", description: "Sua coleção de criativos" },
-      { icon: FileText, label: "Relatórios", href: "/reports", description: "Exportação de dados" },
-    ]
   }
 ];
-
-// Conjunto de hrefs que são botões de navegação — cliques neles NÃO expandem a sidebar
-const NAV_HREFS = new Set([
-  ...menuItems.flatMap(s => s.items.map(i => i.href)),
-  "/settings",
-]);
 
 interface SidebarContentProps {
   location: string;
@@ -76,20 +45,13 @@ interface SidebarContentProps {
 function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, toggleCollapse }: SidebarContentProps) {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Handler de clique na sidebar: expande se estiver colapsada e o clique não foi num ícone de navegação
   const handleSidebarClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isCollapsed) return;
-
-    // Verifica se o clique foi num link de navegação (ícone de aba)
     const target = e.target as HTMLElement;
     const navLink = target.closest("a[data-nav-link]");
     const logoutBtn = target.closest("button[data-logout]");
     const collapseBtn = target.closest("button[data-collapse-btn]");
-
-    // Se clicou num link de nav, botão de logout ou botão de colapso, não expande
     if (navLink || logoutBtn || collapseBtn) return;
-
-    // Qualquer outro clique na sidebar expande
     toggleCollapse();
   };
 
@@ -100,14 +62,13 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleSidebarClick}
     >
-      {/* Logo area — ao passar o rato mostra a seta de expandir/colapsar */}
+      {/* Logo area */}
       <div
         className={cn(
           "px-6 py-6 flex items-center gap-3 shrink-0 border-b border-white/[0.06] relative",
           isCollapsed && "px-4 justify-center"
         )}
       >
-        {/* Botão de colapso — aparece sobre a logo ao passar o rato (apenas desktop) */}
         <AnimatePresence>
           {isHovered && (
             <motion.button
@@ -145,7 +106,6 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
           )}
         </AnimatePresence>
 
-        {/* Logo */}
         <div className="w-7 h-7 bg-white flex items-center justify-center shrink-0">
           <span className="text-black font-black text-[10px] tracking-tighter">FM</span>
         </div>
@@ -165,12 +125,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
         {menuItems.map((section, idx) => (
           <div key={idx} className="space-y-1">
             {!isCollapsed && (
-              <p className={cn(
-                "px-3 text-[9px] font-black uppercase tracking-[0.25em] mb-2",
-                section.section === "FORTE ADS"
-                  ? "text-white/50"
-                  : "text-gray-600"
-              )}>
+              <p className="px-3 text-[9px] font-black uppercase tracking-[0.25em] mb-2 text-white/50">
                 {section.section}
               </p>
             )}
@@ -284,7 +239,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Load collapse state from local storage
   useEffect(() => {
     const saved = localStorage.getItem("sidebar-collapsed");
     if (saved) setIsCollapsed(saved === "true");
@@ -344,7 +298,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Header */}
         <header className="h-14 border-b border-white/[0.06] flex items-center justify-between px-6 bg-black z-40 shrink-0">
           <div className="flex items-center gap-4">
-            {/* Mobile menu trigger */}
             <Button
               variant="ghost"
               size="icon"
@@ -367,7 +320,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Notification badge */}
             <Button variant="ghost" size="icon" className="relative w-8 h-8 rounded-none bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05] transition-all">
               <Bell className="w-3.5 h-3.5 text-gray-500" />
               {unreadCount > 0 && (
@@ -377,9 +329,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </Button>
 
-
-
-            {/* Live indicator */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/[0.06]">
               <div className="relative">
                 <div className="w-1.5 h-1.5 bg-green-500" />

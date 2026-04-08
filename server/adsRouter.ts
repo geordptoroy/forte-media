@@ -195,7 +195,6 @@ export const adsRouter = router({
 
   /**
    * Search ads from Meta API by keywords
-   * Usa getMetaCredentials() para obter o token descriptografado corretamente.
    */
   searchByKeywords: protectedProcedure
     .input(
@@ -210,15 +209,10 @@ export const adsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        // Usar getMetaCredentials para obter o token descriptografado
         const credentials = await getMetaCredentials(ctx.user.id);
 
         if (!credentials || !credentials.accessToken) {
-          throw new Error("Meta API credentials not configured. Please add your access token in settings.");
-        }
-
-        if (!credentials.isValid) {
-          throw new Error("Meta API credentials are invalid or expired. Please update your access token in settings.");
+          throw new Error("Meta API Access Token não configurado no servidor.");
         }
 
         const result = await searchAdsByKeywords(ctx.user.id, credentials.accessToken, input.keywords, input.countries, {
@@ -233,7 +227,7 @@ export const adsRouter = router({
         console.error("[Ads] searchByKeywords error:", error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : "Failed to search ads",
+          error: error instanceof Error ? error.message : "Erro ao buscar anúncios",
           data: [],
         };
       }
@@ -241,7 +235,6 @@ export const adsRouter = router({
 
   /**
    * Search ads from Meta API by page IDs
-   * Usa getMetaCredentials() para obter o token descriptografado corretamente.
    */
   searchByPages: protectedProcedure
     .input(
@@ -256,15 +249,10 @@ export const adsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        // Usar getMetaCredentials para obter o token descriptografado
         const credentials = await getMetaCredentials(ctx.user.id);
 
         if (!credentials || !credentials.accessToken) {
-          throw new Error("Meta API credentials not configured. Please add your access token in settings.");
-        }
-
-        if (!credentials.isValid) {
-          throw new Error("Meta API credentials are invalid or expired. Please update your access token in settings.");
+          throw new Error("Meta API Access Token não configurado no servidor.");
         }
 
         const result = await searchAdsByPages(ctx.user.id, credentials.accessToken, input.pageIds, input.countries, {
@@ -279,7 +267,7 @@ export const adsRouter = router({
         console.error("[Ads] searchByPages error:", error);
         return {
           success: false,
-          error: error instanceof Error ? error.message : "Failed to search ads",
+          error: error instanceof Error ? error.message : "Erro ao buscar anúncios",
           data: [],
         };
       }
@@ -287,7 +275,6 @@ export const adsRouter = router({
 
   /**
    * Extract image from Meta Ad Library snapshot URL
-   * Server-side extraction to bypass CORS restrictions
    */
   extractThumbnail: protectedProcedure
     .input(
