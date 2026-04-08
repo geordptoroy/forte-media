@@ -1,16 +1,11 @@
 /**
- * Meta Credentials Service — v3 (Refatorado para .env)
+ * Meta Credentials Service — v4 (Limpeza Total)
  * ─────────────────────────────────────────────────────────────────────────────
- * Agora as credenciais são lidas diretamente das variáveis de ambiente,
- * removendo a necessidade de armazenamento em banco de dados por usuário.
+ * Agora as credenciais são lidas exclusivamente do META_ACCESS_TOKEN no .env.
  */
 
 export interface MetaCredentialsConfig {
   accessToken: string;
-  metaAppId?: string;
-  metaAppSecret?: string;
-  adAccountId?: string;
-  accountName?: string;
   permissions: string[];
 }
 
@@ -28,11 +23,7 @@ export async function getMetaCredentials(
 
   return {
     accessToken,
-    metaAppId: process.env.META_APP_ID,
-    metaAppSecret: process.env.META_APP_SECRET,
-    adAccountId: process.env.META_AD_ACCOUNT_ID,
-    accountName: process.env.META_ACCOUNT_NAME || "Conta Padrão",
-    permissions: ["ads_read", "ads_management", "pages_read_engagement"], // Permissões padrão assumidas
+    permissions: ["ads_read", "ads_management", "pages_read_engagement"],
     isValid: true,
   };
 }

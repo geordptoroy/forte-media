@@ -4,18 +4,11 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import {
-  storeMetaCredentials,
   getMetaCredentials,
-  deleteMetaCredentials,
-  validateMetaToken,
 } from "./metaCredentials";
 import { sdk } from "./_core/sdk";
 import { adsRouter } from "./adsRouter";
-import { monitoringRouter } from "./monitoringRouter";
-import { campaignsRouter } from "./campaignsRouter";
-import { searchAdsArchive } from "./services/metaAdsService";
 import { searchScaledAds as searchScaledAdsLibrary } from "./metaAdLibrary";
-import { getCampaignMetrics, getAdAccountMetrics, listCampaigns } from "./metaMarketing";
 import { logger } from "./_core/logger";
 
 export const appRouter = router({
@@ -71,65 +64,19 @@ export const appRouter = router({
   }),
 
   ads: adsRouter,
-  monitoring: monitoringRouter,
-  campaigns: campaignsRouter,
 
   meta: router({
-    setCredentials: protectedProcedure
-      .input(
-        z.object({
-          accessToken: z.string().min(1, "Access token is required"),
-          adAccountId: z.string().optional(),
-          accountName: z.string().optional(),
-          metaAppId: z.string().optional(),
-          metaAppSecret: z.string().optional(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        try {
-          const tokenValidation = await validateMetaToken(input.accessToken);
-          if (!tokenValidation.valid) {
-            return { success: false, error: tokenValidation.error || "Invalid access token" };
-          }
-
-          await storeMetaCredentials(ctx.user.id, {
-            accessToken: input.accessToken,
-            adAccountId: input.adAccountId,
-            accountName: input.accountName,
-            metaAppId: input.metaAppId,
-            metaAppSecret: input.metaAppSecret,
-            permissions: tokenValidation.permissions,
-          });
-
-          return { success: true, permissions: tokenValidation.permissions };
-        } catch (error) {
-          logger.error("[Meta] setCredentials error:", error);
-          return { success: false, error: error instanceof Error ? error.message : "Failed to set credentials" };
-        }
-      }),
-
     getCredentialsStatus: protectedProcedure.query(async ({ ctx }) => {
       try {
         const credentials = await getMetaCredentials(ctx.user.id);
         return {
           hasCredentials: !!credentials,
           isValid: credentials?.isValid ?? false,
-          accountName: credentials?.accountName,
           permissions: credentials?.permissions ?? [],
         };
       } catch (error) {
         logger.error("[Meta] getCredentialsStatus error:", error);
         return { hasCredentials: false, isValid: false, permissions: [] };
-      }
-    }),
-
-    deleteCredentials: protectedProcedure.mutation(async ({ ctx }) => {
-      try {
-        await deleteMetaCredentials(ctx.user.id);
-        return { success: true };
-      } catch (error) {
-        logger.error("[Meta] deleteCredentials error:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Failed to delete credentials" };
       }
     }),
 
@@ -150,7 +97,7 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const creds = await getMetaCredentials(ctx.user.id);
         if (!creds || !creds.isValid) {
-          return { success: false, error: "Meta credentials not configured or invalid." };
+          return { success: false, error: "Meta Access Token não configurado no servidor." };
         }
         try {
           const ads = await searchScaledAdsLibrary(
@@ -188,7 +135,7 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const creds = await getMetaCredentials(ctx.user.id);
         if (!creds || !creds.isValid) {
-          return { success: false, error: "Meta credentials not configured." };
+          return { success: false, error: "Meta Access Token não configurado no servidor." };
         }
         try {
           const ads = await searchScaledAdsLibrary(
@@ -204,7 +151,6 @@ export const appRouter = router({
               publisherPlatforms: input.publisherPlatforms,
             }
           );
-          // Para Escalados, filtramos apenas o que tem score relevante
           return { success: true, data: ads.filter(ad => (ad.scalingScore || 0) >= 30) };
         } catch (error: any) {
           logger.error("[Meta] getTopScaledAds error:", error);
@@ -228,7 +174,7 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const creds = await getMetaCredentials(ctx.user.id);
         if (!creds || !creds.isValid) {
-          return { success: false, error: "Meta credentials not configured." };
+          return { success: false, error: "Meta Access Token não configurado no servidor." };
         }
         try {
           const ads = await searchScaledAdsLibrary(
@@ -249,53 +195,6 @@ export const appRouter = router({
           logger.error("[Meta] searchScaledAds error:", error);
           return { success: false, error: error.message };
         }
-      }),
-
-    listCampaigns: protectedProcedure.query(async ({ ctx }) => {
-      const creds = await getMetaCredentials(ctx.user.id);
-      if (!creds || !creds.isValid || !creds.adAccountId) return { campaigns: [] };
-      
-      const campaigns = await listCampaigns(ctx.user.id, creds.accessToken, creds.adAccountId);
-      return { campaigns };
-    }),
-
-    getCampaignMetrics: protectedProcedure
-      .input(z.object({ 
-        campaignId: z.string(),
-        dateStart: z.string(),
-        dateStop: z.string()
-      }))
-      .query(async ({ ctx, input }) => {
-        const creds = await getMetaCredentials(ctx.user.id);
-        if (!creds || !creds.isValid) throw new Error("Meta credentials not configured");
-        
-        const metrics = await getCampaignMetrics(
-          ctx.user.id, 
-          creds.accessToken, 
-          input.campaignId, 
-          input.dateStart, 
-          input.dateStop
-        );
-        return { metrics };
-      }),
-
-    getAccountMetrics: protectedProcedure
-      .input(z.object({ 
-        dateStart: z.string(),
-        dateStop: z.string()
-      }))
-      .query(async ({ ctx, input }) => {
-        const creds = await getMetaCredentials(ctx.user.id);
-        if (!creds || !creds.isValid || !creds.adAccountId) throw new Error("Meta credentials not configured");
-        
-        const metrics = await getAdAccountMetrics(
-          ctx.user.id, 
-          creds.accessToken, 
-          creds.adAccountId, 
-          input.dateStart, 
-          input.dateStop
-        );
-        return { metrics };
       }),
   }),
 });
