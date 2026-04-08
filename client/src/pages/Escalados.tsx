@@ -1,114 +1,46 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { AdCard } from "@/components/ads/AdCard";
 import { RegionSelector } from "@/components/ads/RegionSelector";
-import {
-  Loader2,
-  Trophy,
-  Clock,
-  RefreshCcw,
-  Search,
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Trophy, RefreshCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { EmptyState } from "@/components/EmptyState";
 
-const CACHE_KEY = "escalados_cache";
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
-
-interface CacheEntry {
-  ads: any[];
-  timestamp: number;
-  countries: string[];
-}
-
 export default function Escalados() {
   const [ads, setAds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [countries, setCountries] = useState(["BR"]);
+  const [wordFilter, setWordFilter] = useState("");
 
-  const getTopScaledAdsQuery = trpc.meta.getTopScaledAds.useQuery(
+  const query = trpc.meta.getEscaladosAds.useQuery(
     {
       countries,
       adActiveStatus: "ACTIVE",
+      searchTerms: wordFilter.trim() || undefined,
       limit: 50,
     },
     { enabled: false }
   );
 
-  const loadAds = useCallback(async (forceRefresh = false) => {
-    const currentFiltersHash = JSON.stringify({ countries });
-
-    if (!forceRefresh) {
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const entry: CacheEntry & { filtersHash?: string } = JSON.parse(cached);
-          const isExpired = Date.now() - entry.timestamp > CACHE_TTL_MS;
-          const isSameFilters = entry.filtersHash === currentFiltersHash;
-          
-          if (!isExpired && isSameFilters) {
-            setAds(entry.ads);
-            setLastUpdated(new Date(entry.timestamp));
-            return;
-          }
-        }
-      } catch {
-        // Ignorar erros de cache
-      }
-    }
-
+  const loadAds = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await getTopScaledAdsQuery.refetch();
+      const result = await query.refetch();
       if (result.data?.success && result.data?.data) {
-        const newAds = result.data.data;
-        setAds(newAds);
-        const now = new Date();
-        setLastUpdated(now);
-
-        try {
-          const entry: CacheEntry & { filtersHash: string } = {
-            ads: newAds,
-            timestamp: now.getTime(),
-            countries,
-            filtersHash: currentFiltersHash
-          };
-          localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
-        } catch {
-          // Ignorar erros de cache
-        }
-
-        toast.success(`${newAds.length} anúncios escalados carregados`);
+        setAds(result.data.data);
+        toast.success(`${result.data.data.length} anúncios carregados`);
       } else {
-        toast.error(result.data?.error || "Erro ao carregar anúncios escalados");
+        toast.error(result.data?.error || "Erro ao carregar anúncios");
       }
     } catch {
       toast.error("Erro na conexão com a Meta API");
     } finally {
       setIsLoading(false);
     }
-  }, [countries, getTopScaledAdsQuery]);
-
-  useEffect(() => {
-    loadAds();
-  }, [countries]);
-
-  useEffect(() => {
-    const checkMidnight = () => {
-      const now = new Date();
-      if (now.getHours() === 0 && now.getMinutes() === 0) {
-        loadAds(true);
-      }
-    };
-    const interval = setInterval(checkMidnight, 60000);
-    return () => clearInterval(interval);
-  }, [loadAds]);
-
-  const scaledCount = ads.filter(ad => (ad.scalingScore || 0) >= 61).length;
-  const moderateCount = ads.filter(ad => (ad.scalingScore || 0) >= 31 && (ad.scalingScore || 0) < 61).length;
+  }, [query]);
 
   return (
     <DashboardLayout>
@@ -119,55 +51,62 @@ export default function Escalados() {
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="w-5 h-5 text-yellow-400" />
               <h1 className="text-lg font-black text-white tracking-tight">Escalados</h1>
-              <span className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-black text-yellow-400 uppercase tracking-widest">
-                Campeões
-              </span>
             </div>
             <p className="text-xs text-gray-600 font-medium">
-              50 anúncios com maior escala detectados pela Meta Ad Library — atualizado diariamente às 00:00
+              Anúncios ativos buscados diretamente na Meta Ad Library
             </p>
-            {lastUpdated && (
-              <p className="text-[9px] text-gray-700 font-mono mt-1 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" />
-                Última atualização: {lastUpdated.toLocaleString("pt-BR")}
-              </p>
-            )}
           </div>
-
-          {/* Stats */}
           {ads.length > 0 && (
             <div className="flex items-center gap-3 shrink-0">
               <div className="px-3 py-2 border border-white/[0.06] bg-white/[0.02]">
                 <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Total</p>
                 <p className="text-sm font-black text-white">{ads.length}</p>
               </div>
-              <div className="px-3 py-2 border border-green-500/20 bg-green-500/[0.04]">
-                <p className="text-[9px] font-black text-green-600 uppercase tracking-widest">Escalados</p>
-                <p className="text-sm font-black text-green-500">{scaledCount}</p>
-              </div>
-              <div className="px-3 py-2 border border-yellow-500/20 bg-yellow-500/[0.04]">
-                <p className="text-[9px] font-black text-yellow-600 uppercase tracking-widest">Validação</p>
-                <p className="text-sm font-black text-yellow-500">{moderateCount}</p>
-              </div>
             </div>
           )}
         </div>
 
-        {/* Region Selector Bar */}
-        <div className="border border-white/[0.06] bg-black p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-1 whitespace-nowrap">País / Região</span>
-            <div className="flex-1">
-              <RegionSelector selected={countries} onChange={setCountries} />
+        {/* Filter Bar */}
+        <div className="border border-white/[0.06] bg-black">
+          <div className="flex flex-col md:flex-row gap-0">
+            <div className="flex-1 relative flex items-center border-b md:border-b-0 md:border-r border-white/[0.06]">
+              <Search className="absolute left-4 w-4 h-4 text-gray-600" />
+              <Input
+                placeholder="Filtrar por palavra-chave (ex: emagrecimento, curso, produto...)"
+                value={wordFilter}
+                onChange={(e) => setWordFilter(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && loadAds()}
+                className="h-12 bg-transparent border-none pl-12 text-sm font-medium focus-visible:ring-0 placeholder:text-gray-700 rounded-none"
+              />
             </div>
-            <button
-              onClick={() => loadAds(true)}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-white/[0.06] text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all disabled:opacity-50"
-            >
-              {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCcw className="w-3 h-3" />}
-              Atualizar
-            </button>
+            <div className="flex">
+              <button
+                onClick={loadAds}
+                disabled={isLoading}
+                className="flex-1 md:flex-none px-6 h-12 bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Buscar"}
+              </button>
+              <button
+                onClick={loadAds}
+                disabled={isLoading}
+                className="w-12 h-12 border-l border-white/[0.06] text-gray-500 hover:text-white hover:bg-white/[0.04] transition-all flex items-center justify-center"
+              >
+                <RefreshCcw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Region Selector */}
+          <div className="border-t border-white/[0.06] px-4 py-3">
+            <div className="flex items-start gap-3">
+              <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-1 whitespace-nowrap">
+                País / Região
+              </span>
+              <div className="flex-1">
+                <RegionSelector selected={countries} onChange={setCountries} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -191,14 +130,14 @@ export default function Escalados() {
               <div className="col-span-full py-12">
                 <EmptyState
                   icon={Search}
-                  title="Nenhum anúncio escalado"
+                  title="Nenhum anúncio encontrado"
                   description={
                     isLoading
-                      ? "Buscando campeões na Meta API..."
-                      : "Tente mudar a região para encontrar mais resultados."
+                      ? "Buscando anúncios na Meta Ad Library..."
+                      : "Digite uma palavra-chave e clique em Buscar, ou clique em Buscar para ver anúncios ativos."
                   }
-                  actionLabel="Tentar Novamente"
-                  onAction={() => loadAds(true)}
+                  actionLabel="Buscar Anúncios"
+                  onAction={loadAds}
                 />
               </div>
             )}

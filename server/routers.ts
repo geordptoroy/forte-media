@@ -10,15 +10,13 @@ import {
 } from "./metaCredentials";
 import { sdk } from "./_core/sdk";
 import { adsRouter } from "./adsRouter";
-import { searchScaledAds as searchScaledAdsLibrary } from "./metaAdLibrary";
+import { searchAdLibrary } from "./metaAdLibrary";
 import { logger } from "./_core/logger";
 
 export const appRouter = router({
   system: systemRouter,
-
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
-
     register: publicProcedure
       .input(
         z.object({
@@ -38,7 +36,6 @@ export const appRouter = router({
           throw new Error(error instanceof Error ? error.message : "Registration failed");
         }
       }),
-
     login: publicProcedure
       .input(
         z.object({
@@ -57,16 +54,13 @@ export const appRouter = router({
           throw new Error(error instanceof Error ? error.message : "Login failed");
         }
       }),
-
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
   }),
-
   ads: adsRouter,
-
   meta: router({
     getCredentialsStatus: protectedProcedure.query(async ({ ctx }) => {
       try {
@@ -82,111 +76,91 @@ export const appRouter = router({
       }
     }),
 
-    // Unified Search Procedure for Advanced Search
-    searchByKeywords: protectedProcedure
+    /**
+     * Busca de anúncios na Meta Ad Library — Minerador
+     * Suporta todos os filtros disponíveis na API da Meta.
+     */
+    searchAds: protectedProcedure
       .input(
         z.object({
-          keywords: z.string().min(1),
-          countries: z.array(z.string()).default(["BR"]),
-          adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "CREDIT_ADS", "EMPLOYMENT_ADS", "HOUSING_ADS"]).default("ALL"),
-          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ACTIVE"),
-          limit: z.number().max(100).default(50),
+          searchTerms: z.string().optional(),
+          searchPageIds: z.array(z.string()).optional(),
+          countries: z.array(z.string()).min(1).default(["BR"]),
+          adType: z
+            .enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "CREDIT_ADS", "EMPLOYMENT_ADS", "HOUSING_ADS"])
+            .default("ALL"),
+          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ALL"),
+          adDeliveryDateMin: z.string().optional(),
+          adDeliveryDateMax: z.string().optional(),
+          mediaType: z.enum(["ALL", "IMAGE", "VIDEO", "MEME", "NONE"]).optional(),
+          publisherPlatforms: z
+            .array(z.enum(["FACEBOOK", "INSTAGRAM", "AUDIENCE_NETWORK", "MESSENGER", "WHATSAPP"]))
+            .optional(),
+          limit: z.number().min(1).max(500).default(50),
           after: z.string().optional(),
-          mediaType: z.string().optional(),
-          publisherPlatforms: z.array(z.string()).optional(),
         })
       )
       .query(async ({ ctx, input }) => {
         try {
           const creds = await requireMetaCredentials(ctx.user.id);
-          const ads = await searchScaledAdsLibrary(
-            ctx.user.id,
-            creds.accessToken,
-            input.countries,
-            {
-              searchTerms: input.keywords,
-              adActiveStatus: input.adActiveStatus,
-              limit: input.limit,
-              mediaType: input.mediaType,
-              publisherPlatforms: input.publisherPlatforms,
-            }
-          );
-          return { success: true, data: ads };
+          const result = await searchAdLibrary(creds.accessToken, {
+            userId: ctx.user.id,
+            searchTerms: input.searchTerms,
+            searchPageIds: input.searchPageIds,
+            countries: input.countries,
+            adType: input.adType,
+            adActiveStatus: input.adActiveStatus,
+            adDeliveryDateMin: input.adDeliveryDateMin,
+            adDeliveryDateMax: input.adDeliveryDateMax,
+            mediaType: input.mediaType === "ALL" ? undefined : input.mediaType,
+            publisherPlatforms: input.publisherPlatforms,
+            limit: input.limit,
+            after: input.after,
+          });
+          return { success: true, data: result.ads, paging: result.paging };
         } catch (error: any) {
-          logger.error("[Meta] searchByKeywords error:", error);
-          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR };
+          logger.error("[Meta] searchAds error:", error);
+          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR, data: [], paging: null };
         }
       }),
 
-    // Top Scaled Ads for Escalados page (daily champions)
-     getTopScaledAds: protectedProcedure
+    /**
+     * Busca de anúncios na página Escalados — com filtro de palavra.
+     * Sem nenhum algoritmo de score: retorna os anúncios diretamente da API.
+     */
+    getEscaladosAds: protectedProcedure
       .input(
         z.object({
-          countries: z.array(z.string()).default(["BR"]),
           searchTerms: z.string().optional(),
-          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ALL"),
+          countries: z.array(z.string()).min(1).default(["BR"]),
+          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ACTIVE"),
           adDeliveryDateMin: z.string().optional(),
-          limit: z.number().max(100).default(50),
-          mediaType: z.string().optional(),
-          publisherPlatforms: z.array(z.string()).optional(),
+          mediaType: z.enum(["ALL", "IMAGE", "VIDEO", "MEME", "NONE"]).optional(),
+          publisherPlatforms: z
+            .array(z.enum(["FACEBOOK", "INSTAGRAM", "AUDIENCE_NETWORK", "MESSENGER", "WHATSAPP"]))
+            .optional(),
+          limit: z.number().min(1).max(500).default(50),
+          after: z.string().optional(),
         })
       )
       .query(async ({ ctx, input }) => {
         try {
           const creds = await requireMetaCredentials(ctx.user.id);
-          const ads = await searchScaledAdsLibrary(
-            ctx.user.id,
-            creds.accessToken,
-            input.countries,
-            {
-              searchTerms: input.searchTerms,
-              adActiveStatus: input.adActiveStatus,
-              adDeliveryDateMin: input.adDeliveryDateMin,
-              limit: input.limit,
-              mediaType: input.mediaType,
-              publisherPlatforms: input.publisherPlatforms,
-            }
-          );
-          return { success: true, data: ads.filter(ad => (ad.scalingScore || 0) >= 30) };
+          const result = await searchAdLibrary(creds.accessToken, {
+            userId: ctx.user.id,
+            searchTerms: input.searchTerms || ".",
+            countries: input.countries,
+            adActiveStatus: input.adActiveStatus,
+            adDeliveryDateMin: input.adDeliveryDateMin,
+            mediaType: input.mediaType === "ALL" ? undefined : input.mediaType,
+            publisherPlatforms: input.publisherPlatforms,
+            limit: input.limit,
+            after: input.after,
+          });
+          return { success: true, data: result.ads, paging: result.paging };
         } catch (error: any) {
-          logger.error("[Meta] getTopScaledAds error:", error);
-          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR };
-        }
-      }),
-
-    // Optimized Scaled Ads Search for Dashboard
-    searchScaledAds: protectedProcedure
-      .input(
-        z.object({
-          countries: z.array(z.string()).default(["BR"]),
-          searchTerms: z.string().optional(),
-          adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).default("ALL"),
-          adDeliveryDateMin: z.string().optional(),
-          limit: z.number().max(100).default(50),
-          mediaType: z.string().optional(),
-          publisherPlatforms: z.array(z.string()).optional(),
-        })
-      )
-      .query(async ({ ctx, input }) => {
-        try {
-          const creds = await requireMetaCredentials(ctx.user.id);
-          const ads = await searchScaledAdsLibrary(
-            ctx.user.id,
-            creds.accessToken,
-            input.countries,
-            {
-              searchTerms: input.searchTerms,
-              adActiveStatus: input.adActiveStatus,
-              adDeliveryDateMin: input.adDeliveryDateMin,
-              limit: input.limit,
-              mediaType: input.mediaType,
-              publisherPlatforms: input.publisherPlatforms,
-            }
-          );
-          return { success: true, data: ads };
-        } catch (error: any) {
-          logger.error("[Meta] searchScaledAds error:", error);
-          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR };
+          logger.error("[Meta] getEscaladosAds error:", error);
+          return { success: false, error: error?.message || META_TOKEN_MISSING_ERROR, data: [], paging: null };
         }
       }),
   }),

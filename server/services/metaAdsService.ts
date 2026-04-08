@@ -17,6 +17,7 @@ export interface AdsArchiveSearchParams {
   adDeliveryDateMin?: string;
   adDeliveryDateMax?: string;
   mediaType?: string;
+  publisherPlatforms?: string[];
   fields?: string[];
   limit?: number;
   after?: string;
@@ -100,6 +101,7 @@ export async function searchAdsArchive(params: AdsArchiveSearchParams): Promise<
   if (searchParams.adDeliveryDateMin) queryParams.ad_delivery_date_min = searchParams.adDeliveryDateMin;
   if (searchParams.adDeliveryDateMax) queryParams.ad_delivery_date_max = searchParams.adDeliveryDateMax;
   if (searchParams.mediaType && searchParams.mediaType !== 'ALL') queryParams.media_type = searchParams.mediaType;
+  if (searchParams.publisherPlatforms?.length) queryParams.publisher_platforms = JSON.stringify(searchParams.publisherPlatforms);
   if (searchParams.after) queryParams.after = searchParams.after;
 
   try {

@@ -1,45 +1,11 @@
 /**
- * Meta Ad Library API Service — v2 (Refatorado)
+ * Meta Ad Library API Service
  * ─────────────────────────────────────────────────────────────────────────────
- * Servico principal de busca na Meta Ad Library.
- *
- * Mudancas v2:
- *  - Adicionados campos ad_creative_images e ad_creative_videos na requisicao
- *    para permitir exibicao de thumbnails diretamente da API (sem scraping)
- *  - Removida funcao analyzeScaling() duplicada — toda logica de escala agora
- *    passa pelo scalingValidationService centralizado
- *  - Mapeamento de ad_creative_images e ad_creative_videos no retorno
+ * Serviço de busca na Meta Ad Library — sem nenhuma lógica proprietária.
+ * Apenas repassa os parâmetros para a API oficial da Meta e retorna os dados.
  */
 import { searchAdsArchive } from "./services/metaAdsService";
-import { validateAdScaling } from "./services/scalingValidationService";
 import { logger } from "./_core/logger";
-
-export interface AdLibrarySearchParams {
-  userId: number;
-  searchTerms: string[];
-  countries: string[];
-  adType?: "POLITICAL" | "ISSUE_ADS" | "ALL";
-  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
-  adDeliveryDateMin?: string;
-  limit?: number;
-  after?: string;
-  mediaType?: string;
-  publisherPlatforms?: string[];
-}
-
-export interface ScalingAnalysisParams {
-  searchTerms?: string;
-  minSpend?: number;
-  minCTR?: number;
-  minROAS?: number;
-  minImpressions?: number;
-  minDaysActive?: number;
-  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
-  adDeliveryDateMin?: string;
-  limit?: number;
-  mediaType?: string;
-  publisherPlatforms?: string[];
-}
 
 export interface AdLibraryAd {
   id: string;
@@ -58,15 +24,22 @@ export interface AdLibraryAd {
   spend?: { range?: string; min?: number; max?: number } | string | null;
   impressions?: { range?: string; min?: number; max?: number } | string | null;
   media_type?: string;
-  scalingScore?: number;
-  scalingReasons?: string[];
-  daysActive?: number;
-  estimatedCPM?: number;
-  estimatedCTR?: number;
-  // Campos adicionados pelo scalingValidationService
-  scaleLevel?: string;
-  isScaled?: boolean;
-  confidence?: string;
+  ad_reached_countries?: string[];
+}
+
+export interface AdLibrarySearchParams {
+  userId: number;
+  searchTerms?: string;
+  searchPageIds?: string[];
+  countries: string[];
+  adType?: "ALL" | "POLITICAL_AND_ISSUE_ADS" | "CREDIT_ADS" | "EMPLOYMENT_ADS" | "HOUSING_ADS";
+  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
+  adDeliveryDateMin?: string;
+  adDeliveryDateMax?: string;
+  mediaType?: string;
+  publisherPlatforms?: string[];
+  limit?: number;
+  after?: string;
 }
 
 export interface AdLibrarySearchResult {
@@ -83,22 +56,36 @@ export async function searchAdLibrary(
   accessToken: string,
   params: AdLibrarySearchParams
 ): Promise<AdLibrarySearchResult> {
-  const { userId, searchTerms, countries, adType, adActiveStatus, adDeliveryDateMin, limit, after } = params;
-  try {
-    const rawTerms = searchTerms.join(" ").trim();
-    const searchTermsFormatted = rawTerms === "" || rawTerms === "*" ? "." : rawTerms;
+  const {
+    userId,
+    searchTerms,
+    searchPageIds,
+    countries,
+    adType,
+    adActiveStatus,
+    adDeliveryDateMin,
+    adDeliveryDateMax,
+    mediaType,
+    publisherPlatforms,
+    limit,
+    after,
+  } = params;
 
+  try {
     const result = await searchAdsArchive({
       userId,
       accessToken,
       adReachedCountries: countries,
-      searchTerms: searchTermsFormatted,
-      adType: adType === "ALL" ? "ALL" : undefined,
+      searchTerms: searchTerms || ".",
+      searchPageIds,
+      adType,
       adActiveStatus: adActiveStatus || "ALL",
-      adDeliveryDateMin: adDeliveryDateMin,
+      adDeliveryDateMin,
+      adDeliveryDateMax,
+      mediaType,
+      publisherPlatforms,
       limit: limit || 25,
-      after: after,
-      mediaType: params.mediaType,
+      after,
       fields: [
         "id",
         "page_id",
@@ -110,13 +97,13 @@ export async function searchAdLibrary(
         "ad_creative_bodies",
         "ad_creative_link_titles",
         "ad_creative_link_descriptions",
-        // Campos de imagem/video — essenciais para thumbnails sem scraping
         "ad_creative_images",
         "ad_creative_videos",
         "currency",
         "spend",
         "impressions",
         "media_type",
+        "ad_reached_countries",
       ],
     });
 
@@ -132,13 +119,13 @@ export async function searchAdLibrary(
         ad_creative_bodies: ad.ad_creative_bodies,
         ad_creative_link_titles: ad.ad_creative_link_titles,
         ad_creative_link_descriptions: ad.ad_creative_link_descriptions,
-        // Imagens e videos diretos da API
         ad_creative_images: ad.ad_creative_images ?? [],
         ad_creative_videos: ad.ad_creative_videos ?? [],
         currency: ad.currency,
         spend: ad.spend ?? null,
         impressions: ad.impressions ?? null,
-        media_type: ad.media_type as string | undefined,
+        media_type: ad.media_type,
+        ad_reached_countries: ad.ad_reached_countries,
       })),
       paging: result.paging
         ? {
@@ -151,51 +138,6 @@ export async function searchAdLibrary(
     };
   } catch (error) {
     logger.error("[Ad Library] Search error for user " + userId + ":", error);
-    throw error;
-  }
-}
-
-export async function searchScaledAds(
-  userId: number,
-  accessToken: string,
-  countries: string[],
-  params?: ScalingAnalysisParams
-): Promise<AdLibraryAd[]> {
-  try {
-    const result = await searchAdLibrary(accessToken, {
-      userId,
-      searchTerms: params?.searchTerms ? [params.searchTerms] : ["."],
-      countries,
-      adType: "ALL",
-      adActiveStatus: params?.adActiveStatus || "ALL",
-      adDeliveryDateMin: params?.adDeliveryDateMin,
-      limit: params?.limit || 100,
-      mediaType: params?.mediaType,
-      publisherPlatforms: params?.publisherPlatforms,
-    });
-
-    const enrichedAds = result.ads.map((ad) => {
-      const validation = validateAdScaling(ad);
-      return {
-        ...ad,
-        daysActive: validation.rawMetrics.daysActive,
-        scalingScore: validation.scalingScore,
-        scalingReasons: validation.signals.filter(s => s.passed).map(s => s.description),
-        scaleLevel: validation.scaleLevel,
-        isScaled: validation.isScaled,
-        confidence: validation.confidence,
-      };
-    });
-
-    // Ordenacao estavel por score e ID
-    return enrichedAds.sort((a, b) => {
-      const scoreA = a.scalingScore || 0;
-      const scoreB = b.scalingScore || 0;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      return (b.id || "").localeCompare(a.id || "");
-    });
-  } catch (error) {
-    logger.error("[Ad Library] Scaled ads search error for user " + userId + ":", error);
     throw error;
   }
 }

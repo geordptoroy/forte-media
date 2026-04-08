@@ -78,16 +78,18 @@ describe('tRPC Procedures - Integration Tests', () => {
   });
 
   describe('Ads Procedures', () => {
-    it('should validate searchScaledAds input', () => {
+    it('should validate searchAds input', () => {
       const schema = z.object({
         countries: z.array(z.string()).min(1),
-        minSpend: z.number().optional(),
-        limit: z.number().min(1).max(100).optional(),
+        searchTerms: z.string().optional(),
+        adActiveStatus: z.enum(['ACTIVE', 'INACTIVE', 'ALL']).optional(),
+        limit: z.number().min(1).max(500).optional(),
       });
 
       const validInput = {
         countries: ['US', 'BR'],
-        minSpend: 1000,
+        searchTerms: 'cosmeticos',
+        adActiveStatus: 'ALL' as const,
         limit: 50,
       };
 
