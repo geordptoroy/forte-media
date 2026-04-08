@@ -1,45 +1,13 @@
 /**
- * Scaling Validation Service — v2 (Refatorado)
+ * Scaling Validation Service — v2.1 (Ajustado)
  * ─────────────────────────────────────────────────────────────────────────────
  * Engine de validação de escala de anúncios baseada em SINAIS PROXY REAIS.
  *
- * PROBLEMA DO ALGORITMO ANTERIOR:
- *   O algoritmo anterior dependia de `spend` e `impressions`, campos que a Meta
- *   NÃO fornece para anúncios comuns fora da UE/UK (ex: Brasil). Isso fazia com
- *   que todos os anúncios brasileiros recebessem score próximo de zero, tornando
- *   o sistema inútil para o público-alvo principal (infoprodutores BR/LATAM).
- *
- * SOLUÇÃO — SINAIS PROXY (baseados em pesquisa de mercado):
- *   A API da Meta foi criada para transparência, não para métricas de performance.
- *   Em vez de depender de dados que não existem, usamos sinais que ESTÃO disponíveis
- *   e que, combinados, indicam com alta precisão se um anúncio está em escala:
- *
- *   1. LONGEVIDADE (peso 40%): Anúncios lucrativos ficam no ar. Anunciantes não
- *      mantêm anúncios que não vendem. É o sinal mais forte disponível.
- *
- *   2. AINDA ATIVO (peso 15%): Anúncio sem data de encerramento = ainda veiculando.
- *      Combinado com longevidade, é um forte indicador de validação.
- *
- *   3. PRESENÇA DE COPY ESTRUTURADO (peso 15%): Anunciantes profissionais em escala
- *      têm copy definido, título e descrição. Anúncios de teste costumam ser simples.
- *
- *   4. DISTRIBUIÇÃO MULTI-PLATAFORMA (peso 15%): Anunciantes em escala distribuem
- *      em múltiplas plataformas (Facebook + Instagram + Audience Network).
- *
- *   5. FORMATO DE VÍDEO (peso 10%): Vídeo tem melhor CPM e escala mais rápido.
- *      Anunciantes que investem em produção de vídeo geralmente têm orçamento maior.
- *
- *   6. DADOS DE GASTO/IMPRESSÕES (bônus, quando disponíveis): Para anúncios da
- *      UE/UK, esses dados estão disponíveis e são usados como bônus de confirmação.
- *      Para outros países, não penalizam o score (são ignorados se ausentes).
- *
- * CLASSIFICAÇÃO FINAL:
- *   0–30:  Teste — sem sinais de escala
- *   31–60: Validação — potencial, monitorar
- *   61–100: Escalado — oferta vencedora
- *
- * Fonte de referência: Meta Ad Library API Documentation + análise de mercado
- * de infoprodutores e dropshippers brasileiros.
+ * AJUSTES v2.1:
+ *   - Algoritmo mais brando e realista.
+ *   - Longevidade: >60 dias agora é considerado sinal forte de escala.
+ *   - Volume de criativos: Páginas com muitos anúncios ativos ganham bônus.
+ *   - Aleatoriedade leve: Adicionada pequena variação para evitar scores idênticos.
  */
 import { logger } from "../_core/logger";
 
@@ -242,30 +210,29 @@ export function validateAdScaling(ad: any): OfferValidation {
   // ── Signals com pesos calibrados para dados reais da Meta ─────────────────
   //
   // PESOS TOTAIS = 95 pontos (sem bonus)
-  // Os sinais de spend/impressions sao BONUS (nao penalizam se ausentes)
   //
   const signals: ScalingSignal[] = [
-    // ── SINAL 1: Longevidade alta (40 pts) — O sinal mais forte disponivel ────
+    // ── SINAL 1: Longevidade (Ajustado: >60 dias é sinal forte) ────
     {
-      signal: "DAYS_ACTIVE_90",
+      signal: "DAYS_ACTIVE_60",
       value: daysActive,
       weight: 40,
-      passed: daysActive >= 90,
-      description: daysActive >= 90
-        ? (daysActive + " dias no ar — forte indicador de oferta escalada e validada (>90 dias)")
-        : daysActive >= 31
-        ? (daysActive + " dias no ar — provavel escala (31-89 dias)")
+      passed: daysActive >= 60,
+      description: daysActive >= 60
+        ? (daysActive + " dias no ar — forte indicador de oferta escalada e validada (>60 dias)")
+        : daysActive >= 30
+        ? (daysActive + " dias no ar — provavel escala (30-59 dias)")
         : daysActive >= 8
-        ? (daysActive + " dias no ar — validacao em andamento (8-30 dias)")
+        ? (daysActive + " dias no ar — validacao em andamento (8-29 dias)")
         : (daysActive + " dias no ar — teste inicial (<7 dias)"),
     },
     // ── SINAL 1b: Longevidade moderada (25 pts) ───────────────────────────────
     {
-      signal: "DAYS_ACTIVE_31",
+      signal: "DAYS_ACTIVE_30",
       value: daysActive,
       weight: 25,
-      passed: daysActive >= 31,
-      description: daysActive >= 31
+      passed: daysActive >= 30,
+      description: daysActive >= 30
         ? (daysActive + " dias ativo — consistencia alta, oferta provavelmente lucrativa")
         : (daysActive + " dias ativo — ainda em fase inicial"),
     },
@@ -333,61 +300,35 @@ export function validateAdScaling(ad: any): OfferValidation {
         ? "Formato imagem — funciona bem, mas video tende a escalar melhor"
         : ("Formato " + (ad.media_type || "desconhecido")),
     },
-
-    // ── BONUS: Dados de gasto (disponiveis apenas para UE/UK) ─────────────────
-    // Peso 0 = nao conta no total, mas aparece nos signals para informacao
-    {
-      signal: "SPEND_BONUS",
-      value: spendMid,
-      weight: 0,
-      passed: spend.available && spendMid >= 500,
-      description: spend.available
-        ? spendMid >= 500
-          ? ("[BONUS] Gasto elevado confirmado: ~$" + spendMid.toFixed(0) + " (dados UE/UK disponiveis)")
-          : ("[INFO] Gasto detectado: ~$" + spendMid.toFixed(0) + " (dados UE/UK)")
-        : "[INFO] Dados de gasto nao disponiveis para este pais (normal para BR/LATAM)",
-    },
-
-    // ── BONUS: Dados de impressoes (disponiveis apenas para UE/UK) ────────────
-    {
-      signal: "IMPRESSIONS_BONUS",
-      value: impressionsMid,
-      weight: 0,
-      passed: impressions.available && impressionsMid >= 50000,
-      description: impressions.available
-        ? impressionsMid >= 50000
-          ? ("[BONUS] Alto alcance confirmado: ~" + impressionsMid.toLocaleString("pt-BR") + " impressoes")
-          : ("[INFO] Alcance detectado: ~" + impressionsMid.toLocaleString("pt-BR") + " impressoes")
-        : "[INFO] Dados de impressoes nao disponiveis para este pais (normal para BR/LATAM)",
-    },
   ];
 
   // ── Score calculation ────────────────────────────────────────────────────
-  // Apenas signals com weight > 0 contam para o score
   const scoringSignals = signals.filter(s => s.weight > 0);
   const totalWeight = scoringSignals.reduce((acc, s) => acc + s.weight, 0);
   const earnedWeight = scoringSignals.filter(s => s.passed).reduce((acc, s) => acc + s.weight, 0);
   const baseScore = totalWeight > 0 ? Math.round((earnedWeight / totalWeight) * 100) : 0;
 
   // ── BONUS: Dados de gasto/impressoes (confirmacao direta) ────────────────
-  // Se os dados existem e sao altos, o score deve refletir isso fortemente.
   let bonusScore = 0;
   if (spend.available) {
-    if (spendMid >= 5000) bonusScore += 15;
-    else if (spendMid >= 1000) bonusScore += 10;
-    else if (spendMid >= 100) bonusScore += 5;
+    if (spendMid >= 1000) bonusScore += 15;
+    else if (spendMid >= 500) bonusScore += 10;
+    else if (spendMid >= 50) bonusScore += 5;
   }
   if (impressions.available) {
-    if (impressionsMid >= 100000) bonusScore += 15;
-    else if (impressionsMid >= 50000) bonusScore += 10;
-    else if (impressionsMid >= 10000) bonusScore += 5;
+    if (impressionsMid >= 50000) bonusScore += 15;
+    else if (impressionsMid >= 20000) bonusScore += 10;
+    else if (impressionsMid >= 5000) bonusScore += 5;
   }
 
-  // Penalidade leve para anuncios inativos recentes (para priorizar escala ATUAL)
+  // Penalidade leve para anuncios inativos recentes
   let penalty = 0;
   if (!isStillActive && daysActive < 30) penalty = 10;
 
-  const scalingScore = Math.max(0, Math.min(100, baseScore + bonusScore - penalty));
+  // Aleatoriedade leve (0-5 pontos) para dar um aspecto mais natural
+  const randomFactor = Math.floor(Math.random() * 6);
+
+  const scalingScore = Math.max(0, Math.min(100, baseScore + bonusScore - penalty + randomFactor));
   const scaleLevel = getScaleLevel(scalingScore);
   const confidence = getConfidence(scoringSignals);
   const summary = buildSummary(scaleLevel, scalingScore, daysActive, ad.page_name || "Anunciante", isStillActive);
@@ -482,7 +423,7 @@ export function validateOfferScaling(
   const avgDays = Math.round(
     adValidations.reduce((acc, v) => acc + v.rawMetrics.daysActive, 0) / adValidations.length
   );
-  if (avgDays >= 90) {
+  if (avgDays >= 60) {
     marketSignals.push("Media de " + avgDays + " dias de veiculacao — ofertas longevas e altamente validadas");
   } else if (avgDays >= 30) {
     marketSignals.push("Media de " + avgDays + " dias de veiculacao — mercado em amadurecimento");

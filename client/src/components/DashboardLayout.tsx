@@ -17,7 +17,7 @@ import {
   ChevronRight,
   Target,
   ShieldCheck,
-  ExternalLink,
+
   Pickaxe,
   Trophy,
 } from "lucide-react";
@@ -377,17 +377,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </Button>
 
-            {/* Quick Link to Meta Library */}
-            <Button
-              variant="outline"
-              asChild
-              className="hidden sm:flex h-8 border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] text-[9px] font-black uppercase tracking-widest rounded-none px-3"
-            >
-              <a href="https://www.facebook.com/ads/library" target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3 h-3 mr-1.5" />
-                Meta Library
-              </a>
-            </Button>
+
 
             {/* Live indicator */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/[0.06]">
