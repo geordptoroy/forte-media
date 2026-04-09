@@ -67,7 +67,7 @@ export type InsertUserMetaCredentials = typeof userMetaCredentials.$inferInsert;
 
 /**
  * Anúncios competitivos favoritos do usuário.
- * Refatorado para incluir todos os campos da API ads_archive da Meta.
+ * Refatorado para incluir todos os campos da API ads_archive da Meta + Inteligência v3.
  */
 export const favoriteAds = mysqlTable(
   "favorite_ads",
@@ -98,6 +98,19 @@ export const favoriteAds = mysqlTable(
     demographicDistribution: json("demographic_distribution"),
     regionDistribution: json("region_distribution"),
     
+    // NOVO v3: URLs de Mídia CDN (Extração de Criativo Real)
+    cdnVideoUrl: text("cdn_video_url"),
+    cdnImageUrl: text("cdn_image_url"),
+    cdnThumbnailUrl: text("cdn_thumbnail_url"),
+    mediaExtractedAt: timestamp("media_extracted_at"),
+    
+    // NOVO v3: Metadados de Inteligência (Escala e Nicho)
+    scaleScore: int("scale_score").default(0).notNull(), // 0-100
+    scaleLevelLabel: varchar("scale_level_label", { length: 20 }).default("Teste").notNull(), // "Teste", "Média", "Alta", "Massiva"
+    niche: varchar("niche", { length: 64 }).default("Geral").notNull(), // "Infoproduto", "Nutra", "SaaS", "E-commerce", "Imobiliário", "Geral"
+    daysActive: int("days_active").default(0).notNull(),
+    isScaledAd: boolean("is_scaled_ad").default(false).notNull(), // True se score >= 70
+    
     // Internal Tracking
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -106,11 +119,89 @@ export const favoriteAds = mysqlTable(
   (table) => ({
     userIdIdx: index("fav_user_id_idx").on(table.userId),
     adIdIdx: index("fav_ad_id_idx").on(table.adId),
+    nicheIdx: index("fav_niche_idx").on(table.niche),
+    scaleScoreIdx: index("fav_scale_score_idx").on(table.scaleScore),
   })
 );
 
 export type FavoriteAd = typeof favoriteAds.$inferSelect;
 export type InsertFavoriteAd = typeof favoriteAds.$inferInsert;
+
+/**
+ * Tabela de Anúncios Escalados (Curadoria da Página "Escalados")
+ * Armazena os anúncios selecionados pelo algoritmo para exibição na página Escalados.
+ * Apenas anúncios com scaleScore >= 70 são incluídos.
+ */
+export const scaledAdsLibrary = mysqlTable(
+  "scaled_ads_library",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    adId: varchar("ad_id", { length: 64 }).notNull().unique(),
+    pageId: varchar("page_id", { length: 64 }).notNull(),
+    pageName: text("page_name"),
+    
+    // Mídia e Criativo
+    cdnVideoUrl: text("cdn_video_url"),
+    cdnImageUrl: text("cdn_image_url"),
+    cdnThumbnailUrl: text("cdn_thumbnail_url"),
+    adCreativeBodies: json("ad_creative_bodies").$type<string[]>().notNull().default([]),
+    
+    // Inteligência
+    scaleScore: int("scale_score").notNull(), // >= 70 para estar aqui
+    niche: varchar("niche", { length: 64 }).notNull(),
+    daysActive: int("days_active").notNull(),
+    publisherPlatforms: json("publisher_platforms").$type<string[]>().notNull().default([]),
+    
+    // Metadata
+    adDeliveryStartTime: timestamp("ad_delivery_start_time"),
+    adDeliveryStopTime: timestamp("ad_delivery_stop_time"),
+    
+    // Rastreamento
+    addedToLibraryAt: timestamp("added_to_library_at").defaultNow().notNull(),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().onUpdateNow().notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+  },
+  (table) => ({
+    adIdIdx: index("scaled_ad_id_idx").on(table.adId),
+    nicheIdx: index("scaled_niche_idx").on(table.niche),
+    scaleScoreIdx: index("scaled_score_idx").on(table.scaleScore),
+  })
+);
+
+export type ScaledAdLibrary = typeof scaledAdsLibrary.$inferSelect;
+export type InsertScaledAdLibrary = typeof scaledAdsLibrary.$inferInsert;
+
+/**
+ * Tabela de Log de Mineração de Anúncios
+ * Rastreia as buscas e filtros aplicados pelo usuário no Minerador.
+ */
+export const adMiningLog = mysqlTable(
+  "ad_mining_log",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("user_id").notNull(),
+    
+    // Filtros Aplicados
+    searchTerms: text("search_terms"),
+    nicheFilter: varchar("niche_filter", { length: 64 }),
+    minScaleScore: int("min_scale_score").default(0),
+    maxScaleScore: int("max_scale_score").default(100),
+    countriesFilter: json("countries_filter").$type<string[]>().notNull().default([]),
+    
+    // Resultados
+    resultsCount: int("results_count").default(0),
+    
+    // Rastreamento
+    executedAt: timestamp("executed_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("mining_user_id_idx").on(table.userId),
+    executedAtIdx: index("mining_executed_at_idx").on(table.executedAt),
+  })
+);
+
+export type AdMiningLog = typeof adMiningLog.$inferSelect;
+export type InsertAdMiningLog = typeof adMiningLog.$inferInsert;
 
 /**
  * Monitoramento contínuo de anúncios competitivos.

@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Escalados from "./pages/Escalados";
+import Minerador from "./pages/Minerador";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
 import { useEffect, type ComponentType } from "react";
@@ -55,6 +56,7 @@ function Router() {
 
       <PrivateRoute path="/dashboard" component={Dashboard} />
       <PrivateRoute path="/escalados" component={Escalados} />
+      <PrivateRoute path="/minerador" component={Minerador} />
       <PrivateRoute path="/settings" component={Settings} />
 
       <Route component={NotFound} />
