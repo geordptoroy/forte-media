@@ -1,0 +1,76 @@
+# ============================================================================
+# STAGE 1: Dependencies (Cache Layer)
+# ============================================================================
+FROM node:20-alpine AS dependencies
+WORKDIR /app
+
+# Instalar apenas ferramentas essenciais
+RUN corepack enable && \
+    apk add --no-cache python3 make g++ gcc musl-dev
+
+# Copiar apenas package.json e lock file (maximize cache)
+COPY package.json pnpm-lock.yaml ./
+COPY patches ./patches
+
+# Instalar dependências (com cache)
+RUN pnpm install --frozen-lockfile --prod && \
+    pnpm install --frozen-lockfile
+
+# ============================================================================
+# STAGE 2: Builder
+# ============================================================================
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copiar node_modules do stage anterior
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/pnpm-lock.yaml ./pnpm-lock.yaml
+
+# Copiar código fonte
+COPY package.json ./
+COPY server ./server
+COPY shared ./shared
+COPY drizzle ./drizzle
+COPY tsconfig.json ./
+COPY drizzle.config.ts ./
+
+# Build do backend
+RUN pnpm build:server
+
+# ============================================================================
+# STAGE 3: Runtime (Minimal Image)
+# ============================================================================
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=4000
+
+# Instalar apenas runtime essentials
+RUN apk add --no-cache netcat-openbsd wget curl dumb-init
+
+# Copiar apenas o necessário
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=dependencies /app/pnpm-lock.yaml ./
+
+# Copiar arquivos de configuração
+COPY drizzle ./drizzle
+COPY drizzle.config.js ./
+COPY shared ./shared
+
+# Copiar entrypoint
+COPY scripts/entrypoint.sh ./scripts/entrypoint.sh
+RUN chmod +x ./scripts/entrypoint.sh && \
+    sed -i 's/\r$//' ./scripts/entrypoint.sh
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=10s --retries=10 --start-period=60s \
+  CMD wget --quiet --tries=1 --spider http://localhost:4000/health || exit 1
+
+EXPOSE 4000
+
+# Usar dumb-init para melhor gerenciamento de sinais
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/bin/sh", "/app/scripts/entrypoint.sh"]

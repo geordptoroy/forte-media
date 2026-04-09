@@ -4,25 +4,43 @@ import { Component, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
+  fallback?: (error: Error, retry: () => void) => ReactNode;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+  retryCount: number;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, retryCount: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("[ErrorBoundary] Caught error:", error, errorInfo);
+  }
+
+  retry = () => {
+    this.setState(prev => ({
+      hasError: false,
+      error: null,
+      retryCount: prev.retryCount + 1,
+    }));
+  };
+
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.error) {
+      if (this.props.fallback) {
+        return this.props.fallback(this.state.error, this.retry);
+      }
+
       return (
         <div className="flex items-center justify-center min-h-screen p-8 bg-black">
           <div className="flex flex-col items-center w-full max-w-2xl p-8">
@@ -33,23 +51,35 @@ class ErrorBoundary extends Component<Props, State> {
               Erro Inesperado
             </h2>
             <p className="text-sm text-gray-500 mb-6 text-center">
-              Ocorreu um erro inesperado na aplicação. Recarregue a página para tentar novamente.
+              Ocorreu um erro inesperado na aplicação. Tente novamente ou recarregue a página.
             </p>
             <div className="p-4 w-full rounded-xl bg-white/5 border border-white/10 overflow-auto mb-6">
               <pre className="text-xs text-gray-400 whitespace-pre-wrap break-all">
                 {this.state.error?.message}
               </pre>
             </div>
-            <button
-              onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold uppercase tracking-widest",
-                "bg-white text-black hover:bg-gray-100 transition-colors"
-              )}
-            >
-              <RotateCcw size={16} />
-              Recarregar Página
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={this.retry}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold uppercase tracking-widest",
+                  "bg-white text-black hover:bg-gray-100 transition-colors"
+                )}
+              >
+                <RotateCcw size={16} />
+                Tentar Novamente
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className={cn(
+                  "flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-bold uppercase tracking-widest",
+                  "bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                )}
+              >
+                <RotateCcw size={16} />
+                Recarregar Página
+              </button>
+            </div>
           </div>
         </div>
       );

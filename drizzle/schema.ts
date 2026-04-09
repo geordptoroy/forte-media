@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, decimal, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, decimal, index, uniqueIndex } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -20,7 +20,10 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
-});
+}, (table) => ({
+  emailIdx: uniqueIndex("users_email_idx").on(table.email),
+  createdAtIdx: index("users_created_at_idx").on(table.createdAt),
+}));
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -58,7 +61,8 @@ export const userMetaCredentials = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userIdIdx: index("user_id_idx").on(table.userId),
+    userIdIdx: uniqueIndex("user_id_idx").on(table.userId),
+    isValidIdx: index("user_is_valid_idx").on(table.isValid),
   })
 );
 
@@ -117,10 +121,14 @@ export const favoriteAds = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userIdIdx: index("fav_user_id_idx").on(table.userId),
-    adIdIdx: index("fav_ad_id_idx").on(table.adId),
+    // Composite indexes para queries comuns
+    userAdIdx: uniqueIndex("fav_user_ad_idx").on(table.userId, table.adId),
+    userNicheIdx: index("fav_user_niche_idx").on(table.userId, table.niche),
+    userScoreIdx: index("fav_user_score_idx").on(table.userId, table.scaleScore),
     nicheIdx: index("fav_niche_idx").on(table.niche),
     scaleScoreIdx: index("fav_scale_score_idx").on(table.scaleScore),
+    isScaledIdx: index("fav_is_scaled_idx").on(table.isScaledAd),
+    createdAtIdx: index("fav_created_at_idx").on(table.createdAt),
   })
 );
 
@@ -162,9 +170,11 @@ export const scaledAdsLibrary = mysqlTable(
     isActive: boolean("is_active").default(true).notNull(),
   },
   (table) => ({
-    adIdIdx: index("scaled_ad_id_idx").on(table.adId),
+    adIdIdx: uniqueIndex("scaled_ad_id_idx").on(table.adId),
     nicheIdx: index("scaled_niche_idx").on(table.niche),
     scaleScoreIdx: index("scaled_score_idx").on(table.scaleScore),
+    isActiveIdx: index("scaled_is_active_idx").on(table.isActive),
+    nicheActiveIdx: index("scaled_niche_active_idx").on(table.niche, table.isActive),
   })
 );
 
@@ -197,6 +207,7 @@ export const adMiningLog = mysqlTable(
   (table) => ({
     userIdIdx: index("mining_user_id_idx").on(table.userId),
     executedAtIdx: index("mining_executed_at_idx").on(table.executedAt),
+    userExecutedIdx: index("mining_user_executed_idx").on(table.userId, table.executedAt),
   })
 );
 
@@ -233,8 +244,9 @@ export const monitoredAds = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userIdIdx: index("mon_user_id_idx").on(table.userId),
-    adIdIdx: index("mon_ad_id_idx").on(table.adId),
+    userAdIdx: uniqueIndex("mon_user_ad_idx").on(table.userId, table.adId),
+    userStatusIdx: index("mon_user_status_idx").on(table.userId, table.monitoringStatus),
+    statusIdx: index("mon_status_idx").on(table.monitoringStatus),
   })
 );
 
@@ -272,8 +284,10 @@ export const userCampaigns = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userIdIdx: index("camp_user_id_idx").on(table.userId),
-    campaignIdIdx: index("camp_campaign_id_idx").on(table.campaignId),
+    userCampaignIdx: uniqueIndex("camp_user_campaign_idx").on(table.userId, table.campaignId),
+    userStatusIdx: index("camp_user_status_idx").on(table.userId, table.status),
+    statusIdx: index("camp_status_idx").on(table.status),
+    createdAtIdx: index("camp_created_at_idx").on(table.createdAt),
   })
 );
 
@@ -302,6 +316,7 @@ export const campaignMetricsHistory = mysqlTable(
   (table) => ({
     campaignIdIdx: index("hist_campaign_id_idx").on(table.campaignId),
     recordedAtIdx: index("hist_recorded_at_idx").on(table.recordedAt),
+    campaignRecordedIdx: index("hist_campaign_recorded_idx").on(table.campaignId, table.recordedAt),
   })
 );
 

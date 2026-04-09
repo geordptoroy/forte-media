@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "./_core/trpc";
+import { protectedProcedure, router, RATE_LIMIT_PRESETS } from "./_core/trpc";
 import { getDb } from "./db";
 import { favoriteAds, scaledAdsLibrary, adMiningLog } from "../drizzle/schema";
 import { eq, and, gte } from "drizzle-orm";
@@ -12,6 +12,29 @@ import {
   updateScaledAdsLibrary,
   searchAdsWithFilters,
 } from "./services/adIntelligenceService";
+import { handleError, withErrorHandling, validateInput } from "./_core/error-handler";
+import { appCache } from "./_core/cache";
+import { TRPCError } from "@trpc/server";
+
+/**
+ * Schemas de validação reutilizáveis
+ */
+const AdInputSchema = z.object({
+  adId: z.string().min(1),
+  pageId: z.string().min(1),
+  pageName: z.string().optional(),
+  adSnapshotUrl: z.string().url().optional(),
+  adDeliveryStartTime: z.date().optional(),
+  adDeliveryStopTime: z.date().optional(),
+  publisherPlatforms: z.array(z.string()).optional(),
+  adCreativeBodies: z.array(z.string()).optional(),
+  adCreativeLinkTitles: z.array(z.string()).optional(),
+  adCreativeLinkDescriptions: z.array(z.string()).optional(),
+  currency: z.string().optional(),
+  spend: z.any().optional(),
+  impressions: z.any().optional(),
+  notes: z.string().optional(),
+});
 
 /**
  * Ads Router - Refactored for Meta ads_archive API
@@ -23,50 +46,34 @@ export const adsRouter = router({
    * Get all favorite ads for the authenticated user
    */
   getFavorites: protectedProcedure.query(async ({ ctx }) => {
-    try {
+    return withErrorHandling(async () => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
+
+      // Tentar obter do cache primeiro
+      const cacheKey = `favorites:${ctx.user.id}`;
+      const cached = appCache.get(cacheKey);
+      if (cached) return { success: true, favorites: cached };
 
       const favorites = await db
         .select()
         .from(favoriteAds)
         .where(eq(favoriteAds.userId, ctx.user.id));
 
+      // Cachear por 5 minutos
+      appCache.set(cacheKey, favorites, 5 * 60 * 1000);
+
       return { success: true, favorites };
-    } catch (error) {
-      console.error("[Ads] getFavorites error:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to get favorites",
-        favorites: [],
-      };
-    }
+    }, "getFavorites");
   }),
 
   /**
    * Add an ad to favorites
    */
   addFavorite: protectedProcedure
-    .input(
-      z.object({
-        adId: z.string().min(1),
-        pageId: z.string().min(1),
-        pageName: z.string().optional(),
-        adSnapshotUrl: z.string().optional(),
-        adDeliveryStartTime: z.date().optional(),
-        adDeliveryStopTime: z.date().optional(),
-        publisherPlatforms: z.array(z.string()).optional(),
-        adCreativeBodies: z.array(z.string()).optional(),
-        adCreativeLinkTitles: z.array(z.string()).optional(),
-        adCreativeLinkDescriptions: z.array(z.string()).optional(),
-        currency: z.string().optional(),
-        spend: z.any().optional(),
-        impressions: z.any().optional(),
-        notes: z.string().optional(),
-      })
-    )
+    .input(AdInputSchema)
     .mutation(async ({ ctx, input }) => {
-      try {
+      return withErrorHandling(async () => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -98,39 +105,20 @@ export const adsRouter = router({
           notes: input.notes,
         });
 
+        // Invalidar cache
+        appCache.invalidate(`favorites:${ctx.user.id}`);
+
         return { success: true, message: "Ad added to favorites" };
-      } catch (error) {
-        console.error("[Ads] addFavorite error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to add favorite",
-        };
-      }
+      }, "addFavorite");
     }),
 
   /**
    * Toggle an ad in favorites (add if not exists, remove if exists)
    */
   toggleFavorite: protectedProcedure
-    .input(
-      z.object({
-        adId: z.string().min(1),
-        pageId: z.string().min(1),
-        pageName: z.string().optional(),
-        adSnapshotUrl: z.string().optional(),
-        adDeliveryStartTime: z.date().optional(),
-        adDeliveryStopTime: z.date().optional(),
-        publisherPlatforms: z.array(z.string()).optional(),
-        adCreativeBodies: z.array(z.string()).optional(),
-        adCreativeLinkTitles: z.array(z.string()).optional(),
-        adCreativeLinkDescriptions: z.array(z.string()).optional(),
-        currency: z.string().optional(),
-        spend: z.any().optional(),
-        impressions: z.any().optional(),
-      })
-    )
+    .input(AdInputSchema)
     .mutation(async ({ ctx, input }) => {
-      try {
+      return withErrorHandling(async () => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -140,12 +128,14 @@ export const adsRouter = router({
           .from(favoriteAds)
           .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
 
+        let action: "removed" | "added";
+
         if (existing.length > 0) {
           // Remove if exists
           await db
             .delete(favoriteAds)
             .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
-          return { success: true, action: "removed", message: "Removido dos favoritos" };
+          action = "removed";
         } else {
           // Add if not exists
           await db.insert(favoriteAds).values({
@@ -164,24 +154,27 @@ export const adsRouter = router({
             spend: input.spend,
             impressions: input.impressions,
           });
-          return { success: true, action: "added", message: "Adicionado aos favoritos" };
+          action = "added";
         }
-      } catch (error) {
-        console.error("[Ads] toggleFavorite error:", error);
+
+        // Invalidar cache
+        appCache.invalidate(`favorites:${ctx.user.id}`);
+
         return {
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to toggle favorite",
+          success: true,
+          action,
+          message: action === "removed" ? "Removido dos favoritos" : "Adicionado aos favoritos",
         };
-      }
+      }, "toggleFavorite");
     }),
 
   /**
    * Remove an ad from favorites
    */
   removeFavorite: protectedProcedure
-    .input(z.object({ adId: z.string() }))
+    .input(z.object({ adId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      try {
+      return withErrorHandling(async () => {
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
@@ -189,35 +182,42 @@ export const adsRouter = router({
           .delete(favoriteAds)
           .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
 
+        // Invalidar cache
+        appCache.invalidate(`favorites:${ctx.user.id}`);
+
         return { success: true };
-      } catch (error) {
-        console.error("[Ads] removeFavorite error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to remove favorite",
-        };
-      }
+      }, "removeFavorite");
     }),
 
   /**
-   * Search ads from Meta API by keywords
+   * Search ads from Meta API by keywords com rate limiting
    */
   searchByKeywords: protectedProcedure
     .input(
       z.object({
-        keywords: z.string().min(1),
+        keywords: z.string().min(1).max(500),
         countries: z.array(z.string()).default(["BR"]),
         adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "CREDIT_ADS", "EMPLOYMENT_ADS", "HOUSING_ADS"]).optional(),
         adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).optional(),
-        limit: z.number().min(1).max(1000).default(100),
+        limit: z.number().min(1).max(100).default(50),
         after: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      try {
+      return withErrorHandling(async () => {
+        // Rate limiting específico para busca
+        const key = `search:${ctx.user.id}`;
+        if (!ctx.rateLimiter.isAllowed(key, RATE_LIMIT_PRESETS.SEARCH.maxRequests, RATE_LIMIT_PRESETS.SEARCH.windowMs)) {
+          const info = ctx.rateLimiter.getInfo(key, RATE_LIMIT_PRESETS.SEARCH.maxRequests, RATE_LIMIT_PRESETS.SEARCH.windowMs);
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: `Rate limit exceeded. Retry after ${info.retryAfter} seconds`,
+          });
+        }
+
         const credentials = await getMetaCredentials(ctx.user.id);
 
-        if (!credentials || !credentials.accessToken) {
+        if (!credentials?.accessToken) {
           throw new Error("Meta API Access Token não configurado no servidor.");
         }
 
@@ -228,15 +228,19 @@ export const adsRouter = router({
           after: input.after,
         });
 
+        // Log da mineração
+        const db = await getDb();
+        if (db) {
+          await db.insert(adMiningLog).values({
+            userId: ctx.user.id,
+            searchTerms: input.keywords,
+            countriesFilter: input.countries,
+            resultsCount: result.data?.length || 0,
+          });
+        }
+
         return { success: true, ...result };
-      } catch (error) {
-        console.error("[Ads] searchByKeywords error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao buscar anúncios",
-          data: [],
-        };
-      }
+      }, "searchByKeywords");
     }),
 
   /**
@@ -249,15 +253,15 @@ export const adsRouter = router({
         countries: z.array(z.string()).default(["BR"]),
         adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "CREDIT_ADS", "EMPLOYMENT_ADS", "HOUSING_ADS"]).optional(),
         adActiveStatus: z.enum(["ACTIVE", "INACTIVE", "ALL"]).optional(),
-        limit: z.number().min(1).max(1000).default(100),
+        limit: z.number().min(1).max(100).default(50),
         after: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      try {
+      return withErrorHandling(async () => {
         const credentials = await getMetaCredentials(ctx.user.id);
 
-        if (!credentials || !credentials.accessToken) {
+        if (!credentials?.accessToken) {
           throw new Error("Meta API Access Token não configurado no servidor.");
         }
 
@@ -269,203 +273,116 @@ export const adsRouter = router({
         });
 
         return { success: true, ...result };
-      } catch (error) {
-        console.error("[Ads] searchByPages error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao buscar anúncios",
-          data: [],
-        };
-      }
+      }, "searchByPages");
     }),
 
   /**
    * Extract image from Meta Ad Library snapshot URL
    */
   extractThumbnail: protectedProcedure
-    .input(
-      z.object({
-        snapshotUrl: z.string().url("Invalid snapshot URL"),
-      })
-    )
+    .input(z.object({ snapshotUrl: z.string().url("Invalid snapshot URL") }))
     .query(async ({ input }) => {
-      try {
+      return withErrorHandling(async () => {
         const result = await extractImageFromSnapshotCached(input.snapshotUrl);
         return result;
-      } catch (error) {
-        console.error("[Ads] extractThumbnail error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to extract thumbnail",
-        };
-      }
+      }, "extractThumbnail");
     }),
 
   /**
-   * Processa inteligência de um anúncio individual
-   * Extrai mídia CDN, detecta nicho e calcula score de escala
+   * Process ad intelligence (scale score, niche detection)
    */
   processAdIntelligence: protectedProcedure
     .input(
       z.object({
-        adId: z.string().min(1),
-        snapshotUrl: z.string().url(),
-        deliveryStartTime: z.date().optional(),
-        publisherPlatforms: z.array(z.string()).default([]),
-        creativeBodies: z.array(z.string()).default([]),
+        adId: z.string(),
+        adData: z.any(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      try {
-        const credentials = await getMetaCredentials(ctx.user.id);
-        const accessToken = credentials?.accessToken || "";
-
-        const result = await processAdIntelligence(
-          input.adId,
-          input.snapshotUrl,
-          input.deliveryStartTime || null,
-          input.publisherPlatforms,
-          input.creativeBodies,
-          accessToken
-        );
-
-        // Atualizar o anúncio no banco se for favorito
+      return withErrorHandling(async () => {
         const db = await getDb();
-        if (db) {
-          await db
-            .update(favoriteAds)
-            .set({
-              scaleScore: result.intelligence.scaleScore,
-              scaleLevelLabel: result.intelligence.scaleLevelLabel,
-              niche: result.intelligence.niche,
-              daysActive: result.intelligence.daysActive,
-              isScaledAd: result.intelligence.isScaledAd,
-              cdnVideoUrl: result.media.videoUrl,
-              cdnImageUrl: result.media.imageUrl,
-              cdnThumbnailUrl: result.media.thumbnailUrl,
-              mediaExtractedAt: new Date(),
-            })
-            .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
-        }
+        if (!db) throw new Error("Database not available");
 
-        return { success: true, ...result };
-      } catch (error) {
-        console.error("[Ads] processAdIntelligence error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao processar inteligência",
-        };
-      }
+        const intelligence = await processAdIntelligence(input.adData);
+
+        // Atualizar favoriteAds com inteligência
+        await db
+          .update(favoriteAds)
+          .set({
+            scaleScore: intelligence.scaleScore,
+            scaleLevelLabel: intelligence.scaleLevelLabel,
+            niche: intelligence.niche,
+            daysActive: intelligence.daysActive,
+            isScaledAd: intelligence.scaleScore >= 70,
+          })
+          .where(and(eq(favoriteAds.userId, ctx.user.id), eq(favoriteAds.adId, input.adId)));
+
+        return { success: true, intelligence };
+      }, "processAdIntelligence");
     }),
 
   /**
-   * Obtém anúncios escalados (score >= 70) para a página Escalados
-   * Retorna anúncios embaralhados da biblioteca curada
+   * Get scaled ads (score >= 70)
    */
   getScaledAds: protectedProcedure
     .input(
       z.object({
-        limit: z.number().min(1).max(200).default(50),
         niche: z.string().optional(),
+        limit: z.number().min(1).max(100).default(20),
       })
     )
-    .query(async ({ ctx, input }) => {
-      try {
-        // Primeiro tentar da biblioteca curada
-        const libraryAds = await getRandomScaledAds(input.limit, input.niche);
+    .query(async ({ input }) => {
+      return withErrorHandling(async () => {
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
 
-        // Se não houver anúncios na biblioteca, buscar dos favoritos do usuário
-        if (libraryAds.length === 0) {
-          const db = await getDb();
-          if (!db) throw new Error("Database not available");
+        const cacheKey = `scaled:${input.niche || "all"}:${input.limit}`;
+        const cached = appCache.get(cacheKey);
+        if (cached) return { success: true, ads: cached };
 
-          const userScaledAds = await db
-            .select()
-            .from(favoriteAds)
-            .where(and(eq(favoriteAds.userId, ctx.user.id), gte(favoriteAds.scaleScore, 70)));
+        const ads = await getRandomScaledAds(input.niche, input.limit);
 
-          const filtered = input.niche
-            ? userScaledAds.filter((ad) => ad.niche === input.niche)
-            : userScaledAds;
+        appCache.set(cacheKey, ads, 10 * 60 * 1000); // 10 min
 
-          const shuffled = filtered.sort(() => Math.random() - 0.5);
-          return { success: true, ads: shuffled.slice(0, input.limit) };
-        }
-
-        return { success: true, ads: libraryAds };
-      } catch (error) {
-        console.error("[Ads] getScaledAds error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro ao buscar anúncios escalados",
-          ads: [],
-        };
-      }
+        return { success: true, ads };
+      }, "getScaledAds");
     }),
 
   /**
-   * Busca avançada de anúncios com filtros de score, nicho e keywords
-   * Usado pelo Minerador para encontrar anúncios relevantes
+   * Search ads with advanced filters
    */
   searchWithFilters: protectedProcedure
     .input(
       z.object({
         keywords: z.string().optional(),
         niche: z.string().optional(),
-        minScaleScore: z.number().min(0).max(100).default(0),
-        maxScaleScore: z.number().min(0).max(100).default(100),
-        limit: z.number().min(1).max(500).default(100),
+        minScore: z.number().min(0).max(100).default(0),
+        maxScore: z.number().min(0).max(100).default(100),
+        limit: z.number().min(1).max(100).default(50),
       })
     )
     .query(async ({ ctx, input }) => {
-      try {
-        const db = await getDb();
-
-        // Registrar log de mineração
-        if (db) {
-          await db.insert(adMiningLog).values({
-            userId: ctx.user.id,
-            searchTerms: input.keywords,
-            nicheFilter: input.niche,
-            minScaleScore: input.minScaleScore,
-            maxScaleScore: input.maxScaleScore,
-            resultsCount: 0,
-          });
-        }
-
-        const ads = await searchAdsWithFilters(ctx.user.id, {
+      return withErrorHandling(async () => {
+        const results = await searchAdsWithFilters({
           keywords: input.keywords,
           niche: input.niche,
-          minScaleScore: input.minScaleScore,
-          maxScaleScore: input.maxScaleScore,
+          minScore: input.minScore,
+          maxScore: input.maxScore,
           limit: input.limit,
         });
 
-        return { success: true, ads };
-      } catch (error) {
-        console.error("[Ads] searchWithFilters error:", error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "Erro na busca com filtros",
-          ads: [],
-        };
-      }
+        return { success: true, ads: results };
+      }, "searchWithFilters");
     }),
 
   /**
-   * Atualiza a biblioteca de anúncios escalados manualmente
-   * Sincroniza anúncios com score >= 70 para a tabela scaledAdsLibrary
+   * Update scaled ads library
    */
   updateScaledLibrary: protectedProcedure.mutation(async ({ ctx }) => {
-    try {
+    return withErrorHandling(async () => {
       const result = await updateScaledAdsLibrary();
-      return { success: true, ...result };
-    } catch (error) {
-      console.error("[Ads] updateScaledLibrary error:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Erro ao atualizar biblioteca",
-      };
-    }
+      appCache.invalidatePattern("scaled:.*");
+      return { success: true, updated: result };
+    }, "updateScaledLibrary");
   }),
 });
