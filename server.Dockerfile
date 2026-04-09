@@ -41,6 +41,7 @@ COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/drizzle ./drizzle
 COPY --from=builder /app/drizzle.config.js ./drizzle.config.js
 COPY --from=builder /app/scripts/entrypoint.sh ./scripts/entrypoint.sh
+COPY --from=builder /app/drizzle/init.sql ./drizzle/init.sql
 
 # Corrigir permissões e formato do entrypoint
 RUN chmod +x ./scripts/entrypoint.sh && \

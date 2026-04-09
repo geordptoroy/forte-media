@@ -93,3 +93,4 @@ const protectedRateLimit = t.middleware(async opts => {
 
 export const publicProcedureWithRateLimit = t.procedure.use(publicRateLimit);
 export const protectedProcedureWithRateLimit = t.procedure.use(protectedRateLimit);
+export { RATE_LIMIT_PRESETS };

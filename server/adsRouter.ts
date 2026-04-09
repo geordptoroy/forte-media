@@ -7,10 +7,10 @@ import { searchAdsByKeywords, searchAdsByPages } from "./services/metaAdsService
 import { extractImageFromSnapshotCached } from "./services/imageProxyService";
 import { getMetaCredentials } from "./metaCredentials";
 import {
-  processAdIntelligence,
-  getRandomScaledAds,
-  updateScaledAdsLibrary,
-  searchAdsWithFilters,
+  processAdIntelligenceOptimized as processAdIntelligence,
+  getScaledAdsWithFilters as getRandomScaledAds,
+  updateScaledLibraryOptimized as updateScaledAdsLibrary,
+  getScaledAdsWithFilters as searchAdsWithFilters,
 } from "./services/adIntelligenceService";
 import { handleError, withErrorHandling, validateInput } from "./_core/error-handler";
 import { appCache } from "./_core/cache";
@@ -303,7 +303,15 @@ export const adsRouter = router({
         const db = await getDb();
         if (!db) throw new Error("Database not available");
 
-        const intelligence = await processAdIntelligence(input.adData);
+        const intelligence = await processAdIntelligence(
+          input.adId,
+          input.adData.ad_snapshot_url,
+          input.adData.ad_delivery_start_time ? new Date(input.adData.ad_delivery_start_time) : null,
+          input.adData.publisher_platforms || [],
+          input.adData.ad_creative_bodies || [],
+          input.adData.spend,
+          input.adData.impressions
+        );
 
         // Atualizar favoriteAds com inteligência
         await db
@@ -340,7 +348,7 @@ export const adsRouter = router({
         const cached = appCache.get(cacheKey);
         if (cached) return { success: true, ads: cached };
 
-        const ads = await getRandomScaledAds(input.niche, input.limit);
+        const ads = await getRandomScaledAds(ctx.user.id, input.niche as any, 70, input.limit);
 
         appCache.set(cacheKey, ads, 10 * 60 * 1000); // 10 min
 
@@ -363,13 +371,12 @@ export const adsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       return withErrorHandling(async () => {
-        const results = await searchAdsWithFilters({
-          keywords: input.keywords,
-          niche: input.niche,
-          minScore: input.minScore,
-          maxScore: input.maxScore,
-          limit: input.limit,
-        });
+        const results = await searchAdsWithFilters(
+          ctx.user.id,
+          input.niche as any,
+          input.minScore,
+          input.limit
+        );
 
         return { success: true, ads: results };
       }, "searchWithFilters");
