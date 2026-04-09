@@ -1,18 +1,17 @@
 /**
- * Image Proxy Service — v3 (Otimizado)
+ * Image Proxy Service — v4 (Final)
  * ─────────────────────────────────────────────────────────────────────────────
  * 
- * DESCOBERTA: A Meta Ad Library não retorna ad_creative_images/videos diretamente.
- * Estratégia otimizada:
- * 
- * 1. Usar CHEERIO (parsing HTML rápido) em vez de regex para extrair og:image
- * 2. Implementar fallback para extrair imagem do texto do anúncio (OCR simples)
- * 3. Cache agressivo com hash do snapshot_url
- * 4. Suporte a CDN URLs do Facebook com validação melhorada
+ * Estratégia de Extração de Mídia:
+ * 1. Extrair URLs diretas de CDN (fbcdn.net) do HTML renderizado
+ * 2. Priorizar: vídeos > posters > imagens > placeholders
+ * 3. Validar URLs antes de retornar
+ * 4. Cache agressivo com TTL de 24h
  */
 
 import axios from 'axios';
 import { logger } from '../_core/logger';
+import { appCache } from '../_core/cache';
 
 interface ImageExtractionResult {
   success: boolean;
@@ -26,11 +25,59 @@ interface ImageExtractionResult {
 }
 
 /**
- * Extrai imagem do snapshot com estratégias otimizadas
+ * Extrai URLs de CDN do HTML renderizado
+ * Procura por: <video src="...">, <img src="...">, poster="..."
  */
-export async function extractImageFromSnapshotOptimized(
-  snapshotUrl: string,
-  adText?: string
+function extractCdnUrlsFromHtml(html: string): {
+  videoUrls: string[];
+  imageUrls: string[];
+  posterUrls: string[];
+} {
+  const result = {
+    videoUrls: [] as string[],
+    imageUrls: [] as string[],
+    posterUrls: [] as string[],
+  };
+
+  if (!html || typeof html !== 'string') return result;
+
+  // ── Extrair vídeos ─────────────────────────────────────────────────────
+  const videoRegex = /<video[^>]+src=["']([^"']+)["']/gi;
+  let match;
+  while ((match = videoRegex.exec(html)) !== null) {
+    const url = decodeHtmlEntities(match[1]);
+    if (url.includes('fbcdn.net') && url.includes('.mp4')) {
+      result.videoUrls.push(url);
+    }
+  }
+
+  // ── Extrair posters (thumbnails de vídeo) ──────────────────────────────
+  const posterRegex = /poster=["']([^"']+)["']/gi;
+  while ((match = posterRegex.exec(html)) !== null) {
+    const url = decodeHtmlEntities(match[1]);
+    if (url.includes('fbcdn.net') && (url.includes('.jpg') || url.includes('.png'))) {
+      result.posterUrls.push(url);
+    }
+  }
+
+  // ── Extrair imagens (excluindo ícones pequenos) ────────────────────────
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  while ((match = imgRegex.exec(html)) !== null) {
+    const url = decodeHtmlEntities(match[1]);
+    // Filtrar ícones pequenos (s60x60, s32x32, etc)
+    if (url.includes('fbcdn.net') && !url.includes('s60x60') && !url.includes('s32x32')) {
+      result.imageUrls.push(url);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extrai imagem do snapshot com priorização de CDN URLs
+ */
+export async function extractImageFromSnapshot(
+  snapshotUrl: string
 ): Promise<ImageExtractionResult> {
   if (!snapshotUrl) {
     return { success: false, error: 'URL do snapshot não fornecida' };
@@ -38,15 +85,13 @@ export async function extractImageFromSnapshotOptimized(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduzido de 8s para 5s
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     const response = await axios.get(snapshotUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'pt-BR,pt;q=0.9',
-        'Accept-Encoding': 'gzip, deflate',
-        'Cache-Control': 'max-age=3600',
       },
       timeout: 5000,
       maxRedirects: 3,
@@ -63,7 +108,42 @@ export async function extractImageFromSnapshotOptimized(
       return { success: false, error: 'Resposta vazia' };
     }
 
-    // ── Estratégia 1: og:image (Meta tags) ────────────────────────────────
+    // ── Estratégia 1: Extrair URLs diretas de CDN ──────────────────────
+    const { videoUrls, imageUrls, posterUrls } = extractCdnUrlsFromHtml(html);
+
+    // Prioridade: Vídeo > Poster > Imagem
+    if (videoUrls.length > 0) {
+      logger.debug('[ImageProxy] Vídeo CDN encontrado', { method: 'video-cdn' });
+      return {
+        success: true,
+        videoUrl: videoUrls[0],
+        thumbnailUrl: posterUrls[0] || undefined,
+        mediaType: 'video',
+        extractionMethod: 'video-cdn',
+      };
+    }
+
+    if (posterUrls.length > 0) {
+      logger.debug('[ImageProxy] Poster CDN encontrado', { method: 'poster-cdn' });
+      return {
+        success: true,
+        imageUrl: posterUrls[0],
+        mediaType: 'image',
+        extractionMethod: 'poster-cdn',
+      };
+    }
+
+    if (imageUrls.length > 0) {
+      logger.debug('[ImageProxy] Imagem CDN encontrada', { method: 'image-cdn' });
+      return {
+        success: true,
+        imageUrl: imageUrls[0],
+        mediaType: 'image',
+        extractionMethod: 'image-cdn',
+      };
+    }
+
+    // ── Estratégia 2: og:image (Meta tags) ─────────────────────────────
     const ogImageMatch = html.match(/<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i)
       || html.match(/<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:image["']/i);
 
@@ -80,22 +160,7 @@ export async function extractImageFromSnapshotOptimized(
       }
     }
 
-    // ── Estratégia 2: twitter:image ───────────────────────────────────────
-    const twitterMatch = html.match(/<meta\s+(?:name|property)=["']twitter:image["']\s+content=["']([^"']+)["']/i);
-    if (twitterMatch?.[1]) {
-      const imageUrl = decodeHtmlEntities(twitterMatch[1]);
-      if (isValidImageUrl(imageUrl)) {
-        logger.debug('[ImageProxy] twitter:image encontrado', { method: 'twitter:image' });
-        return {
-          success: true,
-          imageUrl,
-          mediaType: 'image',
-          extractionMethod: 'twitter:image',
-        };
-      }
-    }
-
-    // ── Estratégia 3: JSON-LD Schema ──────────────────────────────────────
+    // ── Estratégia 3: JSON-LD Schema ───────────────────────────────────
     const jsonLdMatch = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
     if (jsonLdMatch?.[1]) {
       try {
@@ -115,31 +180,13 @@ export async function extractImageFromSnapshotOptimized(
       }
     }
 
-    // ── Estratégia 4: Imagem em img tags (fallback) ───────────────────────
-    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
-    if (imgMatch?.[1]) {
-      const imageUrl = decodeHtmlEntities(imgMatch[1]);
-      if (isValidImageUrl(imageUrl) && !imageUrl.includes('logo') && !imageUrl.includes('icon')) {
-        logger.debug('[ImageProxy] img tag encontrada', { method: 'img-tag' });
-        return {
-          success: true,
-          imageUrl,
-          mediaType: 'image',
-          extractionMethod: 'img-tag',
-        };
-      }
-    }
-
-    // ── Estratégia 5: Gerar placeholder baseado em hash ────────────────────
-    // Se nenhuma imagem foi encontrada, gerar um placeholder com cor baseada no hash
-    const placeholderUrl = generatePlaceholderUrl(snapshotUrl, adText);
-    logger.debug('[ImageProxy] Usando placeholder gerado', { method: 'placeholder' });
-
+    // ── Fallback: Retornar snapshot para iframe ─────────────────────────
+    logger.debug('[ImageProxy] Usando snapshot como iframe', { method: 'iframe-fallback' });
     return {
       success: true,
-      imageUrl: placeholderUrl,
-      mediaType: 'placeholder',
-      extractionMethod: 'placeholder',
+      snapshotUrl,
+      mediaType: 'iframe',
+      extractionMethod: 'iframe-fallback',
     };
 
   } catch (error: any) {
@@ -157,7 +204,6 @@ export async function extractImageFromSnapshotOptimized(
 function extractImageFromJsonLd(data: any): string | null {
   if (!data) return null;
 
-  // Tentar várias propriedades comuns
   const possiblePaths = [
     data.image?.url,
     data.image,
@@ -176,55 +222,24 @@ function extractImageFromJsonLd(data: any): string | null {
   return null;
 }
 
-/**
- * Gera uma URL de placeholder usando serviço externo
- */
-function generatePlaceholderUrl(snapshotUrl: string, adText?: string): string {
-  // Usar Dicebear ou similar para gerar avatar baseado em hash
-  const hash = hashString(snapshotUrl + (adText || ''));
-  
-  // Opção 1: Dicebear Avatars (sem dependências externas)
-  return `https://api.dicebear.com/7.x/abstract/svg?seed=${hash}&scale=80`;
-  
-  // Opção 2: Placeholder.com (fallback)
-  // return `https://via.placeholder.com/600x400?text=${encodeURIComponent((adText || 'Ad').substring(0, 20))}`;
-}
-
-/**
- * Hash simples de string
- */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Converter para 32-bit integer
-  }
-  return Math.abs(hash).toString(16);
-}
-
 // ─── Cache Otimizado ─────────────────────────────────────────────────────────
 
 const extractionCache = new Map<string, { result: ImageExtractionResult; timestamp: number }>();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas (mais agressivo)
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
 
-export async function extractImageFromSnapshotCachedOptimized(
-  snapshotUrl: string,
-  adText?: string
+export async function extractImageFromSnapshotCached(
+  snapshotUrl: string
 ): Promise<ImageExtractionResult> {
   const now = Date.now();
-  const cacheKey = `${snapshotUrl}:${adText || ''}`;
-  const cached = extractionCache.get(cacheKey);
+  const cached = extractionCache.get(snapshotUrl);
 
   if (cached && now - cached.timestamp < CACHE_TTL) {
-    logger.debug('[ImageProxy] Cache hit', { cacheKey: cacheKey.substring(0, 50) });
+    logger.debug('[ImageProxy] Cache hit', { url: snapshotUrl.substring(0, 50) });
     return cached.result;
   }
 
-  const result = await extractImageFromSnapshotOptimized(snapshotUrl, adText);
-
-  // Cache todos os resultados (incluindo erros) por 1 hora
-  extractionCache.set(cacheKey, { result, timestamp: now });
+  const result = await extractImageFromSnapshot(snapshotUrl);
+  extractionCache.set(snapshotUrl, { result, timestamp: now });
 
   return result;
 }
@@ -248,32 +263,18 @@ setInterval(() => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isValidUrl(url: string): boolean {
-  if (!url || typeof url !== 'string') return false;
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function isValidImageUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
 
-  // Extensões de imagem comuns
   const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
   const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.avif', '.bmp'];
   const hasValidExtension = validExtensions.some(ext => cleanUrl.endsWith(ext));
 
-  // CDNs confiáveis
   const isTrustedCdn = url.includes('fbcdn.net')
     || url.includes('facebook.com')
     || url.includes('fbsbx.com')
     || url.includes('cloudinary.com')
-    || url.includes('imgix.net')
-    || url.includes('cdn')
-    || url.includes('api.dicebear.com');
+    || url.includes('imgix.net');
 
   try {
     new URL(url);
@@ -295,13 +296,4 @@ function decodeHtmlEntities(str: string): string {
   };
 
   return str.replace(/&[a-zA-Z0-9#]+;/g, (entity) => entities[entity] || entity);
-}
-
-/**
- * Função compatível com versão anterior
- */
-export async function extractImageFromSnapshotCached(
-  snapshotUrl: string
-): Promise<ImageExtractionResult> {
-  return extractImageFromSnapshotCachedOptimized(snapshotUrl);
 }
