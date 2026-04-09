@@ -29,7 +29,6 @@ const menuItems = [
     items: [
       { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca global de anúncios" },
       { icon: Trophy, label: "Escalados", href: "/escalados", description: "Seus anúncios salvos" },
-      { icon: Settings, label: "Configurações", href: "/settings", description: "Ajustes e Chaves API" },
     ]
   }
 ];
