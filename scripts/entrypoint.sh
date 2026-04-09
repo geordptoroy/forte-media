@@ -33,7 +33,7 @@ fi
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Syncing database schema..."
 # Usamos o ficheiro .js para evitar dependência de ts-node em produção
 if [ -f "drizzle.config.js" ]; then
-  ./node_modules/.bin/drizzle-kit push --config=drizzle.config.js --force
+  echo "n" | ./node_modules/.bin/drizzle-kit push --config=drizzle.config.js
   echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database schema synced successfully"
 else
   echo "!!! [$(date '+%Y-%m-%d %H:%M:%S')] Warning: drizzle.config.js not found, skipping migration"

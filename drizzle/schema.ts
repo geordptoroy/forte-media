@@ -21,7 +21,6 @@ export const users = mysqlTable("users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 }, (table) => ({
-  emailIdx: uniqueIndex("users_email_idx").on(table.email),
   createdAtIdx: index("users_created_at_idx").on(table.createdAt),
 }));
 
@@ -61,7 +60,6 @@ export const userMetaCredentials = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userIdIdx: uniqueIndex("user_id_idx").on(table.userId),
     isValidIdx: index("user_is_valid_idx").on(table.isValid),
   })
 );
@@ -170,7 +168,6 @@ export const scaledAdsLibrary = mysqlTable(
     isActive: boolean("is_active").default(true).notNull(),
   },
   (table) => ({
-    adIdIdx: uniqueIndex("scaled_ad_id_idx").on(table.adId),
     nicheIdx: index("scaled_niche_idx").on(table.niche),
     scaleScoreIdx: index("scaled_score_idx").on(table.scaleScore),
     isActiveIdx: index("scaled_is_active_idx").on(table.isActive),
