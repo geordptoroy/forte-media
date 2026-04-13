@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   CONSTRAINT `users_email_unique` UNIQUE(`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `users_created_at_idx` ON `users` (`createdAt`);
+CREATE INDEX `users_created_at_idx` ON `users` (`createdAt`);
 
 -- ============================================================
 -- Tabela: user_meta_credentials
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS `user_meta_credentials` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `user_is_valid_idx` ON `user_meta_credentials` (`is_valid`);
+CREATE INDEX `user_is_valid_idx` ON `user_meta_credentials` (`is_valid`);
 
 -- ============================================================
 -- Tabela: favorite_ads
@@ -94,12 +94,12 @@ CREATE TABLE IF NOT EXISTS `favorite_ads` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `fav_user_niche_idx` ON `favorite_ads` (`user_id`, `niche`);
-CREATE INDEX IF NOT EXISTS `fav_user_score_idx` ON `favorite_ads` (`user_id`, `scale_score`);
-CREATE INDEX IF NOT EXISTS `fav_niche_idx` ON `favorite_ads` (`niche`);
-CREATE INDEX IF NOT EXISTS `fav_scale_score_idx` ON `favorite_ads` (`scale_score`);
-CREATE INDEX IF NOT EXISTS `fav_is_scaled_idx` ON `favorite_ads` (`is_scaled_ad`);
-CREATE INDEX IF NOT EXISTS `fav_created_at_idx` ON `favorite_ads` (`created_at`);
+CREATE INDEX `fav_user_niche_idx` ON `favorite_ads` (`user_id`, `niche`);
+CREATE INDEX `fav_user_score_idx` ON `favorite_ads` (`user_id`, `scale_score`);
+CREATE INDEX `fav_niche_idx` ON `favorite_ads` (`niche`);
+CREATE INDEX `fav_scale_score_idx` ON `favorite_ads` (`scale_score`);
+CREATE INDEX `fav_is_scaled_idx` ON `favorite_ads` (`is_scaled_ad`);
+CREATE INDEX `fav_created_at_idx` ON `favorite_ads` (`created_at`);
 
 -- ============================================================
 -- Tabela: scaled_ads_library
@@ -126,10 +126,10 @@ CREATE TABLE IF NOT EXISTS `scaled_ads_library` (
   CONSTRAINT `scaled_ads_library_ad_id_unique` UNIQUE(`ad_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `scaled_niche_idx` ON `scaled_ads_library` (`niche`);
-CREATE INDEX IF NOT EXISTS `scaled_score_idx` ON `scaled_ads_library` (`scale_score`);
-CREATE INDEX IF NOT EXISTS `scaled_is_active_idx` ON `scaled_ads_library` (`is_active`);
-CREATE INDEX IF NOT EXISTS `scaled_niche_active_idx` ON `scaled_ads_library` (`niche`, `is_active`);
+CREATE INDEX `scaled_niche_idx` ON `scaled_ads_library` (`niche`);
+CREATE INDEX `scaled_score_idx` ON `scaled_ads_library` (`scale_score`);
+CREATE INDEX `scaled_is_active_idx` ON `scaled_ads_library` (`is_active`);
+CREATE INDEX `scaled_niche_active_idx` ON `scaled_ads_library` (`niche`, `is_active`);
 
 -- ============================================================
 -- Tabela: ad_mining_log
@@ -148,9 +148,9 @@ CREATE TABLE IF NOT EXISTS `ad_mining_log` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `mining_user_id_idx` ON `ad_mining_log` (`user_id`);
-CREATE INDEX IF NOT EXISTS `mining_executed_at_idx` ON `ad_mining_log` (`executed_at`);
-CREATE INDEX IF NOT EXISTS `mining_user_executed_idx` ON `ad_mining_log` (`user_id`, `executed_at`);
+CREATE INDEX `mining_user_id_idx` ON `ad_mining_log` (`user_id`);
+CREATE INDEX `mining_executed_at_idx` ON `ad_mining_log` (`executed_at`);
+CREATE INDEX `mining_user_executed_idx` ON `ad_mining_log` (`user_id`, `executed_at`);
 
 -- ============================================================
 -- Tabela: monitored_ads
@@ -175,8 +175,8 @@ CREATE TABLE IF NOT EXISTS `monitored_ads` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `mon_user_status_idx` ON `monitored_ads` (`user_id`, `monitoring_status`);
-CREATE INDEX IF NOT EXISTS `mon_status_idx` ON `monitored_ads` (`monitoring_status`);
+CREATE INDEX `mon_user_status_idx` ON `monitored_ads` (`user_id`, `monitoring_status`);
+CREATE INDEX `mon_status_idx` ON `monitored_ads` (`monitoring_status`);
 
 -- ============================================================
 -- Tabela: user_campaigns
@@ -210,9 +210,9 @@ CREATE TABLE IF NOT EXISTS `user_campaigns` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `camp_user_status_idx` ON `user_campaigns` (`user_id`, `status`);
-CREATE INDEX IF NOT EXISTS `camp_status_idx` ON `user_campaigns` (`status`);
-CREATE INDEX IF NOT EXISTS `camp_created_at_idx` ON `user_campaigns` (`created_at`);
+CREATE INDEX `camp_user_status_idx` ON `user_campaigns` (`user_id`, `status`);
+CREATE INDEX `camp_status_idx` ON `user_campaigns` (`status`);
+CREATE INDEX `camp_created_at_idx` ON `user_campaigns` (`created_at`);
 
 -- ============================================================
 -- Tabela: campaign_metrics_history
@@ -234,6 +234,6 @@ CREATE TABLE IF NOT EXISTS `campaign_metrics_history` (
   FOREIGN KEY (`campaign_id`) REFERENCES `user_campaigns`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX IF NOT EXISTS `hist_campaign_id_idx` ON `campaign_metrics_history` (`campaign_id`);
-CREATE INDEX IF NOT EXISTS `hist_recorded_at_idx` ON `campaign_metrics_history` (`recorded_at`);
-CREATE INDEX IF NOT EXISTS `hist_campaign_recorded_idx` ON `campaign_metrics_history` (`campaign_id`, `recorded_at`);
+CREATE INDEX `hist_campaign_id_idx` ON `campaign_metrics_history` (`campaign_id`);
+CREATE INDEX `hist_recorded_at_idx` ON `campaign_metrics_history` (`recorded_at`);
+CREATE INDEX `hist_campaign_recorded_idx` ON `campaign_metrics_history` (`campaign_id`, `recorded_at`);
