@@ -1,85 +1,58 @@
-# 🚀 FORTE MEDIA v3 - Intelligence & Performance Dashboard
+# FORTE MEDIA v3 - Inteligência & Performance
 
-Uma plataforma profissional de inteligência competitiva focada em anúncios do Meta (Facebook/Instagram), simplificada para máxima performance e facilidade de uso.
-
-Esta versão foi radicalmente reestruturada para focar no que realmente importa: **Mineração de Criativos** e **Anúncios Escalados**, com configuração simplificada via variáveis de ambiente.
+O **FORTE MEDIA** é uma plataforma profissional de inteligência competitiva focada na extração e análise de dados reais da **Meta Ads Library**. Esta versão foi radicalmente reestruturada para focar na captura exaustiva de dados e performance simplificada.
 
 ---
 
-## 🛠️ Funcionalidades Principais
+## 🚀 Funcionalidades Principais
 
-*   **🏆 Escalados:** Exibição diária dos 50 anúncios com maior tração e escala detectados pelo nosso algoritmo na Meta Ad Library.
-*   **⛏️ Minerador:** Busca poderosa por nichos e palavras-chave para encontrar criativos validados em qualquer região do mundo.
-*   **📊 Algoritmo de Score v4:** Sistema inteligente que analisa longevidade (>60 dias), volume de criativos e sinais de investimento para classificar o nível de escala de cada anúncio.
-*   **🔒 Configuração Simplificada:** Sem necessidade de configurar credenciais na interface. Tudo é gerido via `META_ACCESS_TOKEN` no servidor.
-
----
-
-## 🚀 Como Iniciar (Docker)
-
-A plataforma está totalmente automatizada. Para iniciar tudo (Base de Dados, Backend, Frontend, SSL e Migrations), basta um comando:
-
-### Windows (PowerShell)
-```powershell
-.\docker-start.ps1
-```
-
-### Linux / macOS (Makefile)
-```bash
-make up
-```
-*Ou simplesmente:* `docker compose up -d --build`
-
-Aceda em: **https://localhost**
+*   **⛏️ Minerador de Alta Performance:** Busca oficial na API da Meta com filtros de palavra-chave, localização e categoria.
+*   **📊 Raio-X de Anúncios:** Captura de métricas reais de escala (impressões, gastos, alcance estimado) e distribuição demográfica completa (idade, gênero e região).
+*   **💾 Biblioteca de Favoritos:** Salve criativos com todos os seus metadados ricos para análise de funil e criativos.
+*   **🔒 Segurança & Performance:** Gestão simplificada de tokens e cache otimizado para evitar limites da API da Meta.
 
 ---
 
-## ⚙️ Configuração de Ambiente (.env)
+## 🛠️ Tecnologia
 
-Para que a mineração funcione, você **deve** configurar o seu Access Token da Meta no arquivo `.env` na raiz do projeto:
-
-```env
-# --- META API (CONFIGURAÇÃO GLOBAL) ---
-# Obtenha o User Access Token em https://developers.facebook.com/tools/explorer/
-# Necessário permissão: ads_read
-META_ACCESS_TOKEN=seu_access_token_aqui
-
-# --- SEGURANÇA ---
-JWT_SECRET=uma_chave_secreta_longa
-ENCRYPTION_KEY=chave_de_32_caracteres_exatos
-
-# --- BANCO DE DADOS (DOCKER) ---
-DB_USER=forte_user
-DB_PASSWORD=forte_password
-DB_NAME=forte_media
-```
+- **Frontend:** React 19, TypeScript, TailwindCSS, Vite.
+- **Backend:** Node.js, tRPC (Type-safe API), Drizzle ORM.
+- **Banco de Dados:** MySQL 8.0.
+- **Infraestrutura:** Docker & Docker Compose, Nginx (Proxy Reverso com SSL).
 
 ---
 
-## 📁 Estrutura Simplificada
+## 📦 Como Iniciar
 
-O projeto foi limpo para manter apenas o essencial:
+### Pré-requisitos
+- Docker e Docker Compose instalados.
 
-| Página | Descrição |
-| :--- | :--- |
-| **Escalados** | Os 50 campeões do dia (atualizado às 00:00). |
-| **Minerador** | Busca livre por nichos com filtro de score em tempo real. |
-| **Configurações** | Gestão de perfil e segurança da conta. |
+### Instalação Simplificada
 
----
+1. Configure o seu Access Token da Meta no arquivo `.env` na raiz do projeto:
+   ```env
+   META_ACCESS_TOKEN=seu_token_aqui
+   JWT_SECRET=sua_chave_secreta
+   ```
 
-## 🛠️ Comandos Úteis
+2. Suba os containers:
+   ```bash
+   docker compose up --build
+   ```
 
-*   **Logs em tempo real:** `docker-compose logs -f`
-*   **Reiniciar serviços:** `docker-compose restart`
-*   **Limpar tudo:** `docker-compose down -v`
-
----
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+3. Acesse a plataforma em: **https://localhost**
 
 ---
 
-**Status:** ✅ Reestruturação Radical Concluída | **Versão:** 3.0.0 | **Stack:** React 19 + tRPC + Drizzle
+## 📂 Estrutura Refatorada
+
+O projeto foi limpo para manter apenas o essencial e funcional:
+
+- `/client`: Frontend React moderno e otimizado.
+- `/server`: Backend robusto com integração profunda com a Meta API.
+- `/drizzle`: Definições de esquema sincronizadas com o banco.
+- `/nginx`: Configurações de segurança e proxy.
+
+---
+
+**Status:** ✅ Refatoração Completa Concluída | **Versão:** 3.0.0 | **Foco:** Dados Reais da Meta

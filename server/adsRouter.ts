@@ -1,10 +1,14 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
-import * as metaAdsService from "./services/metaAdsService";
+import { router, protectedProcedure } from "./_core/trpc";
 import { getDb } from "./db";
 import { favoriteAds, adMiningLog } from "../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { logger } from "./_core/logger";
+import * as metaAdsService from "./services/metaAdsService";
+
+/**
+ * Ads Router — Gestão de Anúncios e Persistência de Dados Reais
+ */
 
 export const adsRouter = router({
   /**
@@ -24,18 +28,13 @@ export const adsRouter = router({
       try {
         const userId = ctx.user.id;
         const db = await getDb();
-        if (!db) throw new Error("Banco de dados indisponível");
         
         // Buscar credenciais da Meta do usuário
         const credentials = await db.query.userMetaCredentials.findFirst({
           where: (table, { eq }) => eq(table.userId, userId),
         });
 
-        if (!credentials || !credentials.encryptedAccessToken) {
-          return { success: false, error: "Credenciais da Meta não configuradas. Vá em Configurações." };
-        }
-
-        const accessToken = credentials.encryptedAccessToken;
+        const accessToken = credentials?.encryptedAccessToken || "";
 
         const result = await metaAdsService.searchAdsByKeywords(
           userId,
@@ -66,7 +65,7 @@ export const adsRouter = router({
     }),
 
   /**
-   * Favoritar/Desfavoritar anúncio
+   * Favoritar um anúncio capturando todos os metadados ricos (Raio-X)
    */
   toggleFavorite: protectedProcedure
     .input(
@@ -74,104 +73,92 @@ export const adsRouter = router({
         adId: z.string(),
         pageId: z.string(),
         pageName: z.string().optional(),
+        adSnapshotUrl: z.string().optional(),
+        adData: z.any().optional(), // Payload completo da Meta
       })
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
       const userId = ctx.user.id;
-      const { adId, pageId, pageName } = input;
 
       try {
-        const db = await getDb();
-        if (!db) throw new Error("Banco de dados indisponível");
-
+        // Verificar se já é favorito
         const existing = await db.query.favoriteAds.findFirst({
-          where: and(eq(favoriteAds.userId, userId), eq(favoriteAds.adId, adId)),
+          where: and(eq(favoriteAds.userId, userId), eq(favoriteAds.adId, input.adId)),
         });
 
         if (existing) {
-          await db.delete(favoriteAds).where(and(eq(favoriteAds.userId, userId), eq(favoriteAds.adId, adId)));
-          return { success: true, action: "removed", message: "Removido dos favoritos" };
+          // Remover dos favoritos
+          await db
+            .delete(favoriteAds)
+            .where(and(eq(favoriteAds.userId, userId), eq(favoriteAds.adId, input.adId)));
+          
+          return { success: true, action: "removed" };
         }
 
-        // Buscar detalhes completos do anúncio na Meta
-        const credentials = await db.query.userMetaCredentials.findFirst({
-          where: (table, { eq }) => eq(table.userId, userId),
+        // Se não enviou adData, busca na Meta antes de salvar
+        let ad = input.adData;
+        if (!ad) {
+          const credentials = await db.query.userMetaCredentials.findFirst({
+            where: (table, { eq }) => eq(table.userId, userId),
+          });
+          const metaResult = await metaAdsService.searchAdsByPages(
+            userId,
+            credentials?.encryptedAccessToken || "",
+            [input.pageId],
+            [],
+            { limit: 1 }
+          );
+          ad = metaResult.data?.find((a: any) => a.id === input.adId) || {};
+        }
+        
+        // Adicionar aos favoritos com metadados completos
+        await db.insert(favoriteAds).values({
+          userId,
+          adId: input.adId,
+          pageId: input.pageId,
+          pageName: input.pageName || ad.page_name,
+          adSnapshotUrl: input.adSnapshotUrl || ad.ad_snapshot_url,
+          adDeliveryStartTime: ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time) : null,
+          adDeliveryStopTime: ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : null,
+          publisherPlatforms: ad.publisher_platforms || [],
+          adCreativeBodies: ad.ad_creative_bodies || [],
+          adCreativeLinkTitles: ad.ad_creative_link_titles || [],
+          adCreativeLinkDescriptions: ad.ad_creative_link_descriptions || [],
+          adCreativeLinkCaptions: ad.ad_creative_link_captions || [],
+          languages: ad.languages || [],
+          currency: ad.currency,
+          spend: ad.spend,
+          impressions: ad.impressions,
+          estimatedAudienceSize: ad.estimated_audience_size,
+          demographicDistribution: ad.demographic_distribution,
+          deliveryByRegion: ad.delivery_by_region,
+          ageCountryGenderReachBreakdown: ad.age_country_gender_reach_breakdown,
+          targetLocations: ad.target_locations,
+          targetAges: ad.target_ages,
+          targetGender: ad.target_gender,
         });
 
-        if (!credentials) throw new Error("Credenciais não encontradas");
-
-        const metaResult = await metaAdsService.searchAdsByPages(
-          userId,
-          credentials.encryptedAccessToken,
-          [pageId],
-          [], 
-          { limit: 1 }
-        );
-
-        const adData = metaResult.data?.find((a: any) => a.id === adId);
-
-        if (!adData) {
-          await db.insert(favoriteAds).values({
-            userId,
-            adId,
-            pageId,
-            pageName,
-            publisherPlatforms: [],
-            adCreativeBodies: [],
-            adCreativeLinkTitles: [],
-            adCreativeLinkDescriptions: [],
-            adCreativeLinkCaptions: [],
-            languages: [],
-          });
-        } else {
-          await db.insert(favoriteAds).values({
-            userId,
-            adId,
-            pageId,
-            pageName: adData.page_name || pageName,
-            adSnapshotUrl: adData.ad_snapshot_url,
-            adDeliveryStartTime: adData.ad_delivery_start_time ? new Date(adData.ad_delivery_start_time) : null,
-            adDeliveryStopTime: adData.ad_delivery_stop_time ? new Date(adData.ad_delivery_stop_time) : null,
-            publisherPlatforms: adData.publisher_platforms || [],
-            adCreativeBodies: adData.ad_creative_bodies || [],
-            adCreativeLinkTitles: adData.ad_creative_link_titles || [],
-            adCreativeLinkDescriptions: adData.ad_creative_link_descriptions || [],
-            adCreativeLinkCaptions: adData.ad_creative_link_captions || [],
-            languages: adData.languages || [],
-            currency: adData.currency,
-            spend: adData.spend,
-            impressions: adData.impressions,
-            estimatedAudienceSize: adData.estimated_audience_size,
-            demographicDistribution: adData.demographic_distribution,
-            deliveryByRegion: adData.delivery_by_region,
-            ageCountryGenderReachBreakdown: adData.age_country_gender_reach_breakdown,
-            targetLocations: adData.target_locations,
-            targetAges: adData.target_ages,
-            targetGender: adData.target_gender,
-          });
-        }
-
-        return { success: true, action: "added", message: "Adicionado aos favoritos com dados completos" };
+        return { success: true, action: "added" };
       } catch (error: any) {
-        logger.error("[adsRouter] Erro em toggleFavorite", { error: error.message });
-        return { success: false, error: error.message };
+        logger.error("[Ads] Erro ao alternar favorito:", error);
+        throw new Error("Falha ao processar favorito.");
       }
     }),
 
   /**
-   * Listar favoritos do usuário
+   * Listar anúncios favoritos do usuário
    */
   getFavorites: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
     try {
-      const db = await getDb();
-      if (!db) throw new Error("Banco de dados indisponível");
-
       const favorites = await db.query.favoriteAds.findMany({
         where: eq(favoriteAds.userId, ctx.user.id),
-        orderBy: (table, { desc }) => [desc(table.createdAt)],
+        orderBy: [desc(favoriteAds.createdAt)],
       });
       return { success: true, data: favorites };
     } catch (error: any) {
+      logger.error("[Ads] Erro ao listar favoritos:", error);
       return { success: false, error: error.message };
     }
   }),

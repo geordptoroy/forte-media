@@ -3,16 +3,16 @@ import { logger } from '../_core/logger';
 import { appCache } from '../_core/cache';
 
 /**
- * Meta Ads Service — Enhanced to capture all available data
+ * Meta Ads Service — Optimized for Full Data Capture
  */
 
 const META_GRAPH_URL = 'https://graph.facebook.com/v21.0/ads_archive';
 
-// Token temporário fornecido pelo usuário para testes
-const TEMP_ACCESS_TOKEN = "EAAMuA4Ly8N0BRIi2Saek93TUvuhqBM7g0MST6eVojAk0picNTzwlP8zWTcqw6TlNbgQ3lYPuw0ymJOfQ1Ax2q8otACXKktvcGsJZCVy9F5kDZB4WzqIWjyyNqNZBoYpDMKkl6ZAoV4gqAZBlfh42yzvFsMSuWrvQ9zCnUUwmuqlRK2yY7J72FMoVXn9WkaRnpLaCdJUZCZBMMfpY8yb5y3RVF4nZAaYrH4BRLs2vlhRaeuejPYZBzknljhzCee1Pol6JZB0AQ53ljMpZCvPsnA2S29IkSG7ggcuZAqx110oZD";
+// Token temporário de teste (será substituído pelo token do usuário se disponível)
+const FALLBACK_ACCESS_TOKEN = "EAAMuA4Ly8N0BRIi2Saek93TUvuhqBM7g0MST6eVojAk0picNTzwlP8zWTcqw6TlNbgQ3lYPuw0ymJOfQ1Ax2q8otACXKktvcGsJZCVy9F5kDZB4WzqIWjyyNqNZBoYpDMKkl6ZAoV4gqAZBlfh42yzvFsMSuWrvQ9zCnUUwmuqlRK2yY7J72FMoVXn9WkaRnpLaCdJUZCZBMMfpY8yb5y3RVF4nZAaYrH4BRLs2vlhRaeuejPYZBzknljhzCee1Pol6JZB0AQ53ljMpZCvPsnA2S29IkSG7ggcuZAqx110oZD";
 
-// Lista exaustiva de campos para capturar o máximo de inteligência competitiva
-const META_ADS_FIELDS = [
+// Todos os campos suportados para máxima inteligência competitiva
+export const META_ADS_FIELDS = [
   'id',
   'ad_creative_bodies',
   'ad_creative_link_captions',
@@ -37,186 +37,101 @@ const META_ADS_FIELDS = [
   'estimated_audience_size'
 ].join(',');
 
-interface RetryConfig {
-  maxRetries: number;
-  initialDelayMs: number;
-  maxDelayMs: number;
-  backoffMultiplier: number;
-}
-
-const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 3,
-  initialDelayMs: 1000,
-  maxDelayMs: 10000,
-  backoffMultiplier: 2,
-};
-
-function classifyMetaError(error: any): {
-  type: 'rate_limit' | 'auth' | 'invalid_input' | 'server_error' | 'unknown';
-  retryable: boolean;
-  message: string;
-} {
-  const errorCode = error?.error?.code || error?.code;
-  const errorMessage = error?.error?.message || error?.message || '';
-
-  if (errorCode === 429 || [80004, 80006, 80007].includes(errorCode)) {
-    return { type: 'rate_limit', retryable: true, message: `Rate limit atingido.` };
-  }
-  if (errorCode === 401 || [190, 102].includes(errorCode)) {
-    return { type: 'auth', retryable: false, message: 'Token inválido ou expirado' };
-  }
-  if (errorCode === 400 || [2500, 2501].includes(errorCode)) {
-    return { type: 'invalid_input', retryable: false, message: `Entrada inválida: ${errorMessage}` };
-  }
-  if (errorCode === 500 || [1, 2].includes(errorCode)) {
-    return { type: 'server_error', retryable: true, message: 'Erro no servidor da Meta.' };
-  }
-  return { type: 'unknown', retryable: true, message: `Erro desconhecido: ${errorMessage}` };
-}
-
-async function requestWithRetry<T>(
-  url: string,
-  params: Record<string, any>,
-  config: RetryConfig = DEFAULT_RETRY_CONFIG
-): Promise<T> {
-  let lastError: any;
-  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
-    try {
-      const response = await axios.get(url, { params, timeout: 20000 });
-      return response.data;
-    } catch (error: any) {
-      lastError = error;
-      const classification = classifyMetaError(error.response?.data);
-      if (!classification.retryable || attempt === config.maxRetries) {
-        throw new Error(classification.message);
-      }
-      const delay = Math.min(config.initialDelayMs * Math.pow(config.backoffMultiplier, attempt), config.maxDelayMs);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  throw lastError;
+interface MetaSearchParams {
+  accessToken: string;
+  searchTerms?: string;
+  searchPageIds?: string[];
+  adReachedCountries?: string[];
+  adActiveStatus?: string;
+  adType?: string;
+  adDeliveryDateMin?: string;
+  adDeliveryDateMax?: string;
+  mediaType?: string;
+  publisherPlatforms?: string[];
+  limit?: number;
+  after?: string;
+  fields?: string;
 }
 
 /**
- * Compatibilidade legada para metaAdLibrary.ts
+ * Classifica e trata erros da Meta API
  */
-export async function searchAdsArchive(params: any): Promise<any> {
+function handleMetaError(error: any, context: string) {
+  const data = error.response?.data?.error || {};
+  const message = data.message || error.message;
+  const code = data.code;
+  const subcode = data.error_subcode;
+
+  logger.error(`[MetaAPI] ${context}`, { message, code, subcode });
+  
+  if (code === 190) throw new Error("Token da Meta expirado ou inválido.");
+  if (code === 17) throw new Error("Limite de requisições da Meta atingido (Rate Limit).");
+  
+  throw new Error(`Erro na API da Meta: ${message}`);
+}
+
+/**
+ * Função central de busca na Ads Library
+ */
+export async function fetchAdsArchive(params: MetaSearchParams) {
   const {
-    userId,
     accessToken,
     searchTerms,
     searchPageIds,
-    adReachedCountries,
-    adType,
-    adActiveStatus,
-    limit,
+    adReachedCountries = ['BR'],
+    adActiveStatus = 'ACTIVE',
+    adType = 'ALL',
+    limit = 25,
     after,
+    fields = META_ADS_FIELDS
   } = params;
 
-  // Se o token for o placeholder ou vazio, usa o token temporário de teste
-  const effectiveToken = (!accessToken || accessToken.includes("YOUR_") || accessToken.length < 20) 
-    ? TEMP_ACCESS_TOKEN 
-    : accessToken;
+  const effectiveToken = (!accessToken || accessToken.length < 20) ? FALLBACK_ACCESS_TOKEN : accessToken;
 
-  if (searchPageIds && searchPageIds.length > 0) {
-    return searchAdsByPages(userId, effectiveToken, searchPageIds, adReachedCountries, {
-      adType,
-      adActiveStatus,
-      limit,
-      after,
-    });
-  }
-
-  return searchAdsByKeywords(userId, effectiveToken, searchTerms, adReachedCountries, {
-    adType,
-    adActiveStatus,
-    limit,
-    after,
-  });
-}
-
-/**
- * Buscar anúncios por keywords (API Oficial)
- */
-export async function searchAdsByKeywords(
-  userId: number,
-  accessToken: string,
-  keywords: string,
-  countries: string[] = ['BR'],
-  options: {
-    adType?: string;
-    adActiveStatus?: string;
-    limit?: number;
-    after?: string;
-  } = {}
-): Promise<{ data: any[]; paging?: any }> {
-  const cacheKey = `meta:search:${keywords}:${countries.join(',')}:${options.adType}:${options.after || 'start'}`;
+  // Cache key baseada nos parâmetros principais
+  const cacheKey = `meta:search:${searchTerms || 'all'}:${adReachedCountries.join(',')}:${after || 'first'}`;
   const cached = appCache.get(cacheKey);
   if (cached) return cached;
 
-  const effectiveToken = (!accessToken || accessToken.includes("YOUR_") || accessToken.length < 20) 
-    ? TEMP_ACCESS_TOKEN 
-    : accessToken;
-
   try {
-    const result = await requestWithRetry<{ data: any[]; paging?: any }>(
-      `${META_GRAPH_URL}`,
-      {
-        access_token: effectiveToken,
-        search_terms: keywords,
-        ad_reached_countries: JSON.stringify(countries),
-        ad_active_status: options.adActiveStatus || 'ACTIVE',
-        ad_type: options.adType || 'ALL',
-        fields: META_ADS_FIELDS,
-        limit: options.limit || 50,
-        after: options.after,
-      }
-    );
+    const queryParams: any = {
+      access_token: effectiveToken,
+      ad_reached_countries: JSON.stringify(adReachedCountries),
+      ad_active_status: adActiveStatus,
+      ad_type: adType,
+      fields,
+      limit,
+    };
 
-    appCache.set(cacheKey, result, 30 * 60 * 1000); // 30 min cache
-    return result;
-  } catch (error: any) {
-    logger.error('[MetaAPI] Erro na busca por keywords', { keywords, error: error.message });
-    throw error;
+    if (searchTerms && searchTerms !== ".") queryParams.search_terms = searchTerms;
+    if (searchPageIds && searchPageIds.length > 0) queryParams.search_page_ids = JSON.stringify(searchPageIds);
+    if (after) queryParams.after = after;
+    if (params.adDeliveryDateMin) queryParams.ad_delivery_date_min = params.adDeliveryDateMin;
+    if (params.mediaType) queryParams.media_type = params.mediaType;
+
+    const response = await axios.get(META_GRAPH_URL, { params: queryParams });
+    
+    appCache.set(cacheKey, response.data, 15 * 60 * 1000); // 15 min cache
+    return response.data;
+  } catch (error) {
+    return handleMetaError(error, `Busca por ${searchTerms || 'páginas'}`);
   }
 }
 
 /**
- * Buscar anúncios por IDs de página
+ * Wrapper de compatibilidade legada (mantido para evitar quebras em outros módulos)
  */
-export async function searchAdsByPages(
-  userId: number,
-  accessToken: string,
-  pageIds: string[],
-  countries: string[] = ['BR'],
-  options: {
-    adType?: string;
-    adActiveStatus?: string;
-    limit?: number;
-    after?: string;
-  } = {}
-): Promise<{ data: any[]; paging?: any }> {
-  const effectiveToken = (!accessToken || accessToken.includes("YOUR_") || accessToken.length < 20) 
-    ? TEMP_ACCESS_TOKEN 
-    : accessToken;
-
-  try {
-    const result = await requestWithRetry<{ data: any[]; paging?: any }>(
-      `${META_GRAPH_URL}`,
-      {
-        access_token: effectiveToken,
-        publisher_ids: JSON.stringify(pageIds),
-        ad_reached_countries: JSON.stringify(countries),
-        ad_active_status: options.adActiveStatus || 'ACTIVE',
-        ad_type: options.adType || 'ALL',
-        fields: META_ADS_FIELDS,
-        limit: options.limit || 50,
-        after: options.after,
-      }
-    );
-    return result;
-  } catch (error: any) {
-    logger.error('[MetaAPI] Erro na busca por páginas', { pageIds, error: error.message });
-    throw error;
-  }
+export async function searchAdsArchive(params: any) {
+  return fetchAdsArchive({
+    accessToken: params.accessToken,
+    searchTerms: params.searchTerms,
+    searchPageIds: params.searchPageIds,
+    adReachedCountries: params.adReachedCountries,
+    adType: params.adType,
+    adActiveStatus: params.adActiveStatus,
+    limit: params.limit,
+    after: params.after,
+    adDeliveryDateMin: params.adDeliveryDateMin,
+    mediaType: params.mediaType
+  });
 }

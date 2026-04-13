@@ -1,10 +1,7 @@
 /**
- * Meta Ad Library API Service
- * ─────────────────────────────────────────────────────────────────────────────
- * Serviço de busca na Meta Ad Library — sem nenhuma lógica proprietária.
- * Apenas repassa os parâmetros para a API oficial da Meta e retorna os dados.
+ * Meta Ad Library API Service — Unified Refactor
  */
-import { searchAdsArchive } from "./services/metaAdsService";
+import { fetchAdsArchive, META_ADS_FIELDS } from "./services/metaAdsService";
 import { logger } from "./_core/logger";
 
 export interface AdLibraryAd {
@@ -18,12 +15,14 @@ export interface AdLibraryAd {
   ad_creative_bodies?: string[];
   ad_creative_link_titles?: string[];
   ad_creative_link_descriptions?: string[];
-  ad_creative_images?: Array<{ url: string; width?: number; height?: number }>;
-  ad_creative_videos?: Array<{ url?: string; thumbnail_url?: string }>;
+  ad_creative_link_captions?: string[];
   currency?: string;
-  spend?: { range?: string; min?: number; max?: number } | string | null;
-  impressions?: { range?: string; min?: number; max?: number } | string | null;
-  media_type?: string;
+  spend?: any;
+  impressions?: any;
+  estimated_audience_size?: any;
+  demographic_distribution?: any;
+  delivery_by_region?: any;
+  languages?: string[];
   ad_reached_countries?: string[];
 }
 
@@ -32,8 +31,8 @@ export interface AdLibrarySearchParams {
   searchTerms?: string;
   searchPageIds?: string[];
   countries: string[];
-  adType?: "ALL" | "POLITICAL_AND_ISSUE_ADS" | "CREDIT_ADS" | "EMPLOYMENT_ADS" | "HOUSING_ADS";
-  adActiveStatus?: "ACTIVE" | "INACTIVE" | "ALL";
+  adType?: string;
+  adActiveStatus?: string;
   adDeliveryDateMin?: string;
   adDeliveryDateMax?: string;
   mediaType?: string;
@@ -52,59 +51,28 @@ export interface AdLibrarySearchResult {
   };
 }
 
+/**
+ * Função principal de busca unificada
+ */
 export async function searchAdLibrary(
   accessToken: string,
   params: AdLibrarySearchParams
 ): Promise<AdLibrarySearchResult> {
-  const {
-    userId,
-    searchTerms,
-    searchPageIds,
-    countries,
-    adType,
-    adActiveStatus,
-    adDeliveryDateMin,
-    adDeliveryDateMax,
-    mediaType,
-    publisherPlatforms,
-    limit,
-    after,
-  } = params;
-
   try {
-    const result = await searchAdsArchive({
-      userId,
+    const result = await fetchAdsArchive({
       accessToken,
-      adReachedCountries: countries,
-      searchTerms: searchTerms || ".",
-      searchPageIds,
-      adType,
-      adActiveStatus: adActiveStatus || "ALL",
-      adDeliveryDateMin,
-      adDeliveryDateMax,
-      mediaType,
-      publisherPlatforms,
-      limit: limit || 25,
-      after,
-      fields: [
-        "id",
-        "page_id",
-        "page_name",
-        "ad_snapshot_url",
-        "ad_delivery_start_time",
-        "ad_delivery_stop_time",
-        "publisher_platforms",
-        "ad_creative_bodies",
-        "ad_creative_link_titles",
-        "ad_creative_link_descriptions",
-        "ad_creative_images",
-        "ad_creative_videos",
-        "currency",
-        "spend",
-        "impressions",
-        "media_type",
-        "ad_reached_countries",
-      ],
+      searchTerms: params.searchTerms,
+      searchPageIds: params.searchPageIds,
+      adReachedCountries: params.countries,
+      adType: params.adType,
+      adActiveStatus: params.adActiveStatus,
+      adDeliveryDateMin: params.adDeliveryDateMin,
+      adDeliveryDateMax: params.adDeliveryDateMax,
+      mediaType: params.mediaType,
+      publisherPlatforms: params.publisherPlatforms,
+      limit: params.limit,
+      after: params.after,
+      fields: META_ADS_FIELDS
     });
 
     return {
@@ -119,12 +87,14 @@ export async function searchAdLibrary(
         ad_creative_bodies: ad.ad_creative_bodies,
         ad_creative_link_titles: ad.ad_creative_link_titles,
         ad_creative_link_descriptions: ad.ad_creative_link_descriptions,
-        ad_creative_images: ad.ad_creative_images ?? [],
-        ad_creative_videos: ad.ad_creative_videos ?? [],
+        ad_creative_link_captions: ad.ad_creative_link_captions,
         currency: ad.currency,
-        spend: ad.spend ?? null,
-        impressions: ad.impressions ?? null,
-        media_type: ad.media_type,
+        spend: ad.spend,
+        impressions: ad.impressions,
+        estimated_audience_size: ad.estimated_audience_size,
+        demographic_distribution: ad.demographic_distribution,
+        delivery_by_region: ad.delivery_by_region,
+        languages: ad.languages,
         ad_reached_countries: ad.ad_reached_countries,
       })),
       paging: result.paging
@@ -137,7 +107,7 @@ export async function searchAdLibrary(
         : { cursors: { before: "", after: "" } },
     };
   } catch (error) {
-    logger.error("[Ad Library] Search error for user " + userId + ":", error);
+    logger.error(`[AdLibrary] Erro na busca unificada para usuário ${params.userId}:`, error);
     throw error;
   }
 }
