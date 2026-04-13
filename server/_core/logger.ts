@@ -77,6 +77,13 @@ class Logger extends EventEmitter {
     // Emit event for real-time streaming
     this.emit(`meta_event:${event.userId}`, event);
   }
+
+  /**
+   * Emits a generic event for SSE subscribers.
+   */
+  emitEvent(eventName: string, payload: any) {
+    this.emit(eventName, payload);
+  }
 }
 
 export const logger = new Logger();

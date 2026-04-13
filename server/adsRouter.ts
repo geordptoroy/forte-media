@@ -7,7 +7,7 @@ import { logger } from "./_core/logger";
 import * as metaAdsService from "./services/metaAdsService";
 
 /**
- * Ads Router — Gestão de Anúncios e Persistência de Dados Reais
+ * Ads Router — Refatorado para Gestão de Anúncios e Persistência de Dados Reais
  */
 
 export const adsRouter = router({
@@ -19,15 +19,18 @@ export const adsRouter = router({
       z.object({
         keywords: z.string(),
         countries: z.array(z.string()).default(["BR"]),
-        adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "HOUSING_ADS", "EMPLOYMENT_ADS", "CREDIT_ADS"]).default("ALL"),
+        adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS", "HOUSING_ADS", "EMPLOYMENT_ADS", "CREDIT_ADS", "FINANCIAL_PRODUCTS_AND_SERVICES_ADS"]).default("ALL"),
         limit: z.number().min(1).max(100).default(50),
         after: z.string().optional(),
+        mediaType: z.enum(["ALL", "IMAGE", "VIDEO", "MEME", "NONE"]).default("ALL"),
+        searchType: z.enum(["KEYWORD_UNORDERED", "KEYWORD_EXACT_PHRASE"]).default("KEYWORD_UNORDERED"),
       })
     )
     .query(async ({ input, ctx }) => {
       try {
         const userId = ctx.user.id;
         const db = await getDb();
+        if (!db) throw new Error("Banco de dados indisponível");
         
         // Buscar credenciais da Meta do usuário
         const credentials = await db.query.userMetaCredentials.findFirst({
@@ -45,6 +48,8 @@ export const adsRouter = router({
             adType: input.adType,
             limit: input.limit,
             after: input.after,
+            mediaType: input.mediaType,
+            searchType: input.searchType
           }
         );
 
@@ -79,6 +84,7 @@ export const adsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      if (!db) throw new Error("Banco de dados indisponível");
       const userId = ctx.user.id;
 
       try {
@@ -106,13 +112,13 @@ export const adsRouter = router({
             userId,
             credentials?.encryptedAccessToken || "",
             [input.pageId],
-            [],
+            ["BR"],
             { limit: 1 }
           );
           ad = metaResult.data?.find((a: any) => a.id === input.adId) || {};
         }
         
-        // Adicionar aos favoritos com metadados completos
+        // Adicionar aos favoritos com metadados completos (Extração Máxima)
         await db.insert(favoriteAds).values({
           userId,
           adId: input.adId,
@@ -137,6 +143,8 @@ export const adsRouter = router({
           targetLocations: ad.target_locations,
           targetAges: ad.target_ages,
           targetGender: ad.target_gender,
+          // Novos campos capturados
+          cdnImageUrl: ad.ad_snapshot_url, // Fallback para o snapshot
         });
 
         return { success: true, action: "added" };
@@ -151,6 +159,7 @@ export const adsRouter = router({
    */
   getFavorites: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
+    if (!db) throw new Error("Banco de dados indisponível");
     try {
       const favorites = await db.query.favoriteAds.findMany({
         where: eq(favoriteAds.userId, ctx.user.id),

@@ -1,11 +1,12 @@
 /**
- * Meta Ad Library API Service — Unified Refactor
+ * Meta Ad Library API Service — Refatorado para Extração Máxima de Dados
  */
-import { fetchAdsArchive, META_ADS_FIELDS } from "./services/metaAdsService";
+import { fetchAdsArchive, META_ADS_FIELDS, MetaSearchParams } from "./services/metaAdsService";
 import { logger } from "./_core/logger";
 
 export interface AdLibraryAd {
   id: string;
+  ad_creation_time?: string;
   page_id: string;
   page_name: string;
   ad_snapshot_url: string;
@@ -24,21 +25,16 @@ export interface AdLibraryAd {
   delivery_by_region?: any;
   languages?: string[];
   ad_reached_countries?: string[];
+  age_country_gender_reach_breakdown?: any;
+  target_locations?: any;
+  target_ages?: string[];
+  target_gender?: string;
+  eu_total_reach?: number;
+  br_total_reach?: number;
 }
 
-export interface AdLibrarySearchParams {
+export interface AdLibrarySearchParams extends Omit<MetaSearchParams, 'accessToken'> {
   userId: number;
-  searchTerms?: string;
-  searchPageIds?: string[];
-  countries: string[];
-  adType?: string;
-  adActiveStatus?: string;
-  adDeliveryDateMin?: string;
-  adDeliveryDateMax?: string;
-  mediaType?: string;
-  publisherPlatforms?: string[];
-  limit?: number;
-  after?: string;
 }
 
 export interface AdLibrarySearchResult {
@@ -48,11 +44,12 @@ export interface AdLibrarySearchResult {
       before: string;
       after: string;
     };
+    next?: string;
   };
 }
 
 /**
- * Função principal de busca unificada
+ * Função principal de busca unificada com mapeamento exaustivo de campos
  */
 export async function searchAdLibrary(
   accessToken: string,
@@ -61,23 +58,14 @@ export async function searchAdLibrary(
   try {
     const result = await fetchAdsArchive({
       accessToken,
-      searchTerms: params.searchTerms,
-      searchPageIds: params.searchPageIds,
-      adReachedCountries: params.countries,
-      adType: params.adType,
-      adActiveStatus: params.adActiveStatus,
-      adDeliveryDateMin: params.adDeliveryDateMin,
-      adDeliveryDateMax: params.adDeliveryDateMax,
-      mediaType: params.mediaType,
-      publisherPlatforms: params.publisherPlatforms,
-      limit: params.limit,
-      after: params.after,
+      ...params,
       fields: META_ADS_FIELDS
     });
 
     return {
       ads: (result.data || []).map((ad: any) => ({
         id: ad.id,
+        ad_creation_time: ad.ad_creation_time,
         page_id: ad.page_id,
         page_name: ad.page_name,
         ad_snapshot_url: ad.ad_snapshot_url,
@@ -96,6 +84,12 @@ export async function searchAdLibrary(
         delivery_by_region: ad.delivery_by_region,
         languages: ad.languages,
         ad_reached_countries: ad.ad_reached_countries,
+        age_country_gender_reach_breakdown: ad.age_country_gender_reach_breakdown,
+        target_locations: ad.target_locations,
+        target_ages: ad.target_ages,
+        target_gender: ad.target_gender,
+        eu_total_reach: ad.eu_total_reach,
+        br_total_reach: ad.br_total_reach,
       })),
       paging: result.paging
         ? {
@@ -103,6 +97,7 @@ export async function searchAdLibrary(
               before: result.paging.cursors?.before || "",
               after: result.paging.cursors?.after || "",
             },
+            next: result.paging.next
           }
         : { cursors: { before: "", after: "" } },
     };

@@ -3,17 +3,18 @@ import { logger } from '../_core/logger';
 import { appCache } from '../_core/cache';
 
 /**
- * Meta Ads Service — Optimized for Full Data Capture
+ * Meta Ads Service — Refatorado para Extração Máxima de Dados
  */
 
 const META_GRAPH_URL = 'https://graph.facebook.com/v21.0/ads_archive';
 
-// Token temporário de teste (será substituído pelo token do usuário se disponível)
-const FALLBACK_ACCESS_TOKEN = "EAAMuA4Ly8N0BRIi2Saek93TUvuhqBM7g0MST6eVojAk0picNTzwlP8zWTcqw6TlNbgQ3lYPuw0ymJOfQ1Ax2q8otACXKktvcGsJZCVy9F5kDZB4WzqIWjyyNqNZBoYpDMKkl6ZAoV4gqAZBlfh42yzvFsMSuWrvQ9zCnUUwmuqlRK2yY7J72FMoVXn9WkaRnpLaCdJUZCZBMMfpY8yb5y3RVF4nZAaYrH4BRLs2vlhRaeuejPYZBzknljhzCee1Pol6JZB0AQ53ljMpZCvPsnA2S29IkSG7ggcuZAqx110oZD";
+// Token temporário fornecido pelo usuário para testes e fallback
+const FALLBACK_ACCESS_TOKEN = "EAAMuA4Ly8N0BRC8aBQAbd8HSzkqt4sWx6qkrvZAKS2aILENfNWOe6dFkM2EBa9PWwDUFK1rFzyRUfjUY1K36zNefzQ527Dl4ZCsBrjG6iVxbof375BVSVXnlcN7aN6VRtWHXeR2xvTtxAdY3yPP2qhanoRbR2oLBD8dU7MKpB4a7z6e0Fa3DqXGDMlsOZAghMz1RPvBkEsSxW792lWWgEb3T4P1vi3akeUSiyMzZB4VZCyiz7THHdRBjumuk6xc44zpxAiUugHxqHdaVohXyBtYip93Q7wkQkSAZDZD";
 
-// Todos os campos suportados para máxima inteligência competitiva
+// Lista exaustiva de campos para capturar o máximo de inteligência competitiva
 export const META_ADS_FIELDS = [
   'id',
+  'ad_creation_time',
   'ad_creative_bodies',
   'ad_creative_link_captions',
   'ad_creative_link_descriptions',
@@ -34,27 +35,30 @@ export const META_ADS_FIELDS = [
   'target_ages',
   'target_gender',
   'age_country_gender_reach_breakdown',
-  'estimated_audience_size'
+  'estimated_audience_size',
+  'eu_total_reach',
+  'br_total_reach'
 ].join(',');
 
-interface MetaSearchParams {
+export interface MetaSearchParams {
   accessToken: string;
   searchTerms?: string;
   searchPageIds?: string[];
   adReachedCountries?: string[];
-  adActiveStatus?: string;
-  adType?: string;
+  adActiveStatus?: 'ACTIVE' | 'INACTIVE' | 'ALL';
+  adType?: 'ALL' | 'POLITICAL_AND_ISSUE_ADS' | 'HOUSING_ADS' | 'EMPLOYMENT_ADS' | 'CREDIT_ADS' | 'FINANCIAL_PRODUCTS_AND_SERVICES_ADS';
   adDeliveryDateMin?: string;
   adDeliveryDateMax?: string;
-  mediaType?: string;
+  mediaType?: 'ALL' | 'IMAGE' | 'VIDEO' | 'MEME' | 'NONE';
   publisherPlatforms?: string[];
+  searchType?: 'KEYWORD_UNORDERED' | 'KEYWORD_EXACT_PHRASE';
   limit?: number;
   after?: string;
   fields?: string;
 }
 
 /**
- * Classifica e trata erros da Meta API
+ * Classifica e trata erros da Meta API com logs detalhados
  */
 function handleMetaError(error: any, context: string) {
   const data = error.response?.data?.error || {};
@@ -62,16 +66,22 @@ function handleMetaError(error: any, context: string) {
   const code = data.code;
   const subcode = data.error_subcode;
 
-  logger.error(`[MetaAPI] ${context}`, { message, code, subcode });
+  logger.error(`[MetaAPI] Erro em ${context}`, { 
+    message, 
+    code, 
+    subcode,
+    stack: error.stack 
+  });
   
-  if (code === 190) throw new Error("Token da Meta expirado ou inválido.");
-  if (code === 17) throw new Error("Limite de requisições da Meta atingido (Rate Limit).");
+  if (code === 190) throw new Error("Token da Meta expirado ou inválido. Por favor, reconecte sua conta.");
+  if (code === 17 || code === 4 || code === 341) throw new Error("Limite de requisições da Meta atingido (Rate Limit). Tente novamente em alguns minutos.");
+  if (code === 10) throw new Error("Permissão insuficiente para acessar a Ad Library API.");
   
   throw new Error(`Erro na API da Meta: ${message}`);
 }
 
 /**
- * Função central de busca na Ads Library
+ * Função central de busca na Ads Library com suporte a cache e paginação
  */
 export async function fetchAdsArchive(params: MetaSearchParams) {
   const {
@@ -83,15 +93,29 @@ export async function fetchAdsArchive(params: MetaSearchParams) {
     adType = 'ALL',
     limit = 25,
     after,
-    fields = META_ADS_FIELDS
+    fields = META_ADS_FIELDS,
+    searchType = 'KEYWORD_UNORDERED'
   } = params;
 
   const effectiveToken = (!accessToken || accessToken.length < 20) ? FALLBACK_ACCESS_TOKEN : accessToken;
 
-  // Cache key baseada nos parâmetros principais
-  const cacheKey = `meta:search:${searchTerms || 'all'}:${adReachedCountries.join(',')}:${after || 'first'}`;
+  // Gerar chave de cache baseada nos parâmetros de busca
+  const cacheKey = `meta:v2:search:${JSON.stringify({
+    searchTerms,
+    searchPageIds,
+    adReachedCountries,
+    adActiveStatus,
+    adType,
+    limit,
+    after,
+    searchType
+  })}`;
+
   const cached = appCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    logger.info(`[MetaAPI] Retornando resultados do cache para: ${searchTerms || 'IDs de Página'}`);
+    return cached;
+  }
 
   try {
     const queryParams: any = {
@@ -101,17 +125,48 @@ export async function fetchAdsArchive(params: MetaSearchParams) {
       ad_type: adType,
       fields,
       limit,
+      search_type: searchType
     };
 
-    if (searchTerms && searchTerms !== ".") queryParams.search_terms = searchTerms;
-    if (searchPageIds && searchPageIds.length > 0) queryParams.search_page_ids = JSON.stringify(searchPageIds);
+    if (searchTerms && searchTerms.trim() !== "") {
+      queryParams.search_terms = searchTerms;
+    }
+    
+    if (searchPageIds && searchPageIds.length > 0) {
+      queryParams.search_page_ids = JSON.stringify(searchPageIds);
+    }
+    
     if (after) queryParams.after = after;
     if (params.adDeliveryDateMin) queryParams.ad_delivery_date_min = params.adDeliveryDateMin;
-    if (params.mediaType) queryParams.media_type = params.mediaType;
+    if (params.adDeliveryDateMax) queryParams.ad_delivery_date_max = params.adDeliveryDateMax;
+    if (params.mediaType && params.mediaType !== 'ALL') queryParams.media_type = params.mediaType;
+    if (params.publisherPlatforms && params.publisherPlatforms.length > 0) {
+      queryParams.publisher_platforms = JSON.stringify(params.publisherPlatforms);
+    }
 
-    const response = await axios.get(META_GRAPH_URL, { params: queryParams });
+    logger.info(`[MetaAPI] Iniciando busca: ${searchTerms || 'IDs de Página'} em ${adReachedCountries.join(', ')}`);
     
-    appCache.set(cacheKey, response.data, 15 * 60 * 1000); // 15 min cache
+    const startTime = Date.now();
+    const response = await axios.get(META_GRAPH_URL, { params: queryParams });
+    const duration = Date.now() - startTime;
+
+    logger.info(`[MetaAPI] Busca concluída em ${duration}ms. Resultados: ${response.data?.data?.length || 0}`);
+
+    // Emitir evento para o SSE Tracker
+    logger.emitEvent(`meta_event:${params.accessToken ? 'user' : 'system'}`, {
+      type: 'response',
+      service: 'ad_library',
+      action: 'search',
+      timestamp: new Date().toISOString(),
+      duration,
+      payload: {
+        count: response.data?.data?.length || 0,
+        terms: searchTerms,
+        countries: adReachedCountries
+      }
+    });
+
+    appCache.set(cacheKey, response.data, 10 * 60 * 1000); // 10 min cache
     return response.data;
   } catch (error) {
     return handleMetaError(error, `Busca por ${searchTerms || 'páginas'}`);
@@ -119,7 +174,43 @@ export async function fetchAdsArchive(params: MetaSearchParams) {
 }
 
 /**
- * Wrapper de compatibilidade legada (mantido para evitar quebras em outros módulos)
+ * Wrapper para busca por palavras-chave
+ */
+export async function searchAdsByKeywords(
+  userId: number,
+  accessToken: string,
+  keywords: string,
+  countries: string[],
+  options: Partial<MetaSearchParams> = {}
+) {
+  return fetchAdsArchive({
+    accessToken,
+    searchTerms: keywords,
+    adReachedCountries: countries,
+    ...options
+  });
+}
+
+/**
+ * Wrapper para busca por páginas
+ */
+export async function searchAdsByPages(
+  userId: number,
+  accessToken: string,
+  pageIds: string[],
+  countries: string[],
+  options: Partial<MetaSearchParams> = {}
+) {
+  return fetchAdsArchive({
+    accessToken,
+    searchPageIds: pageIds,
+    adReachedCountries: countries,
+    ...options
+  });
+}
+
+/**
+ * Wrapper de compatibilidade legada
  */
 export async function searchAdsArchive(params: any) {
   return fetchAdsArchive({
@@ -132,45 +223,9 @@ export async function searchAdsArchive(params: any) {
     limit: params.limit,
     after: params.after,
     adDeliveryDateMin: params.adDeliveryDateMin,
-    mediaType: params.mediaType
-  });
-}
-
-/**
- * Busca anúncios por palavras-chave (Compatibilidade com adsRouter)
- */
-export async function searchAdsByKeywords(
-  userId: number,
-  accessToken: string,
-  keywords: string,
-  countries: string[],
-  options: { adType?: string; limit?: number; after?: string } = {}
-) {
-  return fetchAdsArchive({
-    accessToken,
-    searchTerms: keywords,
-    adReachedCountries: countries,
-    adType: options.adType,
-    limit: options.limit,
-    after: options.after,
-  });
-}
-
-/**
- * Busca anúncios por IDs de páginas (Compatibilidade com adsRouter)
- */
-export async function searchAdsByPages(
-  userId: number,
-  accessToken: string,
-  pageIds: string[],
-  countries: string[],
-  options: { limit?: number; after?: string } = {}
-) {
-  return fetchAdsArchive({
-    accessToken,
-    searchPageIds: pageIds,
-    adReachedCountries: countries,
-    limit: options.limit,
-    after: options.after,
+    adDeliveryDateMax: params.adDeliveryDateMax,
+    mediaType: params.mediaType,
+    publisherPlatforms: params.publisherPlatforms,
+    searchType: params.searchType
   });
 }
