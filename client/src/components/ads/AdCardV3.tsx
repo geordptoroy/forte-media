@@ -63,14 +63,10 @@ function getMediaTypeIcon(mediaType?: string) {
 
 /**
  * AdPreviewFrameV3 - Exibe o criativo do anúncio.
- * Prioriza o iframe da snapshot_url para garantir que o criativo (imagem ou vídeo) apareça.
+ * ELIMINADO: Uso de iframes (snapshot_url) que são bloqueados pela Meta.
+ * SOLUÇÃO: Uso exclusivo de mídia direta (imagem/vídeo) via Proxy com Fingerprinting.
  */
 function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean }) {
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [iframeError, setIframeError] = useState(false);
-
-  const snapshotUrl = ad.ad_snapshot_url || ad.adSnapshotUrl;
-  
   // URLs de mídia direta (Imagens/Vídeos) capturadas pela API
   const directImageUrl = ad.ad_creative_images?.[0]?.url || ad.ad_creative_videos?.[0]?.thumbnail_url || ad.cdnImageUrl;
   const directVideoUrl = ad.ad_creative_videos?.[0]?.video_hd_url || ad.ad_creative_videos?.[0]?.video_sd_url || ad.cdnVideoUrl;
@@ -81,65 +77,42 @@ function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean 
   // Se tivermos vídeo direto, usamos o player nativo com proxy
   if (directVideoUrl) {
     return (
-      <video
-        src={getProxyUrl(directVideoUrl)}
-        poster={directImageUrl ? getProxyUrl(directImageUrl) : undefined}
-        className="w-full h-full object-cover"
-        controls={isModal}
-        autoPlay={!isModal}
-        muted
-        loop
-        playsInline
-      />
+      <div className="relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+        <video
+          src={getProxyUrl(directVideoUrl)}
+          poster={directImageUrl ? getProxyUrl(directImageUrl) : undefined}
+          className="w-full h-full object-cover"
+          controls={isModal}
+          autoPlay={!isModal}
+          muted
+          loop
+          playsInline
+        />
+      </div>
     );
   }
 
   // Se tivermos imagem direta, usamos a tag img com proxy
   if (directImageUrl) {
     return (
-      <img
-        src={getProxyUrl(directImageUrl)}
-        alt={ad.page_name || 'Criativo'}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-    );
-  }
-
-  // Fallback para o iframe da snapshot_url se não houver mídia direta
-  if (snapshotUrl && !iframeError) {
-    return (
-      <div className={cn(
-        "relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden",
-        !isModal && "pointer-events-none" // Evita interação no card, apenas no modal
-      )}>
-        {!iframeLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-zinc-950">
-            <div className="w-6 h-6 border-2 border-zinc-800 border-t-zinc-400 rounded-full animate-spin" />
-            <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">Carregando Criativo...</p>
-          </div>
-        )}
-        <iframe
-          src={snapshotUrl}
-          className={cn(
-            "w-full h-full border-0 transition-opacity duration-700 scale-[1.02]",
-            iframeLoaded ? "opacity-100" : "opacity-0"
-          )}
-          onLoad={() => setIframeLoaded(true)}
-          onError={() => setIframeError(true)}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          title={`Anuncio: ${ad.page_name}`}
+      <div className="relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+        <img
+          src={getProxyUrl(directImageUrl)}
+          alt={ad.page_name || 'Criativo'}
+          className="w-full h-full object-cover"
           loading="lazy"
         />
       </div>
     );
   }
 
+  // Fallback se não houver mídia direta disponível
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/50 gap-3 border border-dashed border-zinc-800 rounded-lg m-2">
       <ImageOff className="w-6 h-6 text-zinc-700" />
       <div className="text-center px-4">
-        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Preview Indisponível</p>
+        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Criativo Indisponível</p>
+        <p className="text-[8px] text-zinc-600 mt-1 uppercase">Acesse o link oficial abaixo</p>
       </div>
     </div>
   );
@@ -381,7 +354,7 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
                     <ExternalLink className="w-4 h-4" />
                   </a>
                   <p className="text-[8px] text-center text-zinc-700 font-bold uppercase tracking-widest">
-                    O criativo acima é carregado diretamente dos servidores da Meta.
+                    O criativo acima é carregado via Proxy Seguro com Mascaramento de Fingerprint.
                   </p>
                 </div>
               </div>
