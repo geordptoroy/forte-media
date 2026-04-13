@@ -7,7 +7,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
 import Minerador from "./pages/Minerador";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
@@ -53,12 +52,17 @@ function Router() {
       <PublicRoute path="/login" component={Login} />
       <PublicRoute path="/register" component={Register} />
 
-      <PrivateRoute path="/dashboard" component={Dashboard} />
-      {/* Redirecionar /escalados para /minerador já que a funcionalidade foi removida */}
+      {/* A página Minerador agora é a página principal do Dashboard */}
+      <PrivateRoute path="/dashboard" component={Minerador} />
+      
+      {/* Redirecionar rotas antigas para /dashboard */}
       <Route path="/escalados">
-        <Redirect to="/minerador" />
+        <Redirect to="/dashboard" />
       </Route>
-      <PrivateRoute path="/minerador" component={Minerador} />
+      <Route path="/minerador">
+        <Redirect to="/dashboard" />
+      </Route>
+
       <PrivateRoute path="/settings" component={Settings} />
 
       <Route component={NotFound} />

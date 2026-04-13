@@ -21,12 +21,12 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Unified Menu Structure - Simplified: Removed "Escalados"
+// Unified Menu Structure - Minerador is now the main Dashboard page
 const menuItems = [
   { 
     section: "FORTE ADS",
     items: [
-      { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca oficial de anúncios" },
+      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Busca oficial de anúncios" },
     ]
   }
 ];
@@ -209,7 +209,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-white truncate">{user?.name || "Usuário"}</p>
-                <p className="text-[9px] text-gray-600 font-bold truncate uppercase tracking-tighter">Plano Pro</p>
+                <p className="text-[9px] text-gray-600 font-bold uppercase tracking-tighter">Plano Pro</p>
               </div>
             </div>
           </div>
