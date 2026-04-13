@@ -1,6 +1,6 @@
 -- FORTE MEDIA Database Initialization
--- MySQL 8.0 Schema - Sincronizado com drizzle/schema.ts (v4)
--- Gerado automaticamente para garantir consistência com o Drizzle ORM
+-- MySQL 8.0 Schema
+-- Simplificado: Removida lógica de anúncios escalados e score proprietário
 
 -- Create database if not exists
 CREATE DATABASE IF NOT EXISTS `forte_media`;
@@ -81,11 +81,6 @@ CREATE TABLE IF NOT EXISTS `favorite_ads` (
   `cdn_image_url` text,
   `cdn_thumbnail_url` text,
   `media_extracted_at` timestamp NULL,
-  `scale_score` int NOT NULL DEFAULT 0,
-  `scale_level_label` varchar(20) NOT NULL DEFAULT 'Teste',
-  `niche` varchar(64) NOT NULL DEFAULT 'Geral',
-  `days_active` int NOT NULL DEFAULT 0,
-  `is_scaled_ad` boolean NOT NULL DEFAULT false,
   `notes` text,
   `created_at` timestamp NOT NULL DEFAULT (now()),
   `updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
@@ -94,42 +89,7 @@ CREATE TABLE IF NOT EXISTS `favorite_ads` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX `fav_user_niche_idx` ON `favorite_ads` (`user_id`, `niche`);
-CREATE INDEX `fav_user_score_idx` ON `favorite_ads` (`user_id`, `scale_score`);
-CREATE INDEX `fav_niche_idx` ON `favorite_ads` (`niche`);
-CREATE INDEX `fav_scale_score_idx` ON `favorite_ads` (`scale_score`);
-CREATE INDEX `fav_is_scaled_idx` ON `favorite_ads` (`is_scaled_ad`);
 CREATE INDEX `fav_created_at_idx` ON `favorite_ads` (`created_at`);
-
--- ============================================================
--- Tabela: scaled_ads_library
--- ============================================================
-CREATE TABLE IF NOT EXISTS `scaled_ads_library` (
-  `id` int AUTO_INCREMENT NOT NULL,
-  `ad_id` varchar(64) NOT NULL,
-  `page_id` varchar(64) NOT NULL,
-  `page_name` text,
-  `cdn_video_url` text,
-  `cdn_image_url` text,
-  `cdn_thumbnail_url` text,
-  `ad_creative_bodies` json NOT NULL,
-  `scale_score` int NOT NULL,
-  `niche` varchar(64) NOT NULL,
-  `days_active` int NOT NULL,
-  `publisher_platforms` json NOT NULL,
-  `ad_delivery_start_time` timestamp NULL,
-  `ad_delivery_stop_time` timestamp NULL,
-  `added_to_library_at` timestamp NOT NULL DEFAULT (now()),
-  `last_updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-  `is_active` boolean NOT NULL DEFAULT true,
-  CONSTRAINT `scaled_ads_library_id` PRIMARY KEY(`id`),
-  CONSTRAINT `scaled_ads_library_ad_id_unique` UNIQUE(`ad_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX `scaled_niche_idx` ON `scaled_ads_library` (`niche`);
-CREATE INDEX `scaled_score_idx` ON `scaled_ads_library` (`scale_score`);
-CREATE INDEX `scaled_is_active_idx` ON `scaled_ads_library` (`is_active`);
-CREATE INDEX `scaled_niche_active_idx` ON `scaled_ads_library` (`niche`, `is_active`);
 
 -- ============================================================
 -- Tabela: ad_mining_log
@@ -138,10 +98,8 @@ CREATE TABLE IF NOT EXISTS `ad_mining_log` (
   `id` int AUTO_INCREMENT NOT NULL,
   `user_id` int NOT NULL,
   `search_terms` text,
-  `niche_filter` varchar(64),
-  `min_scale_score` int DEFAULT 0,
-  `max_scale_score` int DEFAULT 100,
   `countries_filter` json NOT NULL,
+  `ad_type_filter` varchar(64),
   `results_count` int DEFAULT 0,
   `executed_at` timestamp NOT NULL DEFAULT (now()),
   CONSTRAINT `ad_mining_log_id` PRIMARY KEY(`id`),
@@ -150,7 +108,6 @@ CREATE TABLE IF NOT EXISTS `ad_mining_log` (
 
 CREATE INDEX `mining_user_id_idx` ON `ad_mining_log` (`user_id`);
 CREATE INDEX `mining_executed_at_idx` ON `ad_mining_log` (`executed_at`);
-CREATE INDEX `mining_user_executed_idx` ON `ad_mining_log` (`user_id`, `executed_at`);
 
 -- ============================================================
 -- Tabela: monitored_ads
@@ -225,7 +182,7 @@ CREATE TABLE IF NOT EXISTS `campaign_metrics_history` (
   `clicks` int NOT NULL,
   `conversions` int,
   `conversion_value` decimal(12,2),
-  `roas` decimal(5,2),
+  `roas?` decimal(5,2),
   `ctr` decimal(5,2),
   `cpc` decimal(8,2),
   `cpm` decimal(8,2),

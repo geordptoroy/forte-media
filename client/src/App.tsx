@@ -1,18 +1,17 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation, Redirect } from "wouter";
+import { Route, Switch, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import Escalados from "./pages/Escalados";
 import Minerador from "./pages/Minerador";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
-import { useEffect, type ComponentType } from "react";
+import { type ComponentType } from "react";
 
 function LoadingScreen() {
   return (
@@ -55,7 +54,10 @@ function Router() {
       <PublicRoute path="/register" component={Register} />
 
       <PrivateRoute path="/dashboard" component={Dashboard} />
-      <PrivateRoute path="/escalados" component={Escalados} />
+      {/* Redirecionar /escalados para /minerador já que a funcionalidade foi removida */}
+      <Route path="/escalados">
+        <Redirect to="/minerador" />
+      </Route>
       <PrivateRoute path="/minerador" component={Minerador} />
       <PrivateRoute path="/settings" component={Settings} />
 

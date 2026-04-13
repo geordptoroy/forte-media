@@ -3,30 +3,42 @@ import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { AdCardV3 } from "@/components/ads/AdCardV3";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, RefreshCcw, Pickaxe, Filter } from "lucide-react";
+import { Loader2, Search, Pickaxe, Filter, Globe, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { EmptyState } from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
 
+const COUNTRIES = [
+  { code: "BR", name: "Brasil" },
+  { code: "US", name: "Estados Unidos" },
+  { code: "PT", name: "Portugal" },
+  { code: "ES", name: "Espanha" },
+  { code: "ALL", name: "Todos" },
+];
+
+const AD_TYPES = [
+  { id: "ALL", name: "Todas as Categorias" },
+  { id: "POLITICAL_AND_ISSUE_ADS", name: "Temas, Eleições ou Política" },
+  { id: "HOUSING_ADS", name: "Moradia" },
+  { id: "EMPLOYMENT_ADS", name: "Emprego" },
+  { id: "CREDIT_ADS", name: "Crédito" },
+];
+
 export default function Minerador() {
   const [ads, setAds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchKeywords, setSearchKeywords] = useState("");
-  const [minScaleScore, setMinScaleScore] = useState(0);
-  const [maxScaleScore, setMaxScaleScore] = useState(100);
-  const [nicheFilter, setNicheFilter] = useState<string>("");
+  const [country, setCountry] = useState("BR");
+  const [adType, setAdType] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
 
-  const niches = ["Infoproduto", "Nutra", "SaaS", "E-commerce", "Imobiliário"];
-
-  const searchWithFiltersQuery = trpc.ads.searchWithFilters.useQuery(
+  const searchByKeywordsQuery = trpc.ads.searchByKeywords.useQuery(
     {
-      keywords: searchKeywords || undefined,
-      niche: nicheFilter || undefined,
-      minScaleScore,
-      maxScaleScore,
-      limit: 100,
+      keywords: searchKeywords,
+      countries: country === "ALL" ? [] : [country],
+      adType: adType as any,
+      limit: 50,
     },
     { enabled: false }
   );
@@ -39,10 +51,10 @@ export default function Minerador() {
 
     setIsLoading(true);
     try {
-      const result = await searchWithFiltersQuery.refetch();
-      if (result.data?.success && result.data?.ads) {
-        setAds(result.data.ads);
-        toast.success(`${result.data.ads.length} anúncios encontrados`);
+      const result = await searchByKeywordsQuery.refetch();
+      if (result.data?.success && result.data?.data) {
+        setAds(result.data.data);
+        toast.success(`${result.data.data.length} anúncios encontrados`);
       } else {
         toast.error(result.data?.error || "Erro ao buscar anúncios");
       }
@@ -51,7 +63,7 @@ export default function Minerador() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchKeywords, searchWithFiltersQuery]);
+  }, [searchKeywords, searchByKeywordsQuery]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -61,9 +73,8 @@ export default function Minerador() {
 
   const resetFilters = () => {
     setSearchKeywords("");
-    setMinScaleScore(0);
-    setMaxScaleScore(100);
-    setNicheFilter("");
+    setCountry("BR");
+    setAdType("ALL");
     setAds([]);
   };
 
@@ -78,7 +89,7 @@ export default function Minerador() {
               <h1 className="text-lg font-black text-white tracking-tight">Minerador</h1>
             </div>
             <p className="text-xs text-gray-600 font-medium">
-              Ferramenta avançada para minerar anúncios com filtros de escala, nicho e performance.
+              Busca oficial na Meta Ad Library por palavra-chave, localização e categoria.
             </p>
           </div>
           {ads.length > 0 && (
@@ -126,79 +137,66 @@ export default function Minerador() {
             </div>
           </div>
 
-          {/* Filtros Avançados */}
+          {/* Filtros Oficiais */}
           {showFilters && (
-            <div className="border-t border-white/[0.06] p-4 space-y-4">
-              {/* Escala de Score */}
+            <div className="border-t border-white/[0.06] p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Localização */}
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">
-                  Score de Escala: {minScaleScore} - {maxScaleScore}
-                </label>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={minScaleScore}
-                      onChange={(e) => setMinScaleScore(Math.min(parseInt(e.target.value), maxScaleScore))}
-                      className="w-full"
-                    />
-                    <p className="text-[8px] text-gray-600 mt-1">Mínimo</p>
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={maxScaleScore}
-                      onChange={(e) => setMaxScaleScore(Math.max(parseInt(e.target.value), minScaleScore))}
-                      className="w-full"
-                    />
-                    <p className="text-[8px] text-gray-600 mt-1">Máximo</p>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Globe className="w-3 h-3 text-gray-600" />
+                  <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Localização</label>
                 </div>
-              </div>
-
-              {/* Nicho */}
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Nicho</label>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setNicheFilter("")}
-                    className={cn(
-                      "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded border transition-all",
-                      nicheFilter === ""
-                        ? "bg-white text-black border-white"
-                        : "bg-transparent border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2]"
-                    )}
-                  >
-                    Todos
-                  </button>
-                  {niches.map((niche) => (
+                  {COUNTRIES.map((c) => (
                     <button
-                      key={niche}
-                      onClick={() => setNicheFilter(niche)}
+                      key={c.code}
+                      onClick={() => setCountry(c.code)}
                       className={cn(
                         "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded border transition-all",
-                        nicheFilter === niche
+                        country === c.code
                           ? "bg-white text-black border-white"
                           : "bg-transparent border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2]"
                       )}
                     >
-                      {niche}
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Categoria de Anúncio */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-3 h-3 text-gray-600" />
+                  <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Categoria de Anúncio</label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {AD_TYPES.map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => setAdType(type.id)}
+                      className={cn(
+                        "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded border transition-all",
+                        adType === type.id
+                          ? "bg-white text-black border-white"
+                          : "bg-transparent border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2]"
+                      )}
+                    >
+                      {type.name}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Reset Button */}
-              <button
-                onClick={resetFilters}
-                className="w-full px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded border border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2] transition-all"
-              >
-                Limpar Filtros
-              </button>
+              <div className="md:col-span-2">
+                <button
+                  onClick={resetFilters}
+                  className="w-full px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded border border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2] transition-all"
+                >
+                  Limpar Filtros
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -209,14 +207,14 @@ export default function Minerador() {
             {ads.length > 0 ? (
               ads.map((ad, idx) => (
                 <motion.div
-                  key={ad.id || ad.adId || idx}
+                  key={ad.id || idx}
                   layout
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <AdCardV3 ad={ad} showIntelligence={true} />
+                  <AdCardV3 ad={ad} showIntelligence={false} />
                 </motion.div>
               ))
             ) : (
@@ -226,8 +224,8 @@ export default function Minerador() {
                   title={isLoading ? "Minerando..." : "Comece a minerar"}
                   description={
                     isLoading
-                      ? "Buscando anúncios com seus critérios..."
-                      : "Digite uma palavra-chave e ajuste os filtros para encontrar os melhores anúncios para clonar."
+                      ? "Buscando anúncios oficiais na Meta..."
+                      : "Digite uma palavra-chave e ajuste a localização e categoria para encontrar anúncios oficiais."
                   }
                   actionLabel="Minerar Agora"
                   onAction={performSearch}

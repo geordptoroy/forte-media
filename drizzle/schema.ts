@@ -2,21 +2,14 @@ import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, de
 
 /**
  * Core user table backing auth flow.
- * Refactored for local authentication with email and password hash.
  */
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  /** User's full name */
   name: text("name"),
-  /** User's unique email address used for login */
   email: varchar("email", { length: 320 }).notNull().unique(),
-  /** BCrypt hashed password */
   passwordHash: text("password_hash"),
-  /** For tracking purposes, can be 'local' or other if added later */
   loginMethod: varchar("loginMethod", { length: 64 }).default("local"),
-  /** User role for permissions */
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  /** Timestamps */
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -29,33 +22,22 @@ export type InsertUser = typeof users.$inferInsert;
 
 /**
  * Armazenamento seguro de credenciais Meta API por usuário.
- * Cada usuário agora fornece seu próprio Access Token.
  */
 export const userMetaCredentials = mysqlTable(
   "user_meta_credentials",
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("user_id").notNull().unique(),
-    
-    // Meta Developer App Configuration (Optional if using User Token)
     metaAppId: varchar("meta_app_id", { length: 255 }),
     encryptedAppSecret: text("encrypted_app_secret"),
-    
-    // Access Token (User Token provided by the user in the UI)
     encryptedAccessToken: text("encrypted_access_token").notNull(),
     tokenHash: varchar("token_hash", { length: 64 }).notNull(),
-    
-    // Ad Account Configuration (Optional, for campaign management)
     adAccountId: varchar("ad_account_id", { length: 64 }),
     accountName: varchar("account_name", { length: 255 }),
-    
-    // Permissions and Validation
     permissions: json("permissions").$type<string[]>().notNull().default([]),
     isValid: boolean("is_valid").default(true).notNull(),
     lastValidatedAt: timestamp("last_validated_at"),
     validationError: text("validation_error"),
-    
-    // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
@@ -64,20 +46,15 @@ export const userMetaCredentials = mysqlTable(
   })
 );
 
-export type UserMetaCredentials = typeof userMetaCredentials.$inferSelect;
-export type InsertUserMetaCredentials = typeof userMetaCredentials.$inferInsert;
-
 /**
  * Anúncios competitivos favoritos do usuário.
- * Refatorado para incluir todos os campos da API ads_archive da Meta + Inteligência v3.
+ * Simplificado: Removida lógica de score e nicho proprietária.
  */
 export const favoriteAds = mysqlTable(
   "favorite_ads",
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("user_id").notNull(),
-    
-    // Meta API Fields
     adId: varchar("ad_id", { length: 64 }).notNull(),
     pageId: varchar("page_id", { length: 64 }).notNull(),
     pageName: text("page_name"),
@@ -85,131 +62,48 @@ export const favoriteAds = mysqlTable(
     adDeliveryStartTime: timestamp("ad_delivery_start_time"),
     adDeliveryStopTime: timestamp("ad_delivery_stop_time"),
     publisherPlatforms: json("publisher_platforms").$type<string[]>().notNull().default([]),
-    
-    // Creative Content
     adCreativeBodies: json("ad_creative_bodies").$type<string[]>().notNull().default([]),
     adCreativeLinkTitles: json("ad_creative_link_titles").$type<string[]>().notNull().default([]),
     adCreativeLinkDescriptions: json("ad_creative_link_descriptions").$type<string[]>().notNull().default([]),
-    
-    // Performance Data (Limited for common ads in BR)
     currency: varchar("currency", { length: 3 }),
     spend: json("spend").$type<{ min?: number; max?: number; range?: string }>(),
     impressions: json("impressions").$type<{ min?: number; max?: number; range?: string }>(),
-    
-    // Demographic and Regional (Political/EU only)
     demographicDistribution: json("demographic_distribution"),
     regionDistribution: json("region_distribution"),
-    
-    // NOVO v3: URLs de Mídia CDN (Extração de Criativo Real)
     cdnVideoUrl: text("cdn_video_url"),
     cdnImageUrl: text("cdn_image_url"),
     cdnThumbnailUrl: text("cdn_thumbnail_url"),
     mediaExtractedAt: timestamp("media_extracted_at"),
-    
-    // NOVO v3: Metadados de Inteligência (Escala e Nicho)
-    scaleScore: int("scale_score").default(0).notNull(), // 0-100
-    scaleLevelLabel: varchar("scale_level_label", { length: 20 }).default("Teste").notNull(), // "Teste", "Média", "Alta", "Massiva"
-    niche: varchar("niche", { length: 64 }).default("Geral").notNull(), // "Infoproduto", "Nutra", "SaaS", "E-commerce", "Imobiliário", "Geral"
-    daysActive: int("days_active").default(0).notNull(),
-    isScaledAd: boolean("is_scaled_ad").default(false).notNull(), // True se score >= 70
-    
-    // Internal Tracking
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    // Composite indexes para queries comuns
     userAdIdx: uniqueIndex("fav_user_ad_idx").on(table.userId, table.adId),
-    userNicheIdx: index("fav_user_niche_idx").on(table.userId, table.niche),
-    userScoreIdx: index("fav_user_score_idx").on(table.userId, table.scaleScore),
-    nicheIdx: index("fav_niche_idx").on(table.niche),
-    scaleScoreIdx: index("fav_scale_score_idx").on(table.scaleScore),
-    isScaledIdx: index("fav_is_scaled_idx").on(table.isScaledAd),
     createdAtIdx: index("fav_created_at_idx").on(table.createdAt),
   })
 );
 
-export type FavoriteAd = typeof favoriteAds.$inferSelect;
-export type InsertFavoriteAd = typeof favoriteAds.$inferInsert;
-
-/**
- * Tabela de Anúncios Escalados (Curadoria da Página "Escalados")
- * Armazena os anúncios selecionados pelo algoritmo para exibição na página Escalados.
- * Apenas anúncios com scaleScore >= 70 são incluídos.
- */
-export const scaledAdsLibrary = mysqlTable(
-  "scaled_ads_library",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    adId: varchar("ad_id", { length: 64 }).notNull().unique(),
-    pageId: varchar("page_id", { length: 64 }).notNull(),
-    pageName: text("page_name"),
-    
-    // Mídia e Criativo
-    cdnVideoUrl: text("cdn_video_url"),
-    cdnImageUrl: text("cdn_image_url"),
-    cdnThumbnailUrl: text("cdn_thumbnail_url"),
-    adCreativeBodies: json("ad_creative_bodies").$type<string[]>().notNull().default([]),
-    
-    // Inteligência
-    scaleScore: int("scale_score").notNull(), // >= 70 para estar aqui
-    niche: varchar("niche", { length: 64 }).notNull(),
-    daysActive: int("days_active").notNull(),
-    publisherPlatforms: json("publisher_platforms").$type<string[]>().notNull().default([]),
-    
-    // Metadata
-    adDeliveryStartTime: timestamp("ad_delivery_start_time"),
-    adDeliveryStopTime: timestamp("ad_delivery_stop_time"),
-    
-    // Rastreamento
-    addedToLibraryAt: timestamp("added_to_library_at").defaultNow().notNull(),
-    lastUpdatedAt: timestamp("last_updated_at").defaultNow().onUpdateNow().notNull(),
-    isActive: boolean("is_active").default(true).notNull(),
-  },
-  (table) => ({
-    nicheIdx: index("scaled_niche_idx").on(table.niche),
-    scaleScoreIdx: index("scaled_score_idx").on(table.scaleScore),
-    isActiveIdx: index("scaled_is_active_idx").on(table.isActive),
-    nicheActiveIdx: index("scaled_niche_active_idx").on(table.niche, table.isActive),
-  })
-);
-
-export type ScaledAdLibrary = typeof scaledAdsLibrary.$inferSelect;
-export type InsertScaledAdLibrary = typeof scaledAdsLibrary.$inferInsert;
-
 /**
  * Tabela de Log de Mineração de Anúncios
- * Rastreia as buscas e filtros aplicados pelo usuário no Minerador.
+ * Simplificado: Mantendo apenas termos de busca, localização e categoria.
  */
 export const adMiningLog = mysqlTable(
   "ad_mining_log",
   {
     id: int("id").autoincrement().primaryKey(),
     userId: int("user_id").notNull(),
-    
-    // Filtros Aplicados
     searchTerms: text("search_terms"),
-    nicheFilter: varchar("niche_filter", { length: 64 }),
-    minScaleScore: int("min_scale_score").default(0),
-    maxScaleScore: int("max_scale_score").default(100),
     countriesFilter: json("countries_filter").$type<string[]>().notNull().default([]),
-    
-    // Resultados
+    adTypeFilter: varchar("ad_type_filter", { length: 64 }),
     resultsCount: int("results_count").default(0),
-    
-    // Rastreamento
     executedAt: timestamp("executed_at").defaultNow().notNull(),
   },
   (table) => ({
     userIdIdx: index("mining_user_id_idx").on(table.userId),
     executedAtIdx: index("mining_executed_at_idx").on(table.executedAt),
-    userExecutedIdx: index("mining_user_executed_idx").on(table.userId, table.executedAt),
   })
 );
-
-export type AdMiningLog = typeof adMiningLog.$inferSelect;
-export type InsertAdMiningLog = typeof adMiningLog.$inferInsert;
 
 /**
  * Monitoramento contínuo de anúncios competitivos.
@@ -225,8 +119,6 @@ export const monitoredAds = mysqlTable(
     monitoringStatus: mysqlEnum("monitoring_status", ["active", "paused", "completed"]).default("active").notNull(),
     lastCheckedAt: timestamp("last_checked_at"),
     isStillActive: boolean("is_still_active").default(true).notNull(),
-    
-    // Historical Data for analysis
     lastKnownSpend: json("last_known_spend"),
     lastKnownImpressions: json("last_known_impressions"),
     metricsHistory: json("metrics_history").$type<Array<{ 
@@ -235,7 +127,6 @@ export const monitoredAds = mysqlTable(
       impressions?: any;
       isActive: boolean;
     }>>().notNull().default([]),
-    
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -246,9 +137,6 @@ export const monitoredAds = mysqlTable(
     statusIdx: index("mon_status_idx").on(table.monitoringStatus),
   })
 );
-
-export type MonitoredAd = typeof monitoredAds.$inferSelect;
-export type InsertMonitoredAd = typeof monitoredAds.$inferInsert;
 
 /**
  * Campanhas do usuário para análise de performance.
@@ -288,12 +176,6 @@ export const userCampaigns = mysqlTable(
   })
 );
 
-export type UserCampaign = typeof userCampaigns.$inferSelect;
-export type InsertUserCampaign = typeof userCampaigns.$inferInsert;
-
-/**
- * Histórico de métricas de campanhas para análise de tendências.
- */
 export const campaignMetricsHistory = mysqlTable(
   "campaign_metrics_history",
   {
@@ -316,6 +198,3 @@ export const campaignMetricsHistory = mysqlTable(
     campaignRecordedIdx: index("hist_campaign_recorded_idx").on(table.campaignId, table.recordedAt),
   })
 );
-
-export type CampaignMetricsHistory = typeof campaignMetricsHistory.$inferSelect;
-export type InsertCampaignMetricsHistory = typeof campaignMetricsHistory.$inferInsert;

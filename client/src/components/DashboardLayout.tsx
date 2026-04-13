@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Pickaxe,
-  Trophy,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -22,13 +21,12 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Unified Menu Structure
+// Unified Menu Structure - Simplified: Removed "Escalados"
 const menuItems = [
   { 
     section: "FORTE ADS",
     items: [
-      { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca global de anúncios" },
-      { icon: Trophy, label: "Escalados", href: "/escalados", description: "Seus anúncios salvos" },
+      { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca oficial de anúncios" },
     ]
   }
 ];
