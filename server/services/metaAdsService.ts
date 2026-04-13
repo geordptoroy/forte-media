@@ -69,6 +69,39 @@ async function requestWithRetry<T>(
 }
 
 /**
+ * Compatibilidade legada para metaAdLibrary.ts
+ */
+export async function searchAdsArchive(params: any): Promise<any> {
+  const {
+    userId,
+    accessToken,
+    searchTerms,
+    searchPageIds,
+    adReachedCountries,
+    adType,
+    adActiveStatus,
+    limit,
+    after,
+  } = params;
+
+  if (searchPageIds && searchPageIds.length > 0) {
+    return searchAdsByPages(userId, accessToken, searchPageIds, adReachedCountries, {
+      adType,
+      adActiveStatus,
+      limit,
+      after,
+    });
+  }
+
+  return searchAdsByKeywords(userId, accessToken, searchTerms, adReachedCountries, {
+    adType,
+    adActiveStatus,
+    limit,
+    after,
+  });
+}
+
+/**
  * Buscar anúncios por keywords (API Oficial)
  */
 export async function searchAdsByKeywords(
