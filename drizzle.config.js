@@ -1,5 +1,5 @@
 module.exports = {
-  schema: "./drizzle/schema.ts",
+  schema: "./dist/drizzle/schema.js",
   out: "./drizzle",
   dialect: "mysql",
   dbCredentials: {

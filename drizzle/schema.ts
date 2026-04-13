@@ -1,4 +1,5 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, decimal, index, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, boolean, decimal, index, uniqueIndex, foreignKey } from "drizzle-orm/mysql-core";
+import { relations } from "drizzle-orm";
 
 /**
  * Core user table backing auth flow.
@@ -15,6 +16,7 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 }, (table) => ({
   createdAtIdx: index("users_created_at_idx").on(table.createdAt),
+  emailIdx: uniqueIndex("users_email_idx").on(table.email),
 }));
 
 export type User = typeof users.$inferSelect;
@@ -42,6 +44,11 @@ export const userMetaCredentials = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
+    userRef: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_user_meta_credentials_user"
+    }).onDelete("cascade"),
     isValidIdx: index("user_is_valid_idx").on(table.isValid),
   })
 );
@@ -85,9 +92,14 @@ export const favoriteAds = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    // Mantendo o nome exato do init.sql para evitar que o Drizzle tente renomear
+    userRef: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_favorite_ads_user"
+    }).onDelete("cascade"),
     favUserAdUnique: uniqueIndex("fav_user_ad_unique").on(table.userId, table.adId),
     createdAtIdx: index("fav_created_at_idx").on(table.createdAt),
+    adIdIdx: index("fav_ad_id_idx").on(table.adId),
   })
 );
 
@@ -106,6 +118,11 @@ export const adMiningLog = mysqlTable(
     executedAt: timestamp("executed_at").defaultNow().notNull(),
   },
   (table) => ({
+    userRef: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_ad_mining_log_user"
+    }).onDelete("cascade"),
     userIdIdx: index("mining_user_id_idx").on(table.userId),
     executedAtIdx: index("mining_executed_at_idx").on(table.executedAt),
   })
@@ -138,6 +155,11 @@ export const monitoredAds = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
+    userRef: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_monitored_ads_user"
+    }).onDelete("cascade"),
     monUserAdUnique: uniqueIndex("mon_user_ad_unique").on(table.userId, table.adId),
     userStatusIdx: index("mon_user_status_idx").on(table.userId, table.monitoringStatus),
     statusIdx: index("mon_status_idx").on(table.monitoringStatus),
@@ -175,6 +197,11 @@ export const userCampaigns = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
+    userRef: foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: "fk_user_campaigns_user"
+    }).onDelete("cascade"),
     campUserCampaignUnique: uniqueIndex("camp_user_campaign_unique").on(table.userId, table.campaignId),
     userStatusIdx: index("camp_user_status_idx").on(table.userId, table.status),
     statusIdx: index("camp_status_idx").on(table.status),
@@ -199,8 +226,61 @@ export const campaignMetricsHistory = mysqlTable(
     recordedAt: timestamp("recorded_at").defaultNow().notNull(),
   },
   (table) => ({
+    campaignRef: foreignKey({
+      columns: [table.campaignId],
+      foreignColumns: [userCampaigns.id],
+      name: "fk_campaign_metrics_history_campaign"
+    }).onDelete("cascade"),
     campaignIdIdx: index("hist_campaign_id_idx").on(table.campaignId),
     recordedAtIdx: index("hist_recorded_at_idx").on(table.recordedAt),
     campaignRecordedIdx: index("hist_campaign_recorded_idx").on(table.campaignId, table.recordedAt),
   })
 );
+
+// RELATIONS
+export const usersRelations = relations(users, ({ many, one }) => ({
+  metaCredentials: one(userMetaCredentials, {
+    fields: [users.id],
+    references: [userMetaCredentials.userId],
+  }),
+  favoriteAds: many(favoriteAds),
+  miningLogs: many(adMiningLog),
+  monitoredAds: many(monitoredAds),
+  campaigns: many(userCampaigns),
+}));
+
+export const favoriteAdsRelations = relations(favoriteAds, ({ one }) => ({
+  user: one(users, {
+    fields: [favoriteAds.userId],
+    references: [users.id],
+  }),
+}));
+
+export const adMiningLogRelations = relations(adMiningLog, ({ one }) => ({
+  user: one(users, {
+    fields: [adMiningLog.userId],
+    references: [users.id],
+  }),
+}));
+
+export const monitoredAdsRelations = relations(monitoredAds, ({ one }) => ({
+  user: one(users, {
+    fields: [monitoredAds.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userCampaignsRelations = relations(userCampaigns, ({ one, many }) => ({
+  user: one(users, {
+    fields: [userCampaigns.userId],
+    references: [users.id],
+  }),
+  metricsHistory: many(campaignMetricsHistory),
+}));
+
+export const campaignMetricsHistoryRelations = relations(campaignMetricsHistory, ({ one }) => ({
+  campaign: one(userCampaigns, {
+    fields: [campaignMetricsHistory.campaignId],
+    references: [userCampaigns.id],
+  }),
+}));

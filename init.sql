@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS `favorite_ads` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX `fav_created_at_idx` ON `favorite_ads` (`created_at`);
+CREATE INDEX `fav_ad_id_idx` ON `favorite_ads` (`ad_id`);
 
 -- ============================================================
 -- Tabela: ad_mining_log
