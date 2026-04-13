@@ -29,7 +29,6 @@ fi
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Syncing database schema..."
 if [ -f "drizzle.config.js" ]; then
   # O drizzle-kit push usa o schema definido no config file.
-  # Não passamos --schema aqui para evitar o erro "Invalid input"
   npx drizzle-kit push --config=drizzle.config.js
   echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database schema synced"
 else
