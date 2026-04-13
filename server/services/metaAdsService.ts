@@ -8,8 +8,8 @@ import { appCache } from '../_core/cache';
 
 const META_GRAPH_URL = 'https://graph.facebook.com/v21.0/ads_archive';
 
-// Token temporário fornecido pelo usuário para testes e fallback
-const FALLBACK_ACCESS_TOKEN = "EAAMuA4Ly8N0BRC8aBQAbd8HSzkqt4sWx6qkrvZAKS2aILENfNWOe6dFkM2EBa9PWwDUFK1rFzyRUfjUY1K36zNefzQ527Dl4ZCsBrjG6iVxbof375BVSVXnlcN7aN6VRtWHXeR2xvTtxAdY3yPP2qhanoRbR2oLBD8dU7MKpB4a7z6e0Fa3DqXGDMlsOZAghMz1RPvBkEsSxW792lWWgEb3T4P1vi3akeUSiyMzZB4VZCyiz7THHdRBjumuk6xc44zpxAiUugHxqHdaVohXyBtYip93Q7wkQkSAZDZD";
+// Token temporário fornecido pelo usuário para testes e fallback (Duração: 2 horas)
+const FALLBACK_ACCESS_TOKEN = "EAAMuA4Ly8N0BRKcQNbnGxK8MMTvQpzAkAbYyzLKWoGWyvF7HCUQ9HgGS1hnawHCQr2wLB2efIRyLju0QfLTP4HjD10UVfoScDKVxZAo90XOzQIR5rE8BRFyR0sHQUVifeZBRwaroatZBiEgpDBZAprgtemgEjjfcrXqchdnyhR3TGOuqKNyDtKeZCOivUbkakej6nk80CryWXKR7xVXIvM0fBFfxAGRNlyYZAOiJzUSsvDS0lZCTWHMZANV11b9RKu76ZAuKY0zS4pV2FKDHO8lzSvbk9OqNeU7YuxQZDZD";
 
 // Lista exaustiva de campos para capturar o máximo de inteligência competitiva
 export const META_ADS_FIELDS = [

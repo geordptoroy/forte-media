@@ -16,13 +16,14 @@ import {
   Layers,
   Monitor,
   Globe,
+  Maximize2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AdCardV3Props {
   ad: any;
   initialIsFavorited?: boolean;
-  showIntelligence?: boolean; // Mantido por compatibilidade, mas ignorado
+  showIntelligence?: boolean;
 }
 
 function formatDateShort(dateStr?: string): string {
@@ -60,66 +61,33 @@ function getMediaTypeIcon(mediaType?: string) {
   }
 }
 
-function AdPreviewFrameV3({ ad }: { ad: any }) {
+/**
+ * AdPreviewFrameV3 - Exibe o criativo do anúncio.
+ * Prioriza o iframe da snapshot_url para garantir que o criativo (imagem ou vídeo) apareça.
+ */
+function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeError, setIframeError] = useState(false);
 
-  const cdnVideoUrl = ad.cdn_video_url || ad.cdnVideoUrl;
-  const cdnImageUrl = ad.cdn_image_url || ad.cdnImageUrl;
-  const cdnThumbnailUrl = ad.cdn_thumbnail_url || ad.cdnThumbnailUrl;
   const snapshotUrl = ad.ad_snapshot_url || ad.adSnapshotUrl;
-  const directImageUrl =
-    ad.ad_creative_images?.[0]?.url ||
-    ad.ad_creative_videos?.[0]?.thumbnail_url ||
-    null;
-
-  if (cdnVideoUrl) {
-    return (
-      <video
-        src={cdnVideoUrl}
-        poster={cdnThumbnailUrl}
-        className="w-full h-full object-cover"
-        controls
-        loading="lazy"
-      />
-    );
-  }
-
-  if (cdnImageUrl) {
-    return (
-      <img
-        src={cdnImageUrl}
-        alt={ad.page_name || 'Criativo'}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-    );
-  }
-
-  if (directImageUrl) {
-    return (
-      <img
-        src={directImageUrl}
-        alt={ad.page_name || 'Criativo'}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
-    );
-  }
-
+  
+  // Se tivermos a snapshot_url, usamos o iframe para renderizar o criativo oficial da Meta
   if (snapshotUrl && !iframeError) {
     return (
-      <div className="relative w-full h-full bg-zinc-950">
+      <div className={cn(
+        "relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden",
+        !isModal && "pointer-events-none" // Evita interação no card, apenas no modal
+      )}>
         {!iframeLoaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-zinc-950">
             <div className="w-6 h-6 border-2 border-zinc-800 border-t-zinc-400 rounded-full animate-spin" />
-            <p className="text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Conectando Meta...</p>
+            <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">Carregando Criativo...</p>
           </div>
         )}
         <iframe
           src={snapshotUrl}
           className={cn(
-            "w-full h-full border-0 transition-opacity duration-700",
+            "w-full h-full border-0 transition-opacity duration-700 scale-[1.02]",
             iframeLoaded ? "opacity-100" : "opacity-0"
           )}
           onLoad={() => setIframeLoaded(true)}
@@ -129,6 +97,19 @@ function AdPreviewFrameV3({ ad }: { ad: any }) {
           loading="lazy"
         />
       </div>
+    );
+  }
+
+  // Fallback para imagem direta se houver
+  const directImageUrl = ad.ad_creative_images?.[0]?.url || ad.ad_creative_videos?.[0]?.thumbnail_url;
+  if (directImageUrl) {
+    return (
+      <img
+        src={directImageUrl}
+        alt={ad.page_name || 'Criativo'}
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
     );
   }
 
@@ -177,7 +158,7 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
     onSuccess: (data) => {
       if (data.success) {
         setIsFavorited(data.action === 'added');
-        toast.success(data.message);
+        toast.success(data.action === 'added' ? 'Adicionado aos favoritos' : 'Removido dos favoritos');
       }
     },
   });
@@ -192,7 +173,7 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
       pageId, 
       pageName: ad.page_name || ad.pageName,
       adSnapshotUrl: ad.ad_snapshot_url || ad.adSnapshotUrl,
-      adData: ad // Envia o payload completo para extração máxima no backend
+      adData: ad
     });
   };
 
@@ -208,10 +189,12 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
         className="group relative bg-[#0a0a0a] rounded-2xl overflow-hidden border border-white/[0.05] hover:border-white/[0.15] transition-all duration-500 flex flex-col shadow-2xl cursor-pointer"
         onClick={() => setOpen(true)}
       >
-        <div className="relative aspect-[4/3] bg-zinc-950 overflow-hidden">
+        {/* Ad Preview Area */}
+        <div className="relative aspect-[4/5] bg-zinc-950 overflow-hidden">
           <AdPreviewFrameV3 ad={ad} />
 
-          <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between z-10">
+          {/* Overlay Controls */}
+          <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between z-10 bg-gradient-to-b from-black/60 to-transparent">
             <div className="flex items-center gap-1.5 px-2 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-full">
               {getMediaTypeIcon(mediaType)}
               <span className="text-[9px] font-black text-white uppercase tracking-widest">
@@ -219,15 +202,37 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
               </span>
             </div>
 
-            {isStillActive && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full ml-auto">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Ativo</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {isStillActive && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Ativo</span>
+                </div>
+              )}
+              <button
+                onClick={handleFavorite}
+                className={cn(
+                  "p-2 rounded-full border backdrop-blur-md transition-all duration-300",
+                  isFavorited 
+                    ? "bg-red-500/20 border-red-500/40 text-red-500" 
+                    : "bg-black/40 border-white/10 text-white/60 hover:text-white hover:bg-black/60"
+                )}
+              >
+                <Heart className={cn("w-3.5 h-3.5", isFavorited && "fill-current")} />
+              </button>
+            </div>
+          </div>
+
+          {/* Hover Action */}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+            <div className="px-4 py-2 bg-white text-black rounded-full flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+              <Maximize2 className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Ver Detalhes</span>
+            </div>
           </div>
         </div>
 
+        {/* Ad Info Area */}
         <div className="p-4 flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -238,17 +243,6 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
                 ID: {ad.id || ad.adId}
               </p>
             </div>
-            <button
-              onClick={handleFavorite}
-              className={cn(
-                "p-2 rounded-full border transition-all duration-300",
-                isFavorited 
-                  ? "bg-red-500/10 border-red-500/20 text-red-500" 
-                  : "bg-white/[0.02] border-white/[0.05] text-zinc-600 hover:text-white hover:bg-white/[0.05]"
-              )}
-            >
-              <Heart className={cn("w-3.5 h-3.5", isFavorited && "fill-current")} />
-            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -276,13 +270,15 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-4xl bg-black border-white/[0.06] p-0 overflow-hidden gap-0 rounded-none lg:rounded-2xl">
+        <DialogContent className="max-w-5xl bg-black border-white/[0.06] p-0 overflow-hidden gap-0 rounded-none lg:rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
           <div className="flex flex-col lg:flex-row h-full max-h-[90vh]">
-            <div className="lg:w-1/2 bg-zinc-950 flex items-center justify-center min-h-[300px] border-b lg:border-b-0 lg:border-r border-white/[0.06]">
-              <AdPreviewFrameV3 ad={ad} />
+            {/* Left: Preview */}
+            <div className="lg:w-[45%] bg-zinc-950 flex items-center justify-center min-h-[400px] border-b lg:border-b-0 lg:border-r border-white/[0.06]">
+              <AdPreviewFrameV3 ad={ad} isModal={true} />
             </div>
 
-            <div className="lg:w-1/2 flex flex-col bg-black overflow-y-auto custom-scrollbar">
+            {/* Right: Details */}
+            <div className="lg:w-[55%] flex flex-col bg-black overflow-y-auto custom-scrollbar">
               <div className="p-6 border-b border-white/[0.06] flex items-center justify-between sticky top-0 bg-black/80 backdrop-blur-xl z-10">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/5 border border-white/10 flex items-center justify-center rounded-xl">
@@ -293,56 +289,78 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
                     <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">Anúncio Oficial Meta</p>
                   </div>
                 </div>
-                <button
-                  onClick={handleFavorite}
-                  className={cn(
-                    "p-2.5 rounded-xl border transition-all",
-                    isFavorited 
-                      ? "bg-red-500/10 border-red-500/20 text-red-500" 
-                      : "bg-white/[0.02] border-white/[0.05] text-zinc-600 hover:text-white"
-                  )}
-                >
-                  <Heart className={cn("w-4 h-4", isFavorited && "fill-current")} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleFavorite}
+                    className={cn(
+                      "p-2.5 rounded-xl border transition-all",
+                      isFavorited 
+                        ? "bg-red-500/10 border-red-500/20 text-red-500" 
+                        : "bg-white/[0.02] border-white/[0.05] text-zinc-600 hover:text-white"
+                    )}
+                  >
+                    <Heart className={cn("w-4 h-4", isFavorited && "fill-current")} />
+                  </button>
+                </div>
               </div>
 
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-8">
+                {/* Status & Timing */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl space-y-1">
+                  <div className="p-4 bg-white/[0.02] border border-white/[0.04] rounded-2xl space-y-2">
                     <div className="flex items-center gap-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest">
-                      <Calendar className="w-3 h-3" />
-                      Início
+                      <Calendar className="w-3.5 h-3.5" />
+                      Data de Início
                     </div>
-                    <p className="text-xs font-black text-white">{formatDateShort(ad.ad_delivery_start_time || ad.adDeliveryStartTime)}</p>
+                    <p className="text-sm font-black text-white">{formatDateShort(ad.ad_delivery_start_time || ad.adDeliveryStartTime)}</p>
                   </div>
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl space-y-1">
+                  <div className="p-4 bg-white/[0.02] border border-white/[0.04] rounded-2xl space-y-2">
                     <div className="flex items-center gap-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest">
-                      <Clock className="w-3 h-3" />
-                      Duração
+                      <Clock className="w-3.5 h-3.5" />
+                      Tempo Ativo
                     </div>
-                    <p className="text-xs font-black text-white">{daysActive} dias</p>
+                    <p className="text-sm font-black text-white">{daysActive} dias</p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-white uppercase tracking-[0.2em] border-l-2 border-white pl-3">Copy do Anúncio</h4>
-                  <div className="p-4 bg-zinc-900/50 border border-white/[0.04] rounded-2xl">
+                {/* Ad Copy */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-white uppercase tracking-[0.2em] border-l-2 border-white pl-3">Copy do Anúncio</h4>
+                  </div>
+                  <div className="p-5 bg-zinc-900/50 border border-white/[0.04] rounded-2xl">
                     <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-medium">
                       {copy || 'Sem texto descritivo.'}
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-4">
+                {/* Platforms */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-white uppercase tracking-[0.2em] border-l-2 border-white pl-3">Plataformas de Veiculação</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {platforms.map((p: string) => (
+                      <span key={p} className="px-3 py-1.5 bg-white/[0.03] border border-white/[0.06] rounded-lg text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-4 space-y-3">
                   <a
                     href={ad.ad_snapshot_url || ad.adSnapshotUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-200 transition-all rounded-xl"
+                    className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-200 transition-all rounded-2xl"
                   >
                     Ver na Biblioteca da Meta
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <ExternalLink className="w-4 h-4" />
                   </a>
+                  <p className="text-[8px] text-center text-zinc-700 font-bold uppercase tracking-widest">
+                    O criativo acima é carregado diretamente dos servidores da Meta.
+                  </p>
                 </div>
               </div>
             </div>

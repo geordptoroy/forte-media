@@ -1,5 +1,7 @@
+const isProduction = process.env.NODE_ENV === 'production';
+
 module.exports = {
-  schema: "./drizzle/schema.ts",
+  schema: isProduction ? "./dist/drizzle/schema.js" : "./drizzle/schema.ts",
   out: "./drizzle",
   dialect: "mysql",
   dbCredentials: {
