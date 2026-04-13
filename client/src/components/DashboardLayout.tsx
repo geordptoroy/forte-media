@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Pickaxe,
+  Heart,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -27,6 +28,7 @@ const menuItems = [
     section: "FORTE ADS",
     items: [
       { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca oficial de anúncios" },
+      { icon: Heart, label: "Favoritos", href: "/favoritos", description: "Anúncios salvos" },
     ]
   }
 ];

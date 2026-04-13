@@ -187,7 +187,13 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
     const adId = ad.id || ad.ad_archive_id || ad.adId;
     const pageId = ad.page_id || ad.pageId;
     if (!adId || !pageId) return;
-    toggleFavoriteMutation.mutate({ adId, pageId, pageName: ad.page_name || ad.pageName });
+    toggleFavoriteMutation.mutate({ 
+      adId, 
+      pageId, 
+      pageName: ad.page_name || ad.pageName,
+      adSnapshotUrl: ad.ad_snapshot_url || ad.adSnapshotUrl,
+      adData: ad // Envia o payload completo para extração máxima no backend
+    });
   };
 
   const copy = ad.ad_creative_bodies?.[0] || ad.adCreativeBodies?.[0] || ad.body || '';

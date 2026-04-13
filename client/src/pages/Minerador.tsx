@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { AdCardV3 } from "@/components/ads/AdCardV3";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Pickaxe, Filter, Globe, Tag } from "lucide-react";
+import { Loader2, Search, Pickaxe, Filter, Globe, Tag, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { EmptyState } from "@/components/EmptyState";
@@ -23,6 +23,15 @@ const AD_TYPES = [
   { id: "HOUSING_ADS", name: "Moradia" },
   { id: "EMPLOYMENT_ADS", name: "Emprego" },
   { id: "CREDIT_ADS", name: "Crédito" },
+  { id: "FINANCIAL_PRODUCTS_AND_SERVICES_ADS", name: "Produtos Financeiros" },
+];
+
+const MEDIA_TYPES = [
+  { id: "ALL", name: "Todos os Formatos" },
+  { id: "IMAGE", name: "Imagem" },
+  { id: "VIDEO", name: "Vídeo" },
+  { id: "MEME", name: "Meme" },
+  { id: "NONE", name: "Sem Mídia" },
 ];
 
 export default function Minerador() {
@@ -31,6 +40,7 @@ export default function Minerador() {
   const [searchKeywords, setSearchKeywords] = useState("");
   const [country, setCountry] = useState("BR");
   const [adType, setAdType] = useState("ALL");
+  const [mediaType, setMediaType] = useState("ALL");
   const [showFilters, setShowFilters] = useState(false);
 
   const searchByKeywordsQuery = trpc.ads.searchByKeywords.useQuery(
@@ -38,6 +48,7 @@ export default function Minerador() {
       keywords: searchKeywords,
       countries: country === "ALL" ? [] : [country],
       adType: adType as any,
+      mediaType: mediaType as any,
       limit: 50,
     },
     { enabled: false }
@@ -178,6 +189,30 @@ export default function Minerador() {
                       className={cn(
                         "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded border transition-all",
                         adType === type.id
+                          ? "bg-white text-black border-white"
+                          : "bg-transparent border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2]"
+                      )}
+                    >
+                      {type.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Formato de Mídia */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-3 h-3 text-gray-600" />
+                  <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Formato de Mídia</label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {MEDIA_TYPES.map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => setMediaType(type.id)}
+                      className={cn(
+                        "px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded border transition-all",
+                        mediaType === type.id
                           ? "bg-white text-black border-white"
                           : "bg-transparent border-white/[0.1] text-gray-600 hover:text-white hover:border-white/[0.2]"
                       )}

@@ -8,6 +8,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Minerador from "./pages/Minerador";
+import Favoritos from "./pages/Favoritos";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
 import { type ComponentType } from "react";
@@ -54,6 +55,7 @@ function Router() {
 
       {/* A página Minerador agora é a página principal do Dashboard */}
       <PrivateRoute path="/minerador" component={Minerador} />
+      <PrivateRoute path="/favoritos" component={Favoritos} />
       
       {/* Redirecionar rotas antigas para /minerador */}
       <Route path="/escalados">
