@@ -85,7 +85,8 @@ export const favoriteAds = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userAdIdx: uniqueIndex("fav_user_ad_idx").on(table.userId, table.adId),
+    // Mantendo o nome exato do init.sql para evitar que o Drizzle tente renomear
+    favUserAdUnique: uniqueIndex("fav_user_ad_unique").on(table.userId, table.adId),
     createdAtIdx: index("fav_created_at_idx").on(table.createdAt),
   })
 );
@@ -137,7 +138,7 @@ export const monitoredAds = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userAdIdx: uniqueIndex("mon_user_ad_idx").on(table.userId, table.adId),
+    monUserAdUnique: uniqueIndex("mon_user_ad_unique").on(table.userId, table.adId),
     userStatusIdx: index("mon_user_status_idx").on(table.userId, table.monitoringStatus),
     statusIdx: index("mon_status_idx").on(table.monitoringStatus),
   })
@@ -174,7 +175,7 @@ export const userCampaigns = mysqlTable(
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
   },
   (table) => ({
-    userCampaignIdx: uniqueIndex("camp_user_campaign_idx").on(table.userId, table.campaignId),
+    campUserCampaignUnique: uniqueIndex("camp_user_campaign_unique").on(table.userId, table.campaignId),
     userStatusIdx: index("camp_user_status_idx").on(table.userId, table.status),
     statusIdx: index("camp_status_idx").on(table.status),
     createdAtIdx: index("camp_created_at_idx").on(table.createdAt),

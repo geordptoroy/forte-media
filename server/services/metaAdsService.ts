@@ -6,7 +6,10 @@ import { appCache } from '../_core/cache';
  * Meta Ads Service — Enhanced to capture all available data
  */
 
-const META_GRAPH_URL = 'https://graph.facebook.com/v21.0';
+const META_GRAPH_URL = 'https://graph.facebook.com/v21.0/ads_archive';
+
+// Token temporário fornecido pelo usuário para testes
+const TEMP_ACCESS_TOKEN = "EAAMuA4Ly8N0BRIi2Saek93TUvuhqBM7g0MST6eVojAk0picNTzwlP8zWTcqw6TlNbgQ3lYPuw0ymJOfQ1Ax2q8otACXKktvcGsJZCVy9F5kDZB4WzqIWjyyNqNZBoYpDMKkl6ZAoV4gqAZBlfh42yzvFsMSuWrvQ9zCnUUwmuqlRK2yY7J72FMoVXn9WkaRnpLaCdJUZCZBMMfpY8yb5y3RVF4nZAaYrH4BRLs2vlhRaeuejPYZBzknljhzCee1Pol6JZB0AQ53ljMpZCvPsnA2S29IkSG7ggcuZAqx110oZD";
 
 // Lista exaustiva de campos para capturar o máximo de inteligência competitiva
 const META_ADS_FIELDS = [
@@ -110,8 +113,13 @@ export async function searchAdsArchive(params: any): Promise<any> {
     after,
   } = params;
 
+  // Se o token for o placeholder ou vazio, usa o token temporário de teste
+  const effectiveToken = (!accessToken || accessToken.includes("YOUR_") || accessToken.length < 20) 
+    ? TEMP_ACCESS_TOKEN 
+    : accessToken;
+
   if (searchPageIds && searchPageIds.length > 0) {
-    return searchAdsByPages(userId, accessToken, searchPageIds, adReachedCountries, {
+    return searchAdsByPages(userId, effectiveToken, searchPageIds, adReachedCountries, {
       adType,
       adActiveStatus,
       limit,
@@ -119,7 +127,7 @@ export async function searchAdsArchive(params: any): Promise<any> {
     });
   }
 
-  return searchAdsByKeywords(userId, accessToken, searchTerms, adReachedCountries, {
+  return searchAdsByKeywords(userId, effectiveToken, searchTerms, adReachedCountries, {
     adType,
     adActiveStatus,
     limit,
@@ -146,11 +154,15 @@ export async function searchAdsByKeywords(
   const cached = appCache.get(cacheKey);
   if (cached) return cached;
 
+  const effectiveToken = (!accessToken || accessToken.includes("YOUR_") || accessToken.length < 20) 
+    ? TEMP_ACCESS_TOKEN 
+    : accessToken;
+
   try {
     const result = await requestWithRetry<{ data: any[]; paging?: any }>(
       `${META_GRAPH_URL}`,
       {
-        access_token: accessToken,
+        access_token: effectiveToken,
         search_terms: keywords,
         ad_reached_countries: JSON.stringify(countries),
         ad_active_status: options.adActiveStatus || 'ACTIVE',
@@ -184,11 +196,15 @@ export async function searchAdsByPages(
     after?: string;
   } = {}
 ): Promise<{ data: any[]; paging?: any }> {
+  const effectiveToken = (!accessToken || accessToken.includes("YOUR_") || accessToken.length < 20) 
+    ? TEMP_ACCESS_TOKEN 
+    : accessToken;
+
   try {
     const result = await requestWithRetry<{ data: any[]; paging?: any }>(
       `${META_GRAPH_URL}`,
       {
-        access_token: accessToken,
+        access_token: effectiveToken,
         publisher_ids: JSON.stringify(pageIds),
         ad_reached_countries: JSON.stringify(countries),
         ad_active_status: options.adActiveStatus || 'ACTIVE',
