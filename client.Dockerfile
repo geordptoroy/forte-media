@@ -1,4 +1,4 @@
-# Etapa 1: Build (Ambiente Completo)
+# Etapa 1: Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -7,18 +7,17 @@ WORKDIR /app
 RUN corepack enable && \
     apk add --no-cache python3 make g++ gcc musl-dev libc6-compat
 
-# Copiar ficheiros de dependências da raiz
+# Copiar arquivos de dependências
 COPY package.json pnpm-lock.yaml ./
-# Copiar patches para aplicação correta no install
 COPY patches ./patches
 
-# Instalar dependências (incluindo devDependencies para o build)
+# Instalar dependências
 RUN pnpm install --frozen-lockfile
 
-# Copiar todo o código fonte para garantir que shared/ e outros estão disponíveis
+# Copiar código fonte
 COPY . .
 
-# Build do frontend usando o script do package.json
+# Build do frontend
 RUN pnpm build:client
 
 # Etapa 2: Produção (Nginx Leve)
@@ -31,7 +30,7 @@ COPY --from=builder /app/dist/public .
 # Copiar configuração personalizada do Nginx para o frontend
 COPY nginx/frontend.conf /etc/nginx/conf.d/default.conf
 
-# Instalar utilitários para o healthcheck (wget)
+# Instalar utilitários para o healthcheck
 RUN apk add --no-cache wget
 
 EXPOSE 80
