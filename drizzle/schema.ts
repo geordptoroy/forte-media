@@ -48,7 +48,6 @@ export const userMetaCredentials = mysqlTable(
 
 /**
  * Anúncios competitivos favoritos do usuário.
- * Simplificado: Removida lógica de score e nicho proprietária.
  */
 export const favoriteAds = mysqlTable(
   "favorite_ads",
@@ -86,7 +85,6 @@ export const favoriteAds = mysqlTable(
 
 /**
  * Tabela de Log de Mineração de Anúncios
- * Simplificado: Mantendo apenas termos de busca, localização e categoria.
  */
 export const adMiningLog = mysqlTable(
   "ad_mining_log",

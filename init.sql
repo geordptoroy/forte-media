@@ -157,11 +157,11 @@ CREATE TABLE IF NOT EXISTS `user_campaigns` (
   `cpm` decimal(8,2),
   `currency` varchar(3),
   `start_date` timestamp NULL,
-  `endDate` timestamp NULL,
+  `end_date` timestamp NULL,
   `last_synced_at` timestamp NULL,
-  `metaData` json,
-  `createdAt` timestamp NOT NULL DEFAULT (now()),
-  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  `meta_data` json,
+  `created_at` timestamp NOT NULL DEFAULT (now()),
+  `updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT `user_campaigns_id` PRIMARY KEY(`id`),
   CONSTRAINT `camp_user_campaign_unique` UNIQUE(`user_id`, `campaign_id`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS `user_campaigns` (
 
 CREATE INDEX `camp_user_status_idx` ON `user_campaigns` (`user_id`, `status`);
 CREATE INDEX `camp_status_idx` ON `user_campaigns` (`status`);
-CREATE INDEX `camp_created_at_idx` ON `user_campaigns` (`createdAt`);
+CREATE INDEX `camp_created_at_idx` ON `user_campaigns` (`created_at`);
 
 -- ============================================================
 -- Tabela: campaign_metrics_history
