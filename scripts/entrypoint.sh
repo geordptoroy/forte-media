@@ -28,8 +28,9 @@ fi
 # Sincronizar Drizzle
 echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Syncing database schema..."
 if [ -f "drizzle.config.js" ]; then
-  # Usar o schema compilado em dist/drizzle/schema.js
-  echo "n" | ./node_modules/.bin/drizzle-kit push --config=drizzle.config.js --schema=./dist/drizzle/schema.js
+  # O drizzle-kit push usa o schema definido no config file.
+  # Não passamos --schema aqui para evitar o erro "Invalid input"
+  npx drizzle-kit push --config=drizzle.config.js
   echo ">>> [$(date '+%Y-%m-%d %H:%M:%S')] Database schema synced"
 else
   echo "!!! [$(date '+%Y-%m-%d %H:%M:%S')] Warning: drizzle.config.js not found"
