@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
+import { router, protectedProcedure } from "./_core/trpc";
 import * as metaAdsService from "./services/metaAdsService";
-import { db } from "./_core/db";
+import { db } from "./db";
 import { favoriteAds, adMiningLog } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { logger } from "./_core/logger";
