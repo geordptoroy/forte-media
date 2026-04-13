@@ -3,10 +3,36 @@ import { logger } from '../_core/logger';
 import { appCache } from '../_core/cache';
 
 /**
- * Meta Ads Service — Simplified
+ * Meta Ads Service — Enhanced to capture all available data
  */
 
 const META_GRAPH_URL = 'https://graph.facebook.com/v21.0';
+
+// Lista exaustiva de campos para capturar o máximo de inteligência competitiva
+const META_ADS_FIELDS = [
+  'id',
+  'ad_creative_bodies',
+  'ad_creative_link_captions',
+  'ad_creative_link_descriptions',
+  'ad_creative_link_titles',
+  'ad_delivery_start_time',
+  'ad_delivery_stop_time',
+  'ad_snapshot_url',
+  'currency',
+  'delivery_by_region',
+  'demographic_distribution',
+  'impressions',
+  'languages',
+  'page_id',
+  'page_name',
+  'publisher_platforms',
+  'spend',
+  'target_locations',
+  'target_ages',
+  'target_gender',
+  'age_country_gender_reach_breakdown',
+  'estimated_audience_size'
+].join(',');
 
 interface RetryConfig {
   maxRetries: number;
@@ -53,7 +79,7 @@ async function requestWithRetry<T>(
   let lastError: any;
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
-      const response = await axios.get(url, { params, timeout: 15000 });
+      const response = await axios.get(url, { params, timeout: 20000 });
       return response.data;
     } catch (error: any) {
       lastError = error;
@@ -116,20 +142,20 @@ export async function searchAdsByKeywords(
     after?: string;
   } = {}
 ): Promise<{ data: any[]; paging?: any }> {
-  const cacheKey = `meta:search:${keywords}:${countries.join(',')}:${options.adType}`;
+  const cacheKey = `meta:search:${keywords}:${countries.join(',')}:${options.adType}:${options.after || 'start'}`;
   const cached = appCache.get(cacheKey);
   if (cached) return cached;
 
   try {
     const result = await requestWithRetry<{ data: any[]; paging?: any }>(
-      `${META_GRAPH_URL}/ads_archive`,
+      `${META_GRAPH_URL}`,
       {
         access_token: accessToken,
         search_terms: keywords,
         ad_reached_countries: JSON.stringify(countries),
         ad_active_status: options.adActiveStatus || 'ACTIVE',
         ad_type: options.adType || 'ALL',
-        fields: 'id,ad_creative_bodies,ad_snapshot_url,page_name,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_creative_link_titles,ad_creative_link_descriptions,currency,spend,impressions',
+        fields: META_ADS_FIELDS,
         limit: options.limit || 50,
         after: options.after,
       }
@@ -138,7 +164,7 @@ export async function searchAdsByKeywords(
     appCache.set(cacheKey, result, 30 * 60 * 1000); // 30 min cache
     return result;
   } catch (error: any) {
-    logger.error('[MetaAPI] Erro na busca', { keywords, error: error.message });
+    logger.error('[MetaAPI] Erro na busca por keywords', { keywords, error: error.message });
     throw error;
   }
 }
@@ -160,14 +186,14 @@ export async function searchAdsByPages(
 ): Promise<{ data: any[]; paging?: any }> {
   try {
     const result = await requestWithRetry<{ data: any[]; paging?: any }>(
-      `${META_GRAPH_URL}/ads_archive`,
+      `${META_GRAPH_URL}`,
       {
         access_token: accessToken,
         publisher_ids: JSON.stringify(pageIds),
         ad_reached_countries: JSON.stringify(countries),
         ad_active_status: options.adActiveStatus || 'ACTIVE',
         ad_type: options.adType || 'ALL',
-        fields: 'id,ad_creative_bodies,ad_snapshot_url,page_name,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_creative_link_titles,ad_creative_link_descriptions,currency,spend,impressions',
+        fields: META_ADS_FIELDS,
         limit: options.limit || 50,
         after: options.after,
       }
