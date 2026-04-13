@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "./_core/trpc";
+import { router, publicProcedure, protectedProcedure } from "./_core/trpc";
 import * as metaAdsService from "./services/metaAdsService";
-import { db } from "./db";
+import { getDb } from "./db";
 import { favoriteAds, adMiningLog } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { logger } from "./_core/logger";
@@ -23,6 +23,8 @@ export const adsRouter = router({
     .query(async ({ input, ctx }) => {
       try {
         const userId = ctx.user.id;
+        const db = await getDb();
+        if (!db) throw new Error("Banco de dados indisponível");
         
         // Buscar credenciais da Meta do usuário
         const credentials = await db.query.userMetaCredentials.findFirst({
@@ -33,7 +35,6 @@ export const adsRouter = router({
           return { success: false, error: "Credenciais da Meta não configuradas. Vá em Configurações." };
         }
 
-        // TODO: Descriptografar o token em produção
         const accessToken = credentials.encryptedAccessToken;
 
         const result = await metaAdsService.searchAdsByKeywords(
@@ -80,6 +81,9 @@ export const adsRouter = router({
       const { adId, pageId, pageName } = input;
 
       try {
+        const db = await getDb();
+        if (!db) throw new Error("Banco de dados indisponível");
+
         const existing = await db.query.favoriteAds.findFirst({
           where: and(eq(favoriteAds.userId, userId), eq(favoriteAds.adId, adId)),
         });
@@ -89,7 +93,7 @@ export const adsRouter = router({
           return { success: true, action: "removed", message: "Removido dos favoritos" };
         }
 
-        // Buscar detalhes completos do anúncio na Meta para salvar com todos os novos campos
+        // Buscar detalhes completos do anúncio na Meta
         const credentials = await db.query.userMetaCredentials.findFirst({
           where: (table, { eq }) => eq(table.userId, userId),
         });
@@ -100,14 +104,13 @@ export const adsRouter = router({
           userId,
           credentials.encryptedAccessToken,
           [pageId],
-          [], // Sem filtro de país para pegar o específico por ID
+          [], 
           { limit: 1 }
         );
 
         const adData = metaResult.data?.find((a: any) => a.id === adId);
 
         if (!adData) {
-          // Se não achar na busca por página (raro), salva o que tem
           await db.insert(favoriteAds).values({
             userId,
             adId,
@@ -121,7 +124,6 @@ export const adsRouter = router({
             languages: [],
           });
         } else {
-          // Salvar com todos os campos ricos retornados pela API
           await db.insert(favoriteAds).values({
             userId,
             adId,
@@ -161,6 +163,9 @@ export const adsRouter = router({
    */
   getFavorites: protectedProcedure.query(async ({ ctx }) => {
     try {
+      const db = await getDb();
+      if (!db) throw new Error("Banco de dados indisponível");
+
       const favorites = await db.query.favoriteAds.findMany({
         where: eq(favoriteAds.userId, ctx.user.id),
         orderBy: (table, { desc }) => [desc(table.createdAt)],
