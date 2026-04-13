@@ -135,3 +135,42 @@ export async function searchAdsArchive(params: any) {
     mediaType: params.mediaType
   });
 }
+
+/**
+ * Busca anúncios por palavras-chave (Compatibilidade com adsRouter)
+ */
+export async function searchAdsByKeywords(
+  userId: number,
+  accessToken: string,
+  keywords: string,
+  countries: string[],
+  options: { adType?: string; limit?: number; after?: string } = {}
+) {
+  return fetchAdsArchive({
+    accessToken,
+    searchTerms: keywords,
+    adReachedCountries: countries,
+    adType: options.adType,
+    limit: options.limit,
+    after: options.after,
+  });
+}
+
+/**
+ * Busca anúncios por IDs de páginas (Compatibilidade com adsRouter)
+ */
+export async function searchAdsByPages(
+  userId: number,
+  accessToken: string,
+  pageIds: string[],
+  countries: string[],
+  options: { limit?: number; after?: string } = {}
+) {
+  return fetchAdsArchive({
+    accessToken,
+    searchPageIds: pageIds,
+    adReachedCountries: countries,
+    limit: options.limit,
+    after: options.after,
+  });
+}

@@ -65,7 +65,15 @@ async function startServer() {
    */
   app.get("/api/meta/events", async (req, res) => {
     try {
-      const user = await sdk.authenticateRequest(req as any);
+      let user;
+      try {
+        user = await sdk.authenticateRequest(req as any);
+      } catch (authError: any) {
+        logger.error("SSE Auth Failed:", { error: authError.message, cookies: req.headers.cookie ? "present" : "missing" });
+        res.status(403).json({ error: "Forbidden", details: authError.message });
+        return;
+      }
+
       if (!user?.id) {
         res.status(401).json({ error: "Unauthorized" });
         return;
