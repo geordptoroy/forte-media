@@ -13,7 +13,7 @@ export default function Login() {
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
-      setLocation("/dashboard");
+      setLocation("/minerador");
     },
     onError: (err) => {
       setError(err.message || "Credenciais invalidas. Tente novamente.");

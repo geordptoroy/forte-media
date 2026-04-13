@@ -1,8 +1,9 @@
 import { createPool } from "mysql2/promise";
 import { drizzle } from "drizzle-orm/mysql2";
 import type { MySql2Database } from "drizzle-orm/mysql2";
+import * as schema from "../drizzle/schema";
 
-let _db: MySql2Database | null = null;
+let _db: MySql2Database<typeof schema> | null = null;
 let _pool: ReturnType<typeof createPool> | null = null;
 
 const DEFAULT_POOL_CONFIG = {
@@ -54,7 +55,7 @@ export async function getDb(): Promise<MySql2Database | null> {
     const pool = await initializePool();
     if (!pool) return null;
 
-    _db = drizzle(pool);
+    _db = drizzle(pool, { schema });
     return _db;
   } catch (error) {
     console.error("[DB] Falha ao obter instância do Drizzle:", error);

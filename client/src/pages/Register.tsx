@@ -15,7 +15,7 @@ export default function Register() {
 
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: () => {
-      setLocation("/dashboard");
+      setLocation("/minerador");
     },
     onError: (err) => {
       setError(err.message || "Erro ao criar conta. Tente novamente.");

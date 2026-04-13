@@ -40,7 +40,7 @@ function PublicRoute({ component: Component, ...rest }: { path: string; componen
   if (loading) return <LoadingScreen />;
   return (
     <Route {...rest} >
-      {!isAuthenticated ? <Component /> : <Redirect to="/dashboard" />}
+      {!isAuthenticated ? <Component /> : <Redirect to="/minerador" />}
     </Route>
   );
 }
@@ -53,14 +53,14 @@ function Router() {
       <PublicRoute path="/register" component={Register} />
 
       {/* A página Minerador agora é a página principal do Dashboard */}
-      <PrivateRoute path="/dashboard" component={Minerador} />
+      <PrivateRoute path="/minerador" component={Minerador} />
       
-      {/* Redirecionar rotas antigas para /dashboard */}
+      {/* Redirecionar rotas antigas para /minerador */}
       <Route path="/escalados">
-        <Redirect to="/dashboard" />
+        <Redirect to="/minerador" />
       </Route>
-      <Route path="/minerador">
-        <Redirect to="/dashboard" />
+      <Route path="/dashboard">
+        <Redirect to="/minerador" />
       </Route>
 
       <PrivateRoute path="/settings" component={Settings} />

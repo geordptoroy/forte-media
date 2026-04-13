@@ -26,7 +26,7 @@ const menuItems = [
   { 
     section: "FORTE ADS",
     items: [
-      { icon: Pickaxe, label: "Minerador", href: "/dashboard", description: "Busca oficial de anúncios" },
+      { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca oficial de anúncios" },
     ]
   }
 ];
