@@ -22,6 +22,8 @@ export const META_ADS_FIELDS = [
   'ad_delivery_start_time',
   'ad_delivery_stop_time',
   'ad_snapshot_url',
+  'ad_creative_images',
+  'ad_creative_videos',
   'currency',
   'delivery_by_region',
   'demographic_distribution',

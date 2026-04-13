@@ -48,6 +48,19 @@ async function startServer() {
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  /**
+   * Media Proxy com Fingerprinting (Mascara de Navegador Real)
+   * Burlar bloqueios de hotlinking da Meta.
+   */
+  app.get("/api/ads/proxy-media", async (req, res) => {
+    const { url } = req.query;
+    if (!url || typeof url !== "string") {
+      return res.status(400).send("URL de mídia é obrigatória.");
+    }
+    const { proxyMedia } = await import("../services/mediaProxyService");
+    return proxyMedia(url, res);
+  });
   
   app.get("/health", (_req, res) => {
     // Retornar 200 OK imediatamente para o healthcheck do Docker

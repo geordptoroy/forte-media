@@ -71,7 +71,42 @@ function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean 
 
   const snapshotUrl = ad.ad_snapshot_url || ad.adSnapshotUrl;
   
-  // Se tivermos a snapshot_url, usamos o iframe para renderizar o criativo oficial da Meta
+  // URLs de mídia direta (Imagens/Vídeos) capturadas pela API
+  const directImageUrl = ad.ad_creative_images?.[0]?.url || ad.ad_creative_videos?.[0]?.thumbnail_url || ad.cdnImageUrl;
+  const directVideoUrl = ad.ad_creative_videos?.[0]?.video_hd_url || ad.ad_creative_videos?.[0]?.video_sd_url || ad.cdnVideoUrl;
+
+  // Função para gerar a URL do Proxy com Mascaramento
+  const getProxyUrl = (originalUrl: string) => `/api/ads/proxy-media?url=${encodeURIComponent(originalUrl)}`;
+
+  // Se tivermos vídeo direto, usamos o player nativo com proxy
+  if (directVideoUrl) {
+    return (
+      <video
+        src={getProxyUrl(directVideoUrl)}
+        poster={directImageUrl ? getProxyUrl(directImageUrl) : undefined}
+        className="w-full h-full object-cover"
+        controls={isModal}
+        autoPlay={!isModal}
+        muted
+        loop
+        playsInline
+      />
+    );
+  }
+
+  // Se tivermos imagem direta, usamos a tag img com proxy
+  if (directImageUrl) {
+    return (
+      <img
+        src={getProxyUrl(directImageUrl)}
+        alt={ad.page_name || 'Criativo'}
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
+    );
+  }
+
+  // Fallback para o iframe da snapshot_url se não houver mídia direta
   if (snapshotUrl && !iframeError) {
     return (
       <div className={cn(
@@ -97,19 +132,6 @@ function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean 
           loading="lazy"
         />
       </div>
-    );
-  }
-
-  // Fallback para imagem direta se houver
-  const directImageUrl = ad.ad_creative_images?.[0]?.url || ad.ad_creative_videos?.[0]?.thumbnail_url;
-  if (directImageUrl) {
-    return (
-      <img
-        src={directImageUrl}
-        alt={ad.page_name || 'Criativo'}
-        className="w-full h-full object-cover"
-        loading="lazy"
-      />
     );
   }
 
