@@ -1,6 +1,4 @@
-if (process.env.NODE_ENV !== "production") {
-  import("dotenv/config");
-}
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import cors from "cors";

@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { logger } from '../_core/logger';
 
-// Priorizar o Access Token do .env, caso contrário usar o fallback (que deve ser atualizado no .env)
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAMuA4Ly8N0BRF0bnGutJMjvKNmcybx3Cr7ZBhHEnUMEFdfJFkGtt4ctQAoqvV8YTVe74TrNSPtMF0KXZCOctSfhQgHKW8YM7O0ZCZBI1aCBXr2s8uFpUZClv2cAIGXx0MPwPntZA3pfJ54ZBACDnaDVevkZBhQayVlZBulZB4X0cI6AeqdjPDA17G3bZACFptY2HQUVb8R6BZCdNGi15I9kraZBeq0LjX0SEvms6vZAWjq4aEIrThc3DyZBsmV8gyh0q3DNKAvqYPzUTPvkANf7NnG15q0GDZATIW9d4rOllhAZD';
+// Token temporário fornecido pelo usuário para teste imediato
+const FALLBACK_TOKEN = 'EAAMuA4Ly8N0BRFpZAWQZAjGQCsMGPIyiDKpZBQuerwNqSJIETJGWZBesOG5ZBeANhf1FCkF0ZCrQfLgvCbT6oWRFKirCYcQCTTXojaN5r1tRcnLL8u95kyye8nBCWImm5uwpTZCSfLAjCSV62nE95D9o0s0VX4zL6BoGRlA7SlZBeBPRgT79orl7XghLV5Id6Gq5ngvDteAS8gSgZAdMQZBpKMTIsmodmxlHUd7zAjrk8dlQ9EhcwZCExmPcXfPjBSVPMbYJRMCt06nU4VNuZBtXnfzPZCKVrm88XQjfd6AgZD';
 
 const ALL_FIELDS = [
   'id',
@@ -40,18 +40,21 @@ export interface SearchAdsParams {
 }
 
 export async function searchAds(params: SearchAdsParams) {
+  // Prioridade: 1. Parâmetro da função, 2. Variável de ambiente, 3. Token de fallback
+  const accessToken = params.accessToken || process.env.META_ACCESS_TOKEN || FALLBACK_TOKEN;
+  
   const { 
     searchTerms, 
     country = 'BR', 
     adType = 'ALL', 
-    limit = 25, 
-    accessToken = META_ACCESS_TOKEN 
+    limit = 50
   } = params;
 
   const url = `https://graph.facebook.com/v22.0/ads_archive`;
 
   try {
-    logger.info(`[MetaAds] Buscando anúncios: "${searchTerms}" em ${country}`);
+    logger.info(`[MetaAds] Iniciando busca: "${searchTerms}" em ${country}`);
+    logger.debug(`[MetaAds] Usando token: ${accessToken.substring(0, 10)}...`);
     
     const response = await axios.get(url, {
       params: {
@@ -64,10 +67,17 @@ export async function searchAds(params: SearchAdsParams) {
       }
     });
 
+    logger.info(`[MetaAds] Busca concluída: ${response.data.data?.length || 0} resultados encontrados.`);
     return response.data.data || [];
   } catch (error: any) {
-    const errorData = error.response?.data || error.message;
-    logger.error(`[MetaAds] Erro na busca:`, errorData);
+    const errorData = error.response?.data || { error: { message: error.message } };
+    logger.error(`[MetaAds] Erro na API da Meta:`, errorData);
+    
+    // Se o erro for de token, lançar uma mensagem mais clara
+    if (errorData.error?.code === 190 || errorData.error?.message?.includes('access token')) {
+      throw new Error(`Token da Meta Inválido ou Expirado: ${errorData.error.message}`);
+    }
+    
     throw new Error(errorData.error?.message || 'Falha ao buscar anúncios na Meta');
   }
 }
