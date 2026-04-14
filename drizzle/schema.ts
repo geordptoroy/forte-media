@@ -36,6 +36,8 @@ export const userMetaCredentials = mysqlTable(
     tokenHash: varchar("token_hash", { length: 64 }).notNull(),
     adAccountId: varchar("ad_account_id", { length: 64 }),
     accountName: varchar("account_name", { length: 255 }),
+    pixelId: varchar("pixel_id", { length: 64 }),
+    pixelAccessToken: text("pixel_access_token"),
     permissions: json("permissions").$type<string[]>().notNull().default([]),
     isValid: boolean("is_valid").default(true).notNull(),
     lastValidatedAt: timestamp("last_validated_at"),

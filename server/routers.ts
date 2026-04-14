@@ -10,11 +10,13 @@ import {
 } from "./metaCredentials";
 import { sdk } from "./_core/sdk";
 import { adsRouter } from "./adsRouter";
+import { credentialsRouter } from "./credentialsRouter";
 import { searchAdLibrary } from "./metaAdLibrary";
 import { logger } from "./_core/logger";
 
 export const appRouter = router({
   system: systemRouter,
+  credentials: credentialsRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     register: publicProcedure
