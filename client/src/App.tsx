@@ -8,6 +8,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Settings from "./pages/Settings";
+import Minerador from "./pages/Minerador";
 import LandingPage from "./pages/LandingPage";
 import { type ComponentType } from "react";
 
@@ -39,7 +40,7 @@ function PublicRoute({ component: Component, ...rest }: { path: string; componen
   if (loading) return <LoadingScreen />;
   return (
     <Route {...rest} >
-      {!isAuthenticated ? <Component /> : <Redirect to="/settings" />}
+      {!isAuthenticated ? <Component /> : <Redirect to="/minerador" />}
     </Route>
   );
 }
@@ -51,21 +52,16 @@ function Router() {
       <PublicRoute path="/login" component={Login} />
       <PublicRoute path="/register" component={Register} />
 
-      {/* Redirecionar rotas antigas para /settings por enquanto */}
-      <Route path="/minerador">
-        <Redirect to="/settings" />
-      </Route>
+      <PrivateRoute path="/minerador" component={Minerador} />
+      <PrivateRoute path="/settings" component={Settings} />
+
+      {/* Redirecionar rotas antigas */}
       <Route path="/favoritos">
-        <Redirect to="/settings" />
-      </Route>
-      <Route path="/escalados">
-        <Redirect to="/settings" />
+        <Redirect to="/minerador" />
       </Route>
       <Route path="/dashboard">
-        <Redirect to="/settings" />
+        <Redirect to="/minerador" />
       </Route>
-
-      <PrivateRoute path="/settings" component={Settings} />
 
       <Route component={NotFound} />
     </Switch>

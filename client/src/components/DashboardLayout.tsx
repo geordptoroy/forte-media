@@ -7,7 +7,7 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard,
+  Search,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -20,12 +20,12 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Menu limpo - Apenas o básico por enquanto
+// Menu atualizado com Minerador
 const menuItems = [
   { 
-    section: "PRINCIPAL",
+    section: "FERRAMENTAS",
     items: [
-      { icon: LayoutDashboard, label: "Dashboard", href: "/settings", description: "Visão geral da conta" },
+      { icon: Search, label: "Minerador", href: "/minerador", description: "Busca de anúncios Meta" },
     ]
   }
 ];

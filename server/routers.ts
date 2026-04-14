@@ -4,10 +4,11 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { sdk } from "./_core/sdk";
-import { logger } from "./_core/logger";
+import { adsRouter } from "./adsRouter";
 
 export const appRouter = router({
   system: systemRouter,
+  ads: adsRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     register: publicProcedure
