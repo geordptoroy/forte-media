@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "./_core/trpc";
 import { searchAds } from "./services/metaAdsService";
+import { StealthExtractorService } from "./services/stealthExtractorService";
 
 export const adsRouter = router({
   search: protectedProcedure
@@ -14,5 +15,16 @@ export const adsRouter = router({
     )
     .query(async ({ input }) => {
       return await searchAds(input);
+    }),
+
+  extractVideo: protectedProcedure
+    .input(
+      z.object({
+        snapshotUrl: z.string().url(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const videoUrl = await StealthExtractorService.extractVideoUrl(input.snapshotUrl);
+      return { videoUrl };
     }),
 });

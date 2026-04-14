@@ -1,31 +1,79 @@
+import { useState, useEffect } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe, Play, Loader2 } from "lucide-react";
+import { trpc } from "../../lib/trpc";
 
 interface AdCardProps {
   ad: any;
 }
 
 export function AdCardV3({ ad }: AdCardProps) {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  
+  const extractMutation = trpc.ads.extractVideo.useMutation({
+    onSuccess: (data) => {
+      if (data.videoUrl) {
+        setVideoUrl(data.videoUrl);
+      }
+      setIsExtracting(false);
+    },
+    onError: () => {
+      setIsExtracting(false);
+    }
+  });
+
+  const handleExtract = () => {
+    if (videoUrl || isExtracting) return;
+    setIsExtracting(true);
+    extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
+  };
+
   const platforms = ad.publisher_platforms || [];
   const body = ad.ad_creative_bodies?.[0] || "Sem descrição disponível.";
   
   return (
     <Card className="overflow-hidden flex flex-col bg-black border-white/[0.06] hover:border-white/20 transition-all group">
-      {/* Media Preview Placeholder */}
-      <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06]">
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-2">
-          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-            <Eye className="w-5 h-5 text-white/20" />
+      {/* Media Preview */}
+      <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06] overflow-hidden">
+        {videoUrl ? (
+          <video 
+            src={videoUrl} 
+            className="w-full h-full object-cover" 
+            controls 
+            autoPlay 
+            muted 
+            loop
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+              {isExtracting ? (
+                <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
+              ) : (
+                <Play className="w-6 h-6 text-white/20 fill-white/10" />
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                {isExtracting ? "Extraindo Mídia..." : "Vídeo Detectado"}
+              </p>
+              {!isExtracting && (
+                <button 
+                  onClick={handleExtract}
+                  className="text-[9px] font-bold text-white/20 hover:text-white/60 underline uppercase tracking-tighter transition-colors"
+                >
+                  Clique para carregar preview
+                </button>
+              )}
+            </div>
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
-            Mídia disponível na biblioteca
-          </p>
-        </div>
+        )}
         
         {/* Platform Badges */}
-        <div className="absolute top-3 left-3 flex gap-1">
+        <div className="absolute top-3 left-3 flex gap-1 z-10">
           {platforms.map((p: string) => (
             <Badge key={p} variant="secondary" className="bg-black/60 backdrop-blur-md text-[8px] px-1.5 py-0 border-white/10 uppercase font-black">
               {p}
