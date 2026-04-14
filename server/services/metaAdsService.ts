@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { logger } from '../_core/logger';
 
-// Chave de API temporária fornecida pelo usuário
-const DEFAULT_ACCESS_TOKEN = 'EAAMuA4Ly8N0BRF0bnGutJMjvKNmcybx3Cr7ZBhHEnUMEFdfJFkGtt4ctQAoqvV8YTVe74TrNSPtMF0KXZCOctSfhQgHKW8YM7O0ZCZBI1aCBXr2s8uFpUZClv2cAIGXx0MPwPntZA3pfJ54ZBACDnaDVevkZBhQayVlZBulZB4X0cI6AeqdjPDA17G3bZACFptY2HQUVb8R6BZCdNGi15I9kraZBeq0LjX0SEvms6vZAWjq4aEIrThc3DyZBsmV8gyh0q3DNKAvqYPzUTPvkANf7NnG15q0GDZATIW9d4rOllhAZD';
+// Priorizar o Access Token do .env, caso contrário usar o fallback (que deve ser atualizado no .env)
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'EAAMuA4Ly8N0BRF0bnGutJMjvKNmcybx3Cr7ZBhHEnUMEFdfJFkGtt4ctQAoqvV8YTVe74TrNSPtMF0KXZCOctSfhQgHKW8YM7O0ZCZBI1aCBXr2s8uFpUZClv2cAIGXx0MPwPntZA3pfJ54ZBACDnaDVevkZBhQayVlZBulZB4X0cI6AeqdjPDA17G3bZACFptY2HQUVb8R6BZCdNGi15I9kraZBeq0LjX0SEvms6vZAWjq4aEIrThc3DyZBsmV8gyh0q3DNKAvqYPzUTPvkANf7NnG15q0GDZATIW9d4rOllhAZD';
 
 const ALL_FIELDS = [
   'id',
@@ -45,7 +45,7 @@ export async function searchAds(params: SearchAdsParams) {
     country = 'BR', 
     adType = 'ALL', 
     limit = 25, 
-    accessToken = DEFAULT_ACCESS_TOKEN 
+    accessToken = META_ACCESS_TOKEN 
   } = params;
 
   const url = `https://graph.facebook.com/v22.0/ads_archive`;

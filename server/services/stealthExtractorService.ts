@@ -4,15 +4,21 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 // Configurar o plugin stealth
 puppeteer.use(StealthPlugin());
 
+export interface ExtractionResult {
+  type: 'video' | 'image' | 'carousel' | 'unknown';
+  url: string | string[];
+  thumbnail?: string;
+}
+
 export class StealthExtractorService {
   private static userAgents = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
   ];
 
-  static async extractVideoUrl(snapshotUrl: string): Promise<string | null> {
-    console.log(`[StealthExtractor] Iniciando extração para: ${snapshotUrl}`);
+  static async extractMedia(snapshotUrl: string): Promise<ExtractionResult | null> {
+    console.log(`[StealthExtractor] Iniciando extração profunda para: ${snapshotUrl}`);
     
     let browser;
     try {
@@ -31,36 +37,73 @@ export class StealthExtractorService {
 
       const page = await browser.newPage();
       
-      // Configurar Fingerprint
-      const randomUA = this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
-      await page.setUserAgent(randomUA);
-      await page.setViewport({ width: 1280, height: 800 });
+      // Usar UA mobile para snapshots costuma ser mais eficiente
+      const mobileUA = this.userAgents[2];
+      await page.setUserAgent(mobileUA);
+      await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
 
-      // Navegar para a URL do snapshot
       await page.goto(snapshotUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-      // Tentar encontrar o vídeo
-      // A Meta costuma usar tags <video> ou blobs. Vamos tentar pegar o src da tag video.
-      const videoSrc = await page.evaluate(() => {
-        const videoElement = document.querySelector('video');
-        return videoElement ? videoElement.getAttribute('src') : null;
+      // Aguardar renderização de mídias dinâmicas
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      const result = await page.evaluate(() => {
+        // 1. Tentar Vídeo
+        const video = document.querySelector('video');
+        if (video && video.getAttribute('src')) {
+          return {
+            type: 'video',
+            url: video.getAttribute('src'),
+            thumbnail: video.getAttribute('poster') || undefined
+          };
+        }
+
+        // 2. Tentar Carrossel (Geralmente múltiplos itens com papel de 'img' ou em containers específicos)
+        const carouselImages = Array.from(document.querySelectorAll('img')).filter(img => {
+          const src = img.getAttribute('src') || '';
+          return src.includes('fbcdn.net') && !src.includes('s60x60') && !src.includes('s32x32');
+        });
+
+        if (carouselImages.length > 1) {
+          return {
+            type: 'carousel',
+            url: carouselImages.map(img => img.getAttribute('src') || '').filter(src => src !== '')
+          };
+        }
+
+        // 3. Tentar Imagem Única
+        const singleImage = carouselImages[0];
+        if (singleImage) {
+          return {
+            type: 'image',
+            url: singleImage.getAttribute('src') || ''
+          };
+        }
+
+        return null;
       });
 
-      if (videoSrc) {
-        console.log(`[StealthExtractor] Vídeo encontrado: ${videoSrc.substring(0, 50)}...`);
-        return videoSrc;
+      // Fallback via Regex no HTML se o DOM falhar
+      if (!result) {
+        const html = await page.content();
+        const videoMatch = html.match(/https:\/\/video[^"']+\.mp4[^"']*/);
+        if (videoMatch) {
+          return {
+            type: 'video',
+            url: videoMatch[0].replace(/\\/g, '')
+          };
+        }
+
+        const imageMatch = html.match(/https:\/\/[^"']+\.fbcdn\.net\/v\/[^"']+\.(?:jpg|png|webp)[^"']*/);
+        if (imageMatch) {
+          return {
+            type: 'image',
+            url: imageMatch[0].replace(/\\/g, '')
+          };
+        }
       }
 
-      // Se não encontrar direto, pode estar dentro de um iframe ou carregar via JS posterior
-      // Vamos esperar um pouco mais ou tentar outro seletor
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const retryVideoSrc = await page.evaluate(() => {
-        const videoElement = document.querySelector('video');
-        return videoElement ? videoElement.getAttribute('src') : null;
-      });
-
-      return retryVideoSrc;
+      return result as ExtractionResult;
 
     } catch (error) {
       console.error('[StealthExtractor] Erro na extração:', error);

@@ -17,14 +17,14 @@ export const adsRouter = router({
       return await searchAds(input);
     }),
 
-  extractVideo: protectedProcedure
+  extractMedia: protectedProcedure
     .input(
       z.object({
         snapshotUrl: z.string().url(),
       })
     )
     .mutation(async ({ input }) => {
-      const videoUrl = await StealthExtractorService.extractVideoUrl(input.snapshotUrl);
-      return { videoUrl };
+      const result = await StealthExtractorService.extractMedia(input.snapshotUrl);
+      return { result };
     }),
 });

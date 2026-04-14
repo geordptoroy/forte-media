@@ -2,21 +2,27 @@ import { useState, useEffect } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe, Play, Loader2 } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe, Play, Loader2, Image as ImageIcon, Layers } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 
 interface AdCardProps {
   ad: any;
 }
 
+interface ExtractionResult {
+  type: 'video' | 'image' | 'carousel' | 'unknown';
+  url: string | string[];
+  thumbnail?: string;
+}
+
 export function AdCardV3({ ad }: AdCardProps) {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [media, setMedia] = useState<ExtractionResult | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   
-  const extractMutation = trpc.ads.extractVideo.useMutation({
+  const extractMutation = trpc.ads.extractMedia.useMutation({
     onSuccess: (data) => {
-      if (data.videoUrl) {
-        setVideoUrl(data.videoUrl);
+      if (data.result) {
+        setMedia(data.result as ExtractionResult);
       }
       setIsExtracting(false);
     },
@@ -25,52 +31,94 @@ export function AdCardV3({ ad }: AdCardProps) {
     }
   });
 
-  const handleExtract = () => {
-    if (videoUrl || isExtracting) return;
-    setIsExtracting(true);
-    extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
-  };
+  // Extração Automática ao montar o componente
+  useEffect(() => {
+    if (!media && !isExtracting) {
+      setIsExtracting(true);
+      extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
+    }
+  }, []);
 
   const platforms = ad.publisher_platforms || [];
   const body = ad.ad_creative_bodies?.[0] || "Sem descrição disponível.";
+  
+  const renderMedia = () => {
+    if (isExtracting) {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
+          </div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-white/40 animate-pulse">
+            Sincronizando Mídia...
+          </p>
+        </div>
+      );
+    }
+
+    if (!media) {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-2">
+          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+            <Eye className="w-5 h-5 text-white/20" />
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+            Mídia indisponível
+          </p>
+        </div>
+      );
+    }
+
+    if (media.type === 'video') {
+      return (
+        <video 
+          src={media.url as string} 
+          className="w-full h-full object-cover" 
+          controls 
+          autoPlay 
+          muted 
+          loop
+          poster={media.thumbnail}
+        />
+      );
+    }
+
+    if (media.type === 'image') {
+      return (
+        <img 
+          src={media.url as string} 
+          className="w-full h-full object-cover" 
+          alt="Ad Creative"
+        />
+      );
+    }
+
+    if (media.type === 'carousel') {
+      const urls = media.url as string[];
+      return (
+        <div className="relative w-full h-full">
+          <img 
+            src={urls[0]} 
+            className="w-full h-full object-cover" 
+            alt="Carousel Start"
+          />
+          <div className="absolute bottom-2 right-2">
+            <Badge className="bg-black/80 text-[8px] font-black border-white/10">
+              <Layers className="w-2.5 h-2.5 mr-1" /> 1/{urls.length}
+            </Badge>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
   
   return (
     <Card className="overflow-hidden flex flex-col bg-black border-white/[0.06] hover:border-white/20 transition-all group">
       {/* Media Preview */}
       <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06] overflow-hidden">
-        {videoUrl ? (
-          <video 
-            src={videoUrl} 
-            className="w-full h-full object-cover" 
-            controls 
-            autoPlay 
-            muted 
-            loop
-          />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-              {isExtracting ? (
-                <Loader2 className="w-6 h-6 text-white/40 animate-spin" />
-              ) : (
-                <Play className="w-6 h-6 text-white/20 fill-white/10" />
-              )}
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                {isExtracting ? "Extraindo Mídia..." : "Vídeo Detectado"}
-              </p>
-              {!isExtracting && (
-                <button 
-                  onClick={handleExtract}
-                  className="text-[9px] font-bold text-white/20 hover:text-white/60 underline uppercase tracking-tighter transition-colors"
-                >
-                  Clique para carregar preview
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        {renderMedia()}
         
         {/* Platform Badges */}
         <div className="absolute top-3 left-3 flex gap-1 z-10">
@@ -80,6 +128,18 @@ export function AdCardV3({ ad }: AdCardProps) {
             </Badge>
           ))}
         </div>
+
+        {/* Media Type Badge */}
+        {media && (
+          <div className="absolute top-3 right-3 z-10">
+            <Badge className="bg-white text-black text-[8px] px-1.5 py-0 uppercase font-black border-none">
+              {media.type === 'video' && <Play className="w-2 h-2 mr-1 fill-black" />}
+              {media.type === 'image' && <ImageIcon className="w-2 h-2 mr-1" />}
+              {media.type === 'carousel' && <Layers className="w-2 h-2 mr-1" />}
+              {media.type}
+            </Badge>
+          </div>
+        )}
       </div>
 
       {/* Content */}
