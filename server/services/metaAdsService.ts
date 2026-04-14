@@ -40,9 +40,16 @@ export interface SearchAdsParams {
 }
 
 export async function searchAds(params: SearchAdsParams) {
+  // LOG AGRESSIVO PARA DEPURAÇÃO
+  console.log('--- DEBUG META ADS SEARCH ---');
+  console.log('Parâmetros recebidos:', JSON.stringify(params));
+  console.log('process.env.META_ACCESS_TOKEN:', process.env.META_ACCESS_TOKEN ? `${process.env.META_ACCESS_TOKEN.substring(0, 15)}...` : 'NÃO DEFINIDO');
+  
   // Prioridade: 1. Parâmetro da função, 2. Variável de ambiente, 3. Token de fallback
   const accessToken = params.accessToken || process.env.META_ACCESS_TOKEN || FALLBACK_TOKEN;
   
+  console.log('Token final selecionado:', `${accessToken.substring(0, 15)}...`);
+
   const { 
     searchTerms, 
     country = 'BR', 
@@ -54,7 +61,6 @@ export async function searchAds(params: SearchAdsParams) {
 
   try {
     logger.info(`[MetaAds] Iniciando busca: "${searchTerms}" em ${country}`);
-    logger.debug(`[MetaAds] Usando token: ${accessToken.substring(0, 10)}...`);
     
     const response = await axios.get(url, {
       params: {
@@ -71,7 +77,7 @@ export async function searchAds(params: SearchAdsParams) {
     return response.data.data || [];
   } catch (error: any) {
     const errorData = error.response?.data || { error: { message: error.message } };
-    logger.error(`[MetaAds] Erro na API da Meta:`, errorData);
+    console.error('[MetaAds] ERRO DETALHADO DA API:', JSON.stringify(errorData, null, 2));
     
     // Se o erro for de token, lançar uma mensagem mais clara
     if (errorData.error?.code === 190 || errorData.error?.message?.includes('access token')) {
