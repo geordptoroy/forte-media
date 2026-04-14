@@ -7,12 +7,10 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  Pickaxe,
-  Heart,
+  LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
-import { MetaEventTracker } from "./ads/MetaEventTracker";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -22,13 +20,12 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Unified Menu Structure - Minerador is now the main Dashboard page
+// Menu limpo - Apenas o básico por enquanto
 const menuItems = [
   { 
-    section: "FORTE ADS",
+    section: "PRINCIPAL",
     items: [
-      { icon: Pickaxe, label: "Minerador", href: "/minerador", description: "Busca oficial de anúncios" },
-      { icon: Heart, label: "Favoritos", href: "/favoritos", description: "Anúncios salvos" },
+      { icon: LayoutDashboard, label: "Dashboard", href: "/settings", description: "Visão geral da conta" },
     ]
   }
 ];
@@ -342,7 +339,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </motion.div>
         </div>
       </main>
-      <MetaEventTracker />
     </div>
   );
 }

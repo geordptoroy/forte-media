@@ -7,8 +7,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Minerador from "./pages/Minerador";
-import Favoritos from "./pages/Favoritos";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
 import { type ComponentType } from "react";
@@ -41,7 +39,7 @@ function PublicRoute({ component: Component, ...rest }: { path: string; componen
   if (loading) return <LoadingScreen />;
   return (
     <Route {...rest} >
-      {!isAuthenticated ? <Component /> : <Redirect to="/minerador" />}
+      {!isAuthenticated ? <Component /> : <Redirect to="/settings" />}
     </Route>
   );
 }
@@ -53,16 +51,18 @@ function Router() {
       <PublicRoute path="/login" component={Login} />
       <PublicRoute path="/register" component={Register} />
 
-      {/* A página Minerador agora é a página principal do Dashboard */}
-      <PrivateRoute path="/minerador" component={Minerador} />
-      <PrivateRoute path="/favoritos" component={Favoritos} />
-      
-      {/* Redirecionar rotas antigas para /minerador */}
+      {/* Redirecionar rotas antigas para /settings por enquanto */}
+      <Route path="/minerador">
+        <Redirect to="/settings" />
+      </Route>
+      <Route path="/favoritos">
+        <Redirect to="/settings" />
+      </Route>
       <Route path="/escalados">
-        <Redirect to="/minerador" />
+        <Redirect to="/settings" />
       </Route>
       <Route path="/dashboard">
-        <Redirect to="/minerador" />
+        <Redirect to="/settings" />
       </Route>
 
       <PrivateRoute path="/settings" component={Settings} />
