@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,7 @@ import {
   Monitor,
   Globe,
   Maximize2,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -63,36 +64,70 @@ function getMediaTypeIcon(mediaType?: string) {
 
 /**
  * AdPreviewFrameV3 - Exibe o criativo do anúncio.
- * ELIMINADO: Uso de iframes (snapshot_url) que são bloqueados pela Meta.
- * SOLUÇÃO: Uso exclusivo de mídia direta (imagem/vídeo) via Proxy com Fingerprinting.
+ * SOLUÇÃO FINAL: Extração profunda via Backend (Puppeteer) + Proxy com Fingerprinting.
+ * Protege o access_token e burla bloqueios de hotlinking.
  */
 function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean }) {
-  // URLs de mídia direta (Imagens/Vídeos) capturadas pela API
-  const directImageUrl = ad.ad_creative_images?.[0]?.url || ad.ad_creative_videos?.[0]?.thumbnail_url || ad.cdnImageUrl;
-  const directVideoUrl = ad.ad_creative_videos?.[0]?.video_hd_url || ad.ad_creative_videos?.[0]?.video_sd_url || ad.cdnVideoUrl;
+  const adId = ad.id || ad.adId || ad.ad_archive_id;
+  
+  // Hook para buscar a mídia extraída profundamente pelo backend
+  const { data: deepMedia, isLoading } = trpc.ads.getDeepMedia.useQuery(
+    { adId: String(adId) },
+    { 
+      enabled: !!adId,
+      staleTime: 24 * 60 * 60 * 1000, // Cache de 24h no frontend
+    }
+  );
 
   // Função para gerar a URL do Proxy com Mascaramento
   const getProxyUrl = (originalUrl: string) => `/api/ads/proxy-media?url=${encodeURIComponent(originalUrl)}`;
 
-  // Se tivermos vídeo direto, usamos o player nativo com proxy
-  if (directVideoUrl) {
+  if (isLoading) {
     return (
-      <div className="relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden">
-        <video
-          src={getProxyUrl(directVideoUrl)}
-          poster={directImageUrl ? getProxyUrl(directImageUrl) : undefined}
-          className="w-full h-full object-cover"
-          controls={isModal}
-          autoPlay={!isModal}
-          muted
-          loop
-          playsInline
-        />
+      <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 gap-3">
+        <Loader2 className="w-6 h-6 text-zinc-700 animate-spin" />
+        <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest">Extraindo Mídia...</p>
       </div>
     );
   }
 
-  // Se tivermos imagem direta, usamos a tag img com proxy
+  const media = deepMedia?.data;
+
+  // Se a extração profunda funcionou, usamos o resultado (Vídeo ou Imagem)
+  if (media) {
+    if (media.type === 'video') {
+      return (
+        <div className="relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+          <video
+            src={getProxyUrl(media.url)}
+            poster={media.poster ? getProxyUrl(media.poster) : undefined}
+            className="w-full h-full object-cover"
+            controls={isModal}
+            autoPlay={!isModal}
+            muted
+            loop
+            playsInline
+          />
+        </div>
+      );
+    }
+
+    if (media.type === 'image') {
+      return (
+        <div className="relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+          <img
+            src={getProxyUrl(media.url)}
+            alt={ad.page_name || 'Criativo'}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      );
+    }
+  }
+
+  // Fallback para dados básicos se a extração profunda falhar
+  const directImageUrl = ad.ad_creative_images?.[0]?.url || ad.ad_creative_videos?.[0]?.thumbnail_url || ad.cdnImageUrl;
   if (directImageUrl) {
     return (
       <div className="relative w-full h-full bg-zinc-950 flex items-center justify-center overflow-hidden">
@@ -106,7 +141,6 @@ function AdPreviewFrameV3({ ad, isModal = false }: { ad: any; isModal?: boolean 
     );
   }
 
-  // Fallback se não houver mídia direta disponível
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-900/50 gap-3 border border-dashed border-zinc-800 rounded-lg m-2">
       <ImageOff className="w-6 h-6 text-zinc-700" />
@@ -345,7 +379,7 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
                 {/* Actions */}
                 <div className="pt-4 space-y-3">
                   <a
-                    href={ad.ad_snapshot_url || ad.adSnapshotUrl}
+                    href={`https://www.facebook.com/ads/library/?id=${ad.id || ad.adId}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black text-[10px] font-black uppercase tracking-[0.2em] hover:bg-zinc-200 transition-all rounded-2xl"
@@ -354,7 +388,7 @@ export const AdCardV3: React.FC<AdCardV3Props> = ({
                     <ExternalLink className="w-4 h-4" />
                   </a>
                   <p className="text-[8px] text-center text-zinc-700 font-bold uppercase tracking-widest">
-                    O criativo acima é carregado via Proxy Seguro com Mascaramento de Fingerprint.
+                    Mídia extraída profundamente via Headless Browser com Fingerprinting Seguro.
                   </p>
                 </div>
               </div>

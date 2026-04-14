@@ -5,6 +5,7 @@ import { favoriteAds, adMiningLog } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { logger } from "./_core/logger";
 import * as metaAdsService from "./services/metaAdsService";
+import { extractDeepMedia } from "./services/adExtractorService";
 
 /**
  * Ads Router — Refatorado para Gestão de Anúncios e Persistência de Dados Reais
@@ -66,6 +67,34 @@ export const adsRouter = router({
       } catch (error: any) {
         logger.error("[adsRouter] Erro em searchByKeywords", { error: error.message });
         return { success: false, error: error.message || "Erro interno ao buscar anúncios" };
+      }
+    }),
+
+  /**
+   * Extração Profunda de Mídia (Vídeo/Imagem) via Headless Browser
+   * Protege o access_token e burla bloqueios de hotlinking.
+   */
+  getDeepMedia: protectedProcedure
+    .input(z.object({ adId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      try {
+        const userId = ctx.user.id;
+        const db = await getDb();
+        if (!db) throw new Error("Banco de dados indisponível");
+
+        // Buscar credenciais da Meta do usuário
+        const credentials = await db.query.userMetaCredentials.findFirst({
+          where: (table, { eq }) => eq(table.userId, userId),
+        });
+
+        const accessToken = credentials?.encryptedAccessToken || "";
+        if (!accessToken) throw new Error("Token da Meta não configurado.");
+
+        const mediaData = await extractDeepMedia(input.adId, accessToken);
+        return { success: true, data: mediaData };
+      } catch (error: any) {
+        logger.error("[adsRouter] Erro em getDeepMedia", { error: error.message });
+        return { success: false, error: error.message };
       }
     }),
 

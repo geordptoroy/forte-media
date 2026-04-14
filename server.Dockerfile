@@ -27,9 +27,20 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=4000
+# Puppeteer config para rodar no Alpine
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
-# Instalar utilitários essenciais
-RUN apk add --no-cache netcat-openbsd wget
+# Instalar utilitários essenciais e dependências do Chromium para Puppeteer
+RUN apk add --no-cache \
+    netcat-openbsd \
+    wget \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
 
 # Copiar apenas o necessário da etapa de build
 COPY --from=builder /app/package.json ./package.json
