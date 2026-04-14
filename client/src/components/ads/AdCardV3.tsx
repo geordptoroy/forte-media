@@ -246,7 +246,7 @@ export function AdCardV3({ ad }: AdCardProps) {
           className="w-full h-10 bg-white text-black hover:bg-white/90 border-none rounded-none font-black text-[10px] uppercase tracking-[0.2em] mt-auto transition-all active:scale-95"
           asChild
         >
-          <a href={ad.ad_snapshot_url} target="_blank" rel="noreferrer">
+          <a href={`https://www.facebook.com/ads/library/?id=${ad.id}`} target="_blank" rel="noreferrer">
             Analisar Criativo <ExternalLink className="w-3.5 h-3.5 ml-2.5" />
           </a>
         </Button>
