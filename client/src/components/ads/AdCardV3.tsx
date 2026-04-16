@@ -21,6 +21,9 @@ export function AdCardV3({ ad }: AdCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   
+  // Tenta pegar uma miniatura inicial da API da Meta se disponível
+  const initialThumbnail = ad.ad_snapshot_url ? `https://graph.facebook.com/v22.0/${ad.id}/thumbnails` : null;
+
   const extractMutation = trpc.ads.extractMedia.useMutation({
     onSuccess: (data) => {
       if (data.result) {
@@ -66,92 +69,98 @@ export function AdCardV3({ ad }: AdCardProps) {
   const renderMedia = () => {
     if (!isVisible) return null;
 
-    if (isExtracting) {
-      return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-white/[0.01]">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-2 border-white/5" />
-            <div className="absolute inset-0 w-12 h-12 border-t-2 border-white/40 rounded-full animate-spin" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 animate-pulse">
-              Sincronizando
-            </p>
-            <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Extraindo Mídia...</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (!media) {
-      return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 bg-white/[0.01]">
-          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-            <AlertCircle className="w-5 h-5 text-white/10" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-[9px] font-black uppercase tracking-widest text-white/20">
-              Mídia Indisponível
-            </p>
-            <button 
-              onClick={() => {
-                setIsExtracting(true);
-                extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
-              }}
-              className="text-[8px] font-bold text-white/40 hover:text-white underline uppercase tracking-tighter transition-colors"
-            >
-              Tentar Novamente
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (media.type === 'video') {
-      return (
-        <video 
-          src={media.url as string} 
-          className="w-full h-full object-cover" 
-          controls 
-          autoPlay 
-          muted 
-          loop
-          poster={media.thumbnail}
-        />
-      );
-    }
-
-    if (media.type === 'image') {
-      return (
-        <img 
-          src={media.url as string} 
-          className="w-full h-full object-cover" 
-          alt="Ad Creative"
-          loading="lazy"
-        />
-      );
-    }
-
-    if (media.type === 'carousel') {
-      const urls = media.url as string[];
-      return (
-        <div className="relative w-full h-full">
-          <img 
-            src={urls[0]} 
+    // Se já temos a mídia extraída, renderiza o player/imagem final
+    if (media) {
+      if (media.type === 'video') {
+        return (
+          <video 
+            src={media.url as string} 
             className="w-full h-full object-cover" 
-            alt="Carousel Start"
+            controls 
+            autoPlay 
+            muted 
+            loop
+            poster={media.thumbnail}
+          />
+        );
+      }
+
+      if (media.type === 'image') {
+        return (
+          <img 
+            src={media.url as string} 
+            className="w-full h-full object-cover" 
+            alt="Ad Creative"
             loading="lazy"
           />
-          <div className="absolute bottom-3 right-3">
-            <Badge className="bg-black/80 backdrop-blur-md text-[9px] font-black border-white/10 px-2 py-0.5 rounded-none">
-              <Layers className="w-3 h-3 mr-1.5" /> 1/{urls.length}
-            </Badge>
+        );
+      }
+
+      if (media.type === 'carousel') {
+        const urls = media.url as string[];
+        return (
+          <div className="relative w-full h-full">
+            <img 
+              src={urls[0]} 
+              className="w-full h-full object-cover" 
+              alt="Carousel Start"
+              loading="lazy"
+            />
+            <div className="absolute bottom-3 right-3">
+              <Badge className="bg-black/80 backdrop-blur-md text-[9px] font-black border-white/10 px-2 py-0.5 rounded-none">
+                <Layers className="w-3 h-3 mr-1.5" /> 1/{urls.length}
+              </Badge>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // Enquanto extrai, mostra um estado de carregamento com a miniatura de fundo se possível
+    if (isExtracting) {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/[0.01]">
+          {/* Camada de fundo com blur se houver miniatura (simulada ou real) */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent animate-pulse" />
+          
+          <div className="relative z-10 flex flex-col items-center space-y-4">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full border-2 border-white/5" />
+              <div className="absolute inset-0 w-12 h-12 border-t-2 border-white/40 rounded-full animate-spin" />
+            </div>
+            <div className="space-y-1 text-center">
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 animate-pulse">
+                Sincronizando
+              </p>
+              <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Otimizando Mídia...</p>
+            </div>
           </div>
         </div>
       );
     }
 
-    return null;
+    // Fallback se falhar
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 bg-white/[0.01]">
+        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+          <AlertCircle className="w-5 h-5 text-white/10" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[9px] font-black uppercase tracking-widest text-white/20">
+            Mídia Indisponível
+          </p>
+          <button 
+            onClick={() => {
+              setIsExtracting(true);
+              extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
+            }}
+            className="text-[8px] font-bold text-white/40 hover:text-white underline uppercase tracking-tighter transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
   };
   
   return (
