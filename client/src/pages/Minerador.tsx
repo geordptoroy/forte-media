@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, AlertCircle, Globe, LayoutGrid, Tag, Package, Clock, Sparkles, ChevronDown, Zap, ArrowUpDown, EyeOff, RefreshCw } from "lucide-react";
+import { Search, Filter, Loader2, AlertCircle, Globe, LayoutGrid, Tag, Package, Clock, Sparkles, ChevronDown, Zap, ArrowUpDown, EyeOff, RefreshCw, Layers } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -9,7 +9,7 @@ import { Switch } from "../components/ui/switch";
 import DashboardLayout from "../components/DashboardLayout";
 import { AdCardV3 } from "../components/ads/AdCardV3";
 import { AdDetailsModal } from "../components/ads/AdDetailsModal";
-import { cn } from "../lib/utils";
+import { Badge } from "../components/ui/badge";
 
 const COUNTRIES = [
   { code: "BR", name: "Brasil" },
@@ -28,16 +28,13 @@ const COUNTRIES = [
   { code: "CL", name: "Chile" },
 ];
 
-const NICHES = [
-  "Relacionamento", "Espiritualidade", "Renda Extra", "Emagrecimento", 
-  "Marketing Digital", "Desenvolvimento Pessoal", "Finanças/Investimentos", 
-  "Saúde & Fitness", "Beleza & Estética", "Culinária/Receitas", 
-  "Maternidade/Paternidade", "Idiomas", "Concursos Públicos", 
-  "Música/Instrumentos", "Artesanato/DIY", "Pet/Animais", 
-  "Tecnologia/Programação", "Negócios/Empreendedorismo", "Outros"
+const PRODUCT_TYPES = [
+  "Todos", "Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"
 ];
 
-const PRODUCT_TYPES = ["Infoproduto", "Nutra", "Encapsulado", "Todos"];
+const FUNNEL_STRUCTURES = [
+  "Todos", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"
+];
 
 const MiniLabel = ({ children }: { children: React.ReactNode }) => (
   <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30 mb-1.5 ml-1 block font-mono">
@@ -50,8 +47,8 @@ export default function Minerador() {
     searchTerms: "",
     country: "BR",
     adType: "ALL" as "ALL" | "POLITICAL_AND_ISSUE_ADS" | "NON_POLITICAL",
-    niche: "Todos",
-    productType: "Todos",
+    selectedType: "Todos",
+    selectedFunnel: "Todos",
     activeSince: "anytime"
   });
 
@@ -66,7 +63,7 @@ export default function Minerador() {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
-  const [syncKey, setSyncKey] = useState(0); // Para disparar re-extração manual
+  const [syncKey, setSyncKey] = useState(0);
   
   const loaderRef = useRef<HTMLDivElement>(null);
 
@@ -79,9 +76,6 @@ export default function Minerador() {
       searchTerms: filters.searchTerms, 
       country: filters.country, 
       adType: filters.adType === "NON_POLITICAL" ? "ALL" : filters.adType,
-      niche: filters.niche,
-      productType: filters.productType,
-      activeSince: filters.activeSince,
       after: nextCursor
     },
     { 
@@ -118,12 +112,22 @@ export default function Minerador() {
     }
   };
 
-  // Lógica de Ordenação e Filtragem de Ocultos
+  // Lógica de Filtragem Local (Multi-Select Heurística)
   const processedAds = useMemo(() => {
     let filtered = [...allAds];
 
     if (hideLowFrequency) {
       filtered = filtered.filter(ad => (ad.frequency || 0) > 2);
+    }
+
+    // Filtro de Tipo de Produto
+    if (filters.selectedType !== "Todos") {
+      filtered = filtered.filter(ad => ad.detectedTypes?.includes(filters.selectedType));
+    }
+
+    // Filtro de Estrutura de Funil
+    if (filters.selectedFunnel !== "Todos") {
+      filtered = filtered.filter(ad => ad.detectedFunnels?.includes(filters.selectedFunnel));
     }
 
     return filtered.sort((a, b) => {
@@ -137,7 +141,7 @@ export default function Minerador() {
         return sortConfig.direction === "desc" ? dateB - dateA : dateA - dateB;
       }
     });
-  }, [allAds, sortConfig, hideLowFrequency]);
+  }, [allAds, sortConfig, hideLowFrequency, filters.selectedType, filters.selectedFunnel]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -255,27 +259,9 @@ export default function Minerador() {
               </div>
 
               <div className="space-y-0">
-                <MiniLabel>Nicho</MiniLabel>
-                <Select value={filters.niche} onValueChange={(v) => updateFilter("niche", v)}>
+                <MiniLabel>Tipo Produto</MiniLabel>
+                <Select value={filters.selectedType} onValueChange={(v) => updateFilter("selectedType", v)}>
                   <SelectTrigger className="w-full lg:w-[120px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                    <div className="flex items-center gap-2 truncate">
-                      <Tag className="w-3 h-3 text-white/20 shrink-0" />
-                      <SelectValue placeholder="Nicho" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg max-h-[300px]">
-                    <SelectItem value="Todos" className="text-[10px] font-black uppercase py-2">Todos Nichos</SelectItem>
-                    {NICHES.map((n) => (
-                      <SelectItem key={n} value={n} className="text-[10px] font-black uppercase py-2">{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-0">
-                <MiniLabel>Tipo</MiniLabel>
-                <Select value={filters.productType} onValueChange={(v) => updateFilter("productType", v)}>
-                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
                       <Package className="w-3 h-3 text-white/20 shrink-0" />
                       <SelectValue placeholder="Tipo" />
@@ -290,116 +276,82 @@ export default function Minerador() {
               </div>
 
               <div className="space-y-0">
-                <MiniLabel>Tempo</MiniLabel>
-                <Select value={filters.activeSince} onValueChange={(v) => updateFilter("activeSince", v)}>
-                  <SelectTrigger className="w-full lg:w-[100px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                <MiniLabel>Funil</MiniLabel>
+                <Select value={filters.selectedFunnel} onValueChange={(v) => updateFilter("selectedFunnel", v)}>
+                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
-                      <Clock className="w-3 h-3 text-white/20 shrink-0" />
-                      <SelectValue placeholder="Tempo" />
+                      <Layers className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Funil" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                    <SelectItem value="anytime" className="text-[10px] font-black uppercase py-2">Qualquer</SelectItem>
-                    <SelectItem value="7" className="text-[10px] font-black uppercase py-2">7 Dias</SelectItem>
-                    <SelectItem value="30" className="text-[10px] font-black uppercase py-2">30 Dias</SelectItem>
-                    <SelectItem value="90" className="text-[10px] font-black uppercase py-2">90 Dias</SelectItem>
+                    {FUNNEL_STRUCTURES.map((f) => (
+                      <SelectItem key={f} value={f} className="text-[10px] font-black uppercase py-2">{f}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="w-full lg:w-auto">
+              <div className="space-y-0">
+                <MiniLabel>Categoria</MiniLabel>
+                <Select value={filters.adType} onValueChange={(v) => updateFilter("adType", v as any)}>
+                  <SelectTrigger className="w-full lg:w-[130px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <Filter className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Categoria" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                    <SelectItem value="ALL" className="text-[10px] font-black uppercase py-2">Não Políticos</SelectItem>
+                    <SelectItem value="POLITICAL_AND_ISSUE_ADS" className="text-[10px] font-black uppercase py-2">Políticos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button 
-                type="submit" 
+                type="submit"
                 disabled={searchMutation.isLoading}
-                className="w-full lg:w-auto h-10 px-6 bg-white text-black hover:bg-white/90 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shrink-0"
+                className="w-full lg:w-auto h-10 bg-white text-black hover:bg-white/90 font-black uppercase text-[10px] tracking-widest px-6 rounded-lg shadow-lg shadow-white/5 transition-all active:scale-95"
               >
-                {searchMutation.isLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-3 h-3" />
-                    <span>Minerar</span>
-                  </div>
-                )}
+                {searchMutation.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Minerar"}
               </Button>
             </div>
           </form>
         </Card>
 
-        {/* Loading State */}
-        {searchMutation.isLoading && allAds.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-32 space-y-6">
-            <div className="w-12 h-12 border-2 border-white/5 border-t-white rounded-full animate-spin" />
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 animate-pulse">Sincronizando com Meta Ads Archive...</p>
-          </div>
-        )}
+        {/* Grid de Resultados */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {processedAds.map((ad) => (
+            <AdCardV3 key={ad.id} ad={ad} syncKey={syncKey} />
+          ))}
+        </div>
 
-        {/* Error State */}
-        {searchMutation.error && (
-          <Card className="p-6 border-red-500/20 bg-red-500/5 rounded-xl">
-            <div className="flex items-center gap-4">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              <div className="flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-500">Erro de Conexão</p>
-                <p className="text-[10px] font-bold text-red-500/60">{searchMutation.error.message}</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => handleSearch()} className="border-red-500/20 text-red-500 hover:bg-red-500/10 text-[9px] font-black uppercase">Tentar Novamente</Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Empty State */}
-        {hasSearched && !searchMutation.isLoading && processedAds.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-xl space-y-3">
-            <Search className="w-6 h-6 text-white/10" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Nenhum criativo encontrado para estes filtros.</p>
-          </div>
-        )}
-
-        {/* Results Grid */}
-        {processedAds.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-            {processedAds.map((ad: any) => (
-              <AdCardV3 
-                key={`${ad.id}-${syncKey}`} 
-                ad={ad} 
-                onExpand={(ad, media) => setSelectedAd({ ad, media })}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Infinite Scroll Loader */}
-        <div ref={loaderRef} className="py-10 flex justify-center">
+        {/* Loading State & Infinite Scroll Target */}
+        <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
           {isFetchingMore && (
-            <div className="flex items-center gap-3">
-              <Loader2 className="w-4 h-4 text-white/40 animate-spin" />
-              <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Carregando mais criativos...</p>
+            <>
+              <Loader2 className="w-6 h-6 text-white/20 animate-spin" />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Carregando mais criativos...</p>
+            </>
+          )}
+          {!isFetchingMore && hasSearched && processedAds.length === 0 && (
+            <div className="flex flex-col items-center gap-3 text-white/20">
+              <AlertCircle className="w-8 h-8" />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em]">Nenhum anúncio encontrado</p>
             </div>
           )}
         </div>
-
-        {/* Ad Details Modal */}
-        <AdDetailsModal 
-          ad={selectedAd?.ad}
-          media={selectedAd?.media}
-          isOpen={!!selectedAd}
-          onClose={() => setSelectedAd(null)}
-        />
       </div>
-    </DashboardLayout>
-  );
-}
 
-function Badge({ children, variant, className }: any) {
-  return (
-    <span className={cn(
-      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-      variant === "outline" ? "text-foreground border border-white/10" : "bg-primary text-primary-foreground hover:bg-primary/80",
-      className
-    )}>
-      {children}
-    </span>
+      {/* Modal de Detalhes */}
+      {selectedAd && (
+        <AdDetailsModal 
+          ad={selectedAd.ad} 
+          media={selectedAd.media} 
+          isOpen={!!selectedAd} 
+          onClose={() => setSelectedAd(null)} 
+        />
+      )}
+    </DashboardLayout>
   );
 }
