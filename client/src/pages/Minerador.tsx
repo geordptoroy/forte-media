@@ -57,8 +57,15 @@ export default function Minerador() {
     direction: "desc" as "asc" | "desc"
   });
 
-  const [hidePolitical, setHidePolitical] = useState(true);
+  const [hidePolitical, setHidePolitical] = useState(() => {
+    const saved = localStorage.getItem("hidePolitical");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [hideLowFrequency, setHideLowFrequency] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("hidePolitical", JSON.stringify(hidePolitical));
+  }, [hidePolitical]);
   const [allAds, setAllAds] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -180,9 +187,9 @@ export default function Minerador() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg">
+            <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg min-w-[280px]">
               <Filter className="w-3 h-3 text-white/40" />
-              <span className="text-[9px] font-black uppercase text-white/60">Ocultar Políticos</span>
+              <span className="text-[9px] font-black uppercase text-white/60">Ocultar Ads Políticos e de Temas Sociais</span>
               <Switch 
                 checked={hidePolitical} 
                 onCheckedChange={setHidePolitical}
