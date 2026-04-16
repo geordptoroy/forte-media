@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
 
@@ -225,16 +225,8 @@ export function AdCardV3({ ad }: AdCardProps) {
           </p>
         </div>
 
-        {/* Metrics Grid */}
+        {/* Metrics Grid - Atualizado conforme solicitado */}
         <div className="grid grid-cols-2 gap-2 pt-1">
-          <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
-            <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
-              <DollarSign className="w-2.5 h-2.5" /> Gasto
-            </div>
-            <p className="text-[10px] font-black text-white tabular-nums">
-              {ad.currency} {ad.spend?.lower_bound || 0} - {ad.spend?.upper_bound || '100+'}
-            </p>
-          </div>
           <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
             <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
               <Eye className="w-2.5 h-2.5" /> Impressões
@@ -243,13 +235,37 @@ export function AdCardV3({ ad }: AdCardProps) {
               {ad.impressions?.lower_bound || 0} - {ad.impressions?.upper_bound || '1k+'}
             </p>
           </div>
+          <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
+            <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
+              <Repeat className="w-2.5 h-2.5" /> Frequência
+            </div>
+            <p className="text-[10px] font-black text-white tabular-nums">
+              {ad.frequency || 1} Anúncios
+            </p>
+          </div>
+          <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
+            <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
+              <Package className="w-2.5 h-2.5" /> Tipo
+            </div>
+            <p className="text-[10px] font-black text-white truncate uppercase tracking-tighter">
+              {ad.detectedProductType || 'Infoproduto'}
+            </p>
+          </div>
+          <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
+            <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
+              <Tag className="w-2.5 h-2.5" /> Nicho
+            </div>
+            <p className="text-[10px] font-black text-white truncate uppercase tracking-tighter">
+              {ad.detectedNiche || 'Outros'}
+            </p>
+          </div>
         </div>
 
         <div className="flex gap-2 mt-auto pt-2">
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1 h-9 bg-white text-black hover:bg-white/90 border-none rounded-lg font-black text-[9px] uppercase tracking-[0.1em] transition-all active:scale-95"
+            className="flex-1 h-9 bg-transparent text-white hover:bg-white/10 border border-white/20 hover:border-white/60 rounded-lg font-black text-[9px] uppercase tracking-[0.1em] transition-all active:scale-95"
             asChild
           >
             <a href={officialLibraryUrl} target="_blank" rel="noreferrer">
@@ -260,7 +276,7 @@ export function AdCardV3({ ad }: AdCardProps) {
           <Button 
             variant="outline" 
             size="icon" 
-            className="w-9 h-9 bg-white/[0.05] hover:bg-white/[0.1] border-white/[0.1] rounded-lg text-white transition-all active:scale-95"
+            className="w-9 h-9 bg-transparent hover:bg-white/10 border border-white/20 hover:border-white/60 rounded-lg text-white transition-all active:scale-95"
             onClick={copyToClipboard}
           >
             <LinkIcon className="w-3.5 h-3.5" />

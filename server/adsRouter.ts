@@ -10,7 +10,10 @@ export const adsRouter = router({
         searchTerms: z.string().min(1),
         country: z.string().default("BR"),
         adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS"]).default("ALL"),
-        limit: z.number().min(1).max(500).default(50), // Aumentado para 50 por padrão, max 500
+        limit: z.number().min(1).max(500).default(50),
+        niche: z.string().optional(),
+        productType: z.string().optional(),
+        activeSince: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
