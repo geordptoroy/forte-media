@@ -72,8 +72,12 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [syncKey, setSyncKey] = useState(0);
+  const [autoLoad, setAutoLoad] = useState(false);
+  const [autoLoadLimit, setAutoLoadLimit] = useState(20);
+  const [isAutoLoading, setIsAutoLoading] = useState(false);
   
   const loaderRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -118,14 +122,62 @@ export default function Minerador() {
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    
+    // Cancelar qualquer auto-carregamento em curso
+    setIsAutoLoading(false);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     setHasSearched(true);
     setAllAds([]);
     setNextCursor(undefined);
     
     const result = await searchMutation.refetch();
     if (result.data) {
-      setAllAds(result.data.data);
-      setNextCursor(result.data.paging?.next_cursor);
+      const ads = result.data.data;
+      setAllAds(ads);
+      const cursor = result.data.paging?.next_cursor;
+      setNextCursor(cursor);
+
+      // Se autoLoad estiver ativo e não atingiu o limite, inicia o loop
+      if (autoLoad && ads.length < autoLoadLimit && cursor) {
+        startAutoLoad(ads.length, cursor);
+      }
+    }
+  };
+
+  const startAutoLoad = async (currentCount: number, cursor: string) => {
+    setIsAutoLoading(true);
+    let totalLoaded = currentCount;
+    let currentCursor: string | undefined = cursor;
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      while (totalLoaded < autoLoadLimit && currentCursor && !controller.signal.aborted) {
+        // Pequeno delay para evitar rate limit
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        if (controller.signal.aborted) break;
+
+        const result = await searchMutation.refetch();
+        if (!result.data || controller.signal.aborted) break;
+
+        const newAds = result.data.data;
+        setAllAds(prev => [...prev, ...newAds]);
+        totalLoaded += newAds.length;
+        currentCursor = result.data.paging?.next_cursor;
+        setNextCursor(currentCursor);
+
+        if (!currentCursor) break;
+      }
+    } catch (error) {
+      console.error("Erro no auto-carregamento:", error);
+    } finally {
+      setIsAutoLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -232,6 +284,18 @@ export default function Minerador() {
                 checked={hidePolitical} 
                 onCheckedChange={setHidePolitical}
                 className="scale-90 data-[state=checked]:bg-emerald-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg">
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black uppercase text-white/40 leading-none mb-1">Auto-Load</span>
+                <span className="text-[9px] font-black uppercase text-white/70 leading-none">Até {autoLoadLimit} Ads</span>
+              </div>
+              <Switch 
+                checked={autoLoad} 
+                onCheckedChange={setAutoLoad}
+                className="scale-75 data-[state=checked]:bg-blue-500"
               />
             </div>
 
@@ -360,10 +424,25 @@ export default function Minerador() {
 
         {/* Loading State & Infinite Scroll Target */}
         <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
-          {isFetchingMore && (
+          {(isFetchingMore || isAutoLoading) && (
             <>
               <Loader2 className="w-6 h-6 text-white/20 animate-spin" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Carregando mais criativos...</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
+                {isAutoLoading ? `Auto-carregando: ${allAds.length} de ${autoLoadLimit} anúncios...` : "Carregando mais criativos..."}
+              </p>
+              {isAutoLoading && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setIsAutoLoading(false);
+                    if (abortControllerRef.current) abortControllerRef.current.abort();
+                  }}
+                  className="text-[8px] font-black uppercase text-red-500/50 hover:text-red-500 hover:bg-red-500/10"
+                >
+                  Parar Carregamento
+                </Button>
+              )}
             </>
           )}
           {!isFetchingMore && hasSearched && processedAds.length === 0 && (
