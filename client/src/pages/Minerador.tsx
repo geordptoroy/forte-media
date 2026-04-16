@@ -79,11 +79,12 @@ export default function Minerador() {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  // Buscamos sempre ambos os tipos na API para permitir a filtragem local instantânea e precisa
   const searchMutation = trpc.ads.search.useQuery(
     { 
       searchTerms: filters.searchTerms, 
       country: filters.country, 
-      adType: hidePolitical ? "ALL" : "POLITICAL_AND_ISSUE_ADS",
+      adType: "ALL", // Sempre buscamos todos para filtrar localmente conforme a regra de "APENAS" ou "OCULTAR"
       after: nextCursor
     },
     { 
@@ -123,6 +124,14 @@ export default function Minerador() {
   // Lógica de Filtragem Local (Multi-Select Heurística)
   const processedAds = useMemo(() => {
     let filtered = [...allAds];
+
+    // Lógica de filtragem de anúncios políticos/sociais
+    // Se hidePolitical for true: remove anúncios que têm 'bylines' (indicador de anúncio político/social na Meta API)
+    // Se hidePolitical for false: mantém APENAS anúncios que têm 'bylines'
+    filtered = filtered.filter(ad => {
+      const isPolitical = !!ad.bylines;
+      return hidePolitical ? !isPolitical : isPolitical;
+    });
 
     if (hideLowFrequency) {
       filtered = filtered.filter(ad => (ad.frequency || 0) > 2);
@@ -187,13 +196,15 @@ export default function Minerador() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg min-w-[280px]">
-              <Filter className="w-3 h-3 text-white/40" />
-              <span className="text-[9px] font-black uppercase text-white/60">Ocultar Ads Políticos e de Temas Sociais</span>
+            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-lg min-w-[380px]">
+              <Filter className="w-3.5 h-3.5 text-white/40" />
+              <span className="text-[10px] font-black uppercase text-white/70 whitespace-nowrap">
+                {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
+              </span>
               <Switch 
                 checked={hidePolitical} 
                 onCheckedChange={setHidePolitical}
-                className="scale-75 data-[state=checked]:bg-emerald-500"
+                className="scale-90 data-[state=checked]:bg-emerald-500"
               />
             </div>
 
