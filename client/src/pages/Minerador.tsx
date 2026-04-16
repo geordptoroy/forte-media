@@ -37,7 +37,7 @@ const FUNNEL_STRUCTURES = [
 ];
 
 const MiniLabel = ({ children }: { children: React.ReactNode }) => (
-  <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30 mb-1.5 ml-1 block font-mono">
+  <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/60 mb-1.5 ml-1 block font-mono">
     {children}
   </label>
 );
