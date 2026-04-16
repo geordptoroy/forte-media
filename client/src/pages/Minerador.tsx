@@ -79,6 +79,29 @@ export default function Minerador() {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  // Debounce para busca por palavra-chave
+  useEffect(() => {
+    if (!filters.searchTerms) return;
+    const timer = setTimeout(() => {
+      handleSearch();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [filters.searchTerms]);
+
+  // Atualização automática para filtros globais (País)
+  useEffect(() => {
+    if (hasSearched) {
+      handleSearch();
+    }
+  }, [filters.country]);
+
+  // Atualização automática para o filtro de Ads Políticos (Global)
+  useEffect(() => {
+    if (hasSearched) {
+      handleSearch();
+    }
+  }, [hidePolitical]);
+
   // Buscamos sempre ambos os tipos na API para permitir a filtragem local instantânea e precisa
   const searchMutation = trpc.ads.search.useQuery(
     { 
@@ -105,6 +128,10 @@ export default function Minerador() {
       setNextCursor(result.data.paging?.next_cursor);
     }
   };
+
+  // NOTA: Filtros locais (Tipo Produto, Funil, Ordenacao) nao disparam chamadas a API
+  // Eles sao reaplicados automaticamente no useMemo(processedAds) sem necessidade de refetch
+  // Apenas filtros globais (Palavra-chave, Pais, Ads Politicos) disparam novas requisicoes a API
 
   const fetchMore = async () => {
     if (isFetchingMore || !nextCursor) return;
