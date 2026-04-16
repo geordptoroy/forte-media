@@ -7,13 +7,14 @@ export const adsRouter = router({
   search: protectedProcedure
     .input(
       z.object({
-        searchTerms: z.string().min(1),
+        searchTerms: z.string().optional().default(""),
         country: z.string().default("BR"),
         adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS"]).default("ALL"),
         limit: z.number().min(1).max(500).default(50),
         niche: z.string().optional(),
         productType: z.string().optional(),
         activeSince: z.string().optional(),
+        after: z.string().optional(), // Suporte a paginação
       })
     )
     .query(async ({ input }) => {

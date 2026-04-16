@@ -12,27 +12,75 @@ const ALL_FIELDS = [
   'target_gender', 'target_locations', 'age_country_gender_reach_breakdown', 'bylines'
 ];
 
-// Dicionário de Nichos com Palavras-Chave Expandidas
-const NICHE_KEYWORDS: Record<string, string[]> = {
-  "Relacionamento": ["namoro", "casamento", "conquista", "relacionamento", "ex", "seduzir", "reconquista", "parceiro", "esposa", "marido"],
-  "Espiritualidade": ["deus", "fé", "oração", "espiritual", "alma", "meditação", "universo", "astrologia", "signo", "manifestação", "lei da atração"],
-  "Renda Extra": ["dinheiro", "ganhar", "renda", "trabalhar em casa", "lucro", "vendas", "afiliado", "dropshipping", "marketing digital", "comissão", "liberdade financeira"],
-  "Emagrecimento": ["perder peso", "emagrecer", "dieta", "jejum", "queimar gordura", "detox", "fitness", "barriga", "peso", "calorias", "receitas fit"],
-  "Marketing Digital": ["tráfego", "lançamento", "copywriting", "vendas online", "anúncios", "leads", "conversão", "funil", "pixel", "escala"],
-  "Finanças/Investimentos": ["investir", "bolsa", "ações", "cripto", "tesouro", "dividendos", "poupando", "bitcoin", "mercado financeiro", "trade"],
-  "Saúde & Fitness": ["treino", "academia", "músculo", "saúde", "suplemento", "corpo", "hipertrofia", "exercício", "performance"],
-  "Beleza & Estética": ["pele", "cabelo", "maquiagem", "unhas", "estética", "rosto", "beleza", "rugas", "rejuvenescimento", "colágeno"],
-  "Culinária/Receitas": ["receita", "cozinhar", "bolo", "doce", "chef", "comida", "sabor", "gastronomia", "cozinha"],
-  "Maternidade/Paternidade": ["bebê", "filho", "mãe", "pai", "gravidez", "criança", "educação", "fralda", "amamentação"],
-  "Idiomas": ["inglês", "espanhol", "falar", "fluente", "curso de", "idioma", "aprender", "vocabulário"],
-  "Tecnologia/Programação": ["código", "python", "javascript", "dev", "software", "tecnologia", "programador", "ti", "web"],
-  "Negócios/Empreendedorismo": ["empresa", "negócio", "empreender", "gestão", "líder", "sucesso", "estratégia", "faturamento"]
+// Dicionário de Nichos com Palavras-Chave Estratégicas para Busca e Classificação
+const NICHE_CONFIG: Record<string, { keywords: string[], searchTerms: string[] }> = {
+  "Relacionamento": {
+    keywords: ["namoro", "casamento", "conquista", "relacionamento", "ex", "seduzir", "reconquista", "parceiro", "esposa", "marido"],
+    searchTerms: ["conquista", "relacionamento", "salvar casamento"]
+  },
+  "Espiritualidade": {
+    keywords: ["deus", "fé", "oração", "espiritual", "alma", "meditação", "universo", "astrologia", "signo", "manifestação", "lei da atração"],
+    searchTerms: ["lei da atração", "meditação guiada", "oração"]
+  },
+  "Renda Extra": {
+    keywords: ["dinheiro", "ganhar", "renda", "trabalhar em casa", "lucro", "vendas", "afiliado", "dropshipping", "marketing digital", "comissão", "liberdade financeira"],
+    searchTerms: ["renda extra", "trabalhar em casa", "ganhar dinheiro online"]
+  },
+  "Emagrecimento": {
+    keywords: ["perder peso", "emagrecer", "dieta", "jejum", "queimar gordura", "detox", "fitness", "barriga", "peso", "calorias", "receitas fit"],
+    searchTerms: ["emagrecer rápido", "dieta detox", "queimar gordura"]
+  },
+  "Marketing Digital": {
+    keywords: ["tráfego", "lançamento", "copywriting", "vendas online", "anúncios", "leads", "conversão", "funil", "pixel", "escala"],
+    searchTerms: ["tráfego pago", "vendas online", "marketing digital"]
+  },
+  "Finanças/Investimentos": {
+    keywords: ["investir", "bolsa", "ações", "cripto", "tesouro", "dividendos", "poupando", "bitcoin", "mercado financeiro", "trade"],
+    searchTerms: ["investimentos", "bolsa de valores", "criptomoedas"]
+  },
+  "Saúde & Fitness": {
+    keywords: ["treino", "academia", "músculo", "saúde", "suplemento", "corpo", "hipertrofia", "exercício", "performance"],
+    searchTerms: ["treino em casa", "suplementos", "hipertrofia"]
+  },
+  "Beleza & Estética": {
+    keywords: ["pele", "cabelo", "maquiagem", "unhas", "estética", "rosto", "beleza", "rugas", "rejuvenescimento", "colágeno"],
+    searchTerms: ["cuidados com a pele", "maquiagem profissional", "rejuvenescimento"]
+  },
+  "Culinária/Receitas": {
+    keywords: ["receita", "cozinhar", "bolo", "doce", "chef", "comida", "sabor", "gastronomia", "cozinha"],
+    searchTerms: ["receitas fáceis", "confeitaria", "cozinha gourmet"]
+  },
+  "Maternidade/Paternidade": {
+    keywords: ["bebê", "filho", "mãe", "pai", "gravidez", "criança", "educação", "fralda", "amamentação"],
+    searchTerms: ["maternidade", "cuidados com bebê", "educação infantil"]
+  },
+  "Idiomas": {
+    keywords: ["inglês", "espanhol", "falar", "fluente", "curso de", "idioma", "aprender", "vocabulário"],
+    searchTerms: ["curso de inglês", "falar espanhol", "aprender idiomas"]
+  },
+  "Tecnologia/Programação": {
+    keywords: ["código", "python", "javascript", "dev", "software", "tecnologia", "programador", "ti", "web"],
+    searchTerms: ["curso de programação", "aprender python", "desenvolvimento web"]
+  },
+  "Negócios/Empreendedorismo": {
+    keywords: ["empresa", "negócio", "empreender", "gestão", "líder", "sucesso", "estratégia", "faturamento"],
+    searchTerms: ["empreendedorismo", "gestão de negócios", "estratégia de vendas"]
+  }
 };
 
-const PRODUCT_TYPE_KEYWORDS: Record<string, string[]> = {
-  "Infoproduto": ["curso", "e-book", "mentoria", "aula", "treinamento", "digital", "pdf", "acesso imediato", "vagas", "inscrição"],
-  "Nutra": ["suplemento", "vitamina", "natural", "cápsula", "saúde", "fórmula", "extrato", "gotas", "comprimido"],
-  "Encapsulado": ["pote", "frasco", "cápsulas", "tratamento", "entrega", "frete", "estoque", "unidades", "frascos"]
+const PRODUCT_TYPE_CONFIG: Record<string, { keywords: string[], searchTerms: string[] }> = {
+  "Infoproduto": {
+    keywords: ["curso", "e-book", "mentoria", "aula", "treinamento", "digital", "pdf", "acesso imediato", "vagas", "inscrição"],
+    searchTerms: ["curso online", "ebook", "mentoria"]
+  },
+  "Nutra": {
+    keywords: ["suplemento", "vitamina", "natural", "cápsula", "saúde", "fórmula", "extrato", "gotas", "comprimido"],
+    searchTerms: ["suplemento natural", "vitamina", "gotas para emagrecer"]
+  },
+  "Encapsulado": {
+    keywords: ["pote", "frasco", "cápsulas", "tratamento", "entrega", "frete", "estoque", "unidades", "frascos"],
+    searchTerms: ["encapsulado", "frasco", "tratamento natural"]
+  }
 };
 
 export interface SearchAdsParams {
@@ -44,6 +92,7 @@ export interface SearchAdsParams {
   niche?: string;
   productType?: string;
   activeSince?: string;
+  after?: string; // Para paginação
 }
 
 function classifyAd(ad: any) {
@@ -52,19 +101,17 @@ function classifyAd(ad: any) {
   const combinedText = `${body} ${title}`;
 
   let detectedNiche = "Outros";
-  let detectedType = "Infoproduto"; // Default
+  let detectedType = "Infoproduto";
 
-  // Classificação de Nicho
-  for (const [n, keywords] of Object.entries(NICHE_KEYWORDS)) {
-    if (keywords.some(k => combinedText.includes(k))) {
+  for (const [n, config] of Object.entries(NICHE_CONFIG)) {
+    if (config.keywords.some(k => combinedText.includes(k))) {
       detectedNiche = n;
       break;
     }
   }
 
-  // Classificação de Tipo de Produto
-  for (const [t, keywords] of Object.entries(PRODUCT_TYPE_KEYWORDS)) {
-    if (keywords.some(k => combinedText.includes(k))) {
+  for (const [t, config] of Object.entries(PRODUCT_TYPE_CONFIG)) {
+    if (config.keywords.some(k => combinedText.includes(k))) {
       detectedType = t;
       break;
     }
@@ -75,11 +122,23 @@ function classifyAd(ad: any) {
 
 export async function searchAds(params: SearchAdsParams) {
   const accessToken = params.accessToken || process.env.META_ACCESS_TOKEN || FALLBACK_TOKEN;
-  const { searchTerms, country = 'BR', adType = 'ALL', limit = 100, activeSince } = params;
+  const { country = 'BR', adType = 'ALL', limit = 100, activeSince, after } = params;
+
+  // Construção inteligente dos termos de busca
+  let finalSearchTerms = params.searchTerms;
+  
+  // Se o usuário selecionou um nicho mas não digitou palavra-chave, usamos os termos do nicho
+  if (!finalSearchTerms && params.niche && NICHE_CONFIG[params.niche]) {
+    finalSearchTerms = NICHE_CONFIG[params.niche].searchTerms[0];
+  }
+  
+  // Se selecionou tipo de produto, adicionamos termos do tipo para refinar
+  if (params.productType && PRODUCT_TYPE_CONFIG[params.productType]) {
+    finalSearchTerms = `${finalSearchTerms} ${PRODUCT_TYPE_CONFIG[params.productType].searchTerms[0]}`.trim();
+  }
 
   const url = `https://graph.facebook.com/v22.0/ads_archive`;
   
-  // Filtro de data de início (Meta API nativo)
   let start_date_min = undefined;
   if (activeSince && activeSince !== 'anytime') {
     const now = new Date();
@@ -90,54 +149,69 @@ export async function searchAds(params: SearchAdsParams) {
     }
   }
 
+  const MIN_RESULTS = 20;
+  let allAds: any[] = [];
+  let currentAfter = after;
+  let attempts = 0;
+  const MAX_ATTEMPTS = 3;
+
   try {
-    logger.info(`[MetaAds] Iniciando busca robusta: "${searchTerms}" | País: ${country} | Categoria: ${adType}`);
-    
-    const response = await axios.get(url, {
-      params: {
-        access_token: accessToken,
-        search_terms: searchTerms,
-        ad_type: adType,
-        ad_reached_countries: `['${country}']`,
-        fields: ALL_FIELDS.join(','),
-        limit: limit,
-        ad_active_status: 'ACTIVE', // Focar apenas em anúncios ativos para mineração
-        ...(start_date_min && { ad_delivery_start_time_min: start_date_min })
-      }
-    });
-
-    const rawAds = response.data.data || [];
-    logger.info(`[MetaAds] ${rawAds.length} anúncios brutos recebidos da API.`);
-    
-    // Processamento e Classificação em Memória
-    const processedAds = rawAds.map((ad: any) => {
-      const classification = classifyAd(ad);
+    // Loop de Busca Mínima Garantida
+    while (allAds.length < MIN_RESULTS && attempts < MAX_ATTEMPTS) {
+      logger.info(`[MetaAds] Tentativa ${attempts + 1}: Buscando "${finalSearchTerms}" | After: ${currentAfter}`);
       
-      // Simulação de frequência baseada em similaridade de corpo (opcional, aqui simplificado)
-      const frequency = Math.floor(Math.random() * 8) + 1; 
+      const response = await axios.get(url, {
+        params: {
+          access_token: accessToken,
+          search_terms: finalSearchTerms,
+          ad_type: adType,
+          ad_reached_countries: `['${country}']`,
+          fields: ALL_FIELDS.join(','),
+          limit: limit,
+          ad_active_status: 'ACTIVE',
+          ...(start_date_min && { ad_delivery_start_time_min: start_date_min }),
+          ...(currentAfter && { after: currentAfter })
+        }
+      });
 
-      return {
-        ...ad,
-        detectedNiche: classification.niche,
-        detectedProductType: classification.productType,
-        frequency
-      };
-    });
+      const rawAds = response.data.data || [];
+      const paging = response.data.paging;
+      
+      const processed = rawAds.map((ad: any) => {
+        const classification = classifyAd(ad);
+        return {
+          ...ad,
+          detectedNiche: classification.niche,
+          detectedProductType: classification.productType,
+          frequency: Math.floor(Math.random() * 8) + 1
+        };
+      });
 
-    // Aplicação de Filtros de Precisão (Pós-API)
-    let filteredAds = processedAds;
+      // Filtragem de precisão
+      let filtered = processed;
+      if (params.niche && params.niche !== "Todos") {
+        filtered = filtered.filter((ad: any) => ad.detectedNiche === params.niche);
+      }
+      if (params.productType && params.productType !== "Todos") {
+        filtered = filtered.filter((ad: any) => ad.detectedProductType === params.productType);
+      }
 
-    if (params.niche && params.niche !== "Todos") {
-      filteredAds = filteredAds.filter((ad: any) => ad.detectedNiche === params.niche);
-      logger.info(`[MetaAds] Filtrado por Nicho (${params.niche}): ${filteredAds.length} restantes.`);
+      allAds = [...allAds, ...filtered];
+      
+      if (!paging?.next || filtered.length >= MIN_RESULTS) break;
+      
+      currentAfter = paging.cursors?.after;
+      attempts++;
     }
 
-    if (params.productType && params.productType !== "Todos") {
-      filteredAds = filteredAds.filter((ad: any) => ad.detectedProductType === params.productType);
-      logger.info(`[MetaAds] Filtrado por Tipo (${params.productType}): ${filteredAds.length} restantes.`);
-    }
-
-    return filteredAds;
+    logger.info(`[MetaAds] Busca finalizada com ${allAds.length} anúncios.`);
+    
+    return {
+      data: allAds,
+      paging: {
+        next_cursor: currentAfter
+      }
+    };
   } catch (error: any) {
     const errorData = error.response?.data || { error: { message: error.message } };
     logger.error(`[MetaAds] Erro na API da Meta:`, errorData);

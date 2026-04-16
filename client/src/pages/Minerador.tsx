@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { trpc } from "../lib/trpc";
 import { Search, Filter, Loader2, AlertCircle, Globe, LayoutGrid, Tag, Package, Clock, Sparkles, ChevronDown, Zap } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -37,7 +37,6 @@ const NICHES = [
 
 const PRODUCT_TYPES = ["Infoproduto", "Nutra", "Encapsulado", "Todos"];
 
-// Componente de Label Compacto
 const MiniLabel = ({ children }: { children: React.ReactNode }) => (
   <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30 mb-1.5 ml-1 block font-mono">
     {children}
@@ -54,20 +53,25 @@ export default function Minerador() {
     activeSince: "anytime"
   });
 
+  const [allAds, setAllAds] = useState<any[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const { data: ads, isLoading, error, refetch } = trpc.ads.search.useQuery(
+  const searchMutation = trpc.ads.search.useQuery(
     { 
       searchTerms: filters.searchTerms, 
       country: filters.country, 
       adType: filters.adType === "NON_POLITICAL" ? "ALL" : filters.adType,
       niche: filters.niche,
       productType: filters.productType,
-      activeSince: filters.activeSince
+      activeSince: filters.activeSince,
+      after: nextCursor
     },
     { 
       enabled: false,
@@ -75,13 +79,51 @@ export default function Minerador() {
     }
   );
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (filters.searchTerms.trim()) {
-      setHasSearched(true);
-      refetch();
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setHasSearched(true);
+    setAllAds([]);
+    setNextCursor(undefined);
+    
+    const result = await searchMutation.refetch();
+    if (result.data) {
+      setAllAds(result.data.data);
+      setNextCursor(result.data.paging?.next_cursor);
     }
   };
+
+  const fetchMore = async () => {
+    if (isFetchingMore || !nextCursor) return;
+    setIsFetchingMore(true);
+    
+    try {
+      const result = await searchMutation.refetch();
+      if (result.data) {
+        setAllAds(prev => [...prev, ...result.data.data]);
+        setNextCursor(result.data.paging?.next_cursor);
+      }
+    } finally {
+      setIsFetchingMore(false);
+    }
+  };
+
+  // Intersection Observer para Scroll Infinito
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && nextCursor && !isFetchingMore) {
+          fetchMore();
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (loaderRef.current) {
+      observer.observe(loaderRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [nextCursor, isFetchingMore]);
 
   return (
     <DashboardLayout>
@@ -94,19 +136,17 @@ export default function Minerador() {
               <Zap className="w-3.5 h-3.5 text-black" />
             </div>
             <h1 className="text-lg font-black tracking-tighter uppercase italic">Minerador Pro</h1>
-            {ads && (
+            {allAds.length > 0 && (
               <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
-                {ads.length} RESULTADOS
+                {allAds.length} RESULTADOS
               </Badge>
             )}
           </div>
         </div>
 
-        {/* Barra de Filtros de Alta Densidade com Labels */}
+        {/* Barra de Filtros */}
         <Card className="p-4 bg-[#0A0A0A] border-white/[0.08] rounded-xl shadow-xl">
           <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-end gap-3">
-            
-            {/* Busca Principal */}
             <div className="flex-1 w-full space-y-0">
               <MiniLabel>Palavra-chave</MiniLabel>
               <div className="relative group">
@@ -120,10 +160,7 @@ export default function Minerador() {
               </div>
             </div>
 
-            {/* Filtros Dropdown */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:flex items-end gap-2 w-full lg:w-auto">
-              
-              {/* País */}
               <div className="space-y-0">
                 <MiniLabel>País</MiniLabel>
                 <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
@@ -141,7 +178,6 @@ export default function Minerador() {
                 </Select>
               </div>
 
-              {/* Nicho */}
               <div className="space-y-0">
                 <MiniLabel>Nicho</MiniLabel>
                 <Select value={filters.niche} onValueChange={(v) => updateFilter("niche", v)}>
@@ -160,7 +196,6 @@ export default function Minerador() {
                 </Select>
               </div>
 
-              {/* Tipo */}
               <div className="space-y-0">
                 <MiniLabel>Tipo</MiniLabel>
                 <Select value={filters.productType} onValueChange={(v) => updateFilter("productType", v)}>
@@ -178,7 +213,6 @@ export default function Minerador() {
                 </Select>
               </div>
 
-              {/* Tempo */}
               <div className="space-y-0">
                 <MiniLabel>Tempo</MiniLabel>
                 <Select value={filters.activeSince} onValueChange={(v) => updateFilter("activeSince", v)}>
@@ -197,7 +231,6 @@ export default function Minerador() {
                 </Select>
               </div>
 
-              {/* Categoria */}
               <div className="space-y-0">
                 <MiniLabel>Categoria</MiniLabel>
                 <Select value={filters.adType} onValueChange={(v: any) => updateFilter("adType", v)}>
@@ -216,14 +249,13 @@ export default function Minerador() {
               </div>
             </div>
 
-            {/* Botão de Busca */}
             <div className="w-full lg:w-auto">
               <Button 
                 type="submit" 
-                disabled={isLoading}
+                disabled={searchMutation.isLoading}
                 className="w-full lg:w-auto h-10 px-6 bg-white text-black hover:bg-white/90 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shrink-0"
               >
-                {isLoading ? (
+                {searchMutation.isLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <div className="flex items-center gap-2">
@@ -237,7 +269,7 @@ export default function Minerador() {
         </Card>
 
         {/* Loading State */}
-        {isLoading && (
+        {searchMutation.isLoading && allAds.length === 0 && (
           <div className="flex flex-col items-center justify-center py-32 space-y-6">
             <div className="w-12 h-12 border-2 border-white/5 border-t-white rounded-full animate-spin" />
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 animate-pulse">Sincronizando com Meta Ads Archive...</p>
@@ -245,21 +277,21 @@ export default function Minerador() {
         )}
 
         {/* Error State */}
-        {error && (
+        {searchMutation.error && (
           <Card className="p-6 border-red-500/20 bg-red-500/5 rounded-xl">
             <div className="flex items-center gap-4">
               <AlertCircle className="h-5 w-5 text-red-500" />
               <div className="flex-1">
                 <p className="text-[10px] font-black uppercase tracking-widest text-red-500">Erro de Conexão</p>
-                <p className="text-[10px] font-bold text-red-500/60">{error.message}</p>
+                <p className="text-[10px] font-bold text-red-500/60">{searchMutation.error.message}</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => refetch()} className="border-red-500/20 text-red-500 hover:bg-red-500/10 text-[9px] font-black uppercase">Tentar Novamente</Button>
+              <Button variant="outline" size="sm" onClick={() => handleSearch()} className="border-red-500/20 text-red-500 hover:bg-red-500/10 text-[9px] font-black uppercase">Tentar Novamente</Button>
             </div>
           </Card>
         )}
 
         {/* Empty State */}
-        {hasSearched && !isLoading && ads && ads.length === 0 && (
+        {hasSearched && !searchMutation.isLoading && allAds.length === 0 && (
           <div className="flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-xl space-y-3">
             <Search className="w-6 h-6 text-white/10" />
             <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Nenhum criativo encontrado para estes filtros.</p>
@@ -267,13 +299,23 @@ export default function Minerador() {
         )}
 
         {/* Results Grid */}
-        {ads && ads.length > 0 && (
+        {allAds.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-            {ads.map((ad: any) => (
+            {allAds.map((ad: any) => (
               <AdCardV3 key={ad.id} ad={ad} />
             ))}
           </div>
         )}
+
+        {/* Infinite Scroll Loader */}
+        <div ref={loaderRef} className="py-10 flex justify-center">
+          {isFetchingMore && (
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-4 h-4 text-white/40 animate-spin" />
+              <p className="text-[8px] font-black uppercase tracking-widest text-white/20">Carregando mais criativos...</p>
+            </div>
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );
