@@ -311,9 +311,9 @@ export default function Minerador() {
               <Button 
                 type="submit"
                 disabled={searchMutation.isLoading}
-                className="w-full lg:w-auto h-10 bg-white text-black hover:bg-white/90 font-black uppercase text-[10px] tracking-widest px-6 rounded-lg shadow-lg shadow-white/5 transition-all active:scale-95"
+                className="w-full lg:w-10 h-10 bg-white text-black hover:bg-white/90 rounded-lg shadow-lg shadow-white/5 transition-all active:scale-95 flex items-center justify-center p-0 shrink-0"
               >
-                {searchMutation.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Minerar"}
+                {searchMutation.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
               </Button>
             </div>
           </form>
