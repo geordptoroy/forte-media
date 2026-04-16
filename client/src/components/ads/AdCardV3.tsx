@@ -25,6 +25,16 @@ export function AdCardV3({ ad, onExpand }: AdCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   
   const officialLibraryUrl = `https://www.facebook.com/ads/library/?id=${ad.id}`;
+  const destinationUrl = ad.destination_url || officialLibraryUrl;
+  
+  // Lógica para definir o texto do botão baseado no funil detectado
+  const getCtaText = () => {
+    const funnels = ad.detectedFunnels || [];
+    if (funnels.includes("X1") || funnels.includes("Type Bot")) {
+      return "Saiba Mais"; // Forçar Saiba Mais para X1 conforme solicitado
+    }
+    return ad.ad_creative_link_titles?.[0] || "Saiba Mais";
+  };
 
   const extractMutation = trpc.ads.extractMedia.useMutation({
     onSuccess: (data) => {
@@ -300,8 +310,8 @@ export function AdCardV3({ ad, onExpand }: AdCardProps) {
             asChild
             onClick={(e) => e.stopPropagation()}
           >
-            <a href={officialLibraryUrl} target="_blank" rel="noreferrer">
-              <span>{ad.ctaText || 'Saiba Mais'}</span>
+            <a href={destinationUrl} target="_blank" rel="noreferrer">
+              <span>{getCtaText()}</span>
               <MousePointer2 className="w-3.5 h-3.5 text-white/40 group-hover/cta:text-white transition-colors" />
             </a>
           </Button>

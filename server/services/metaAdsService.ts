@@ -39,25 +39,25 @@ async function getPageDetails(pageId: string, accessToken: string) {
   }
 }
 
-// Configuração de Classificação de Tipo de Produto
+// Configuração de Classificação de Tipo de Produto (Regras expandidas para maior abrangência)
 const PRODUCT_TYPE_RULES = {
-  "Infoproduto": ["curso", "treinamento", "método", "fórmula", "acesso vitalício", "baixe agora", "aprenda", "workshop", "e-book", "mentoria", "aula"],
-  "Suplementos/Nutra": ["cápsula", "comprimido", "fórmula natural", "emagrecedor", "vitamina", "probiótico", "detox", "encapsulado", "nutra", "pote", "frasco"],
-  "Dropshipping": ["envio direto da fábrica", "estoque limitado", "frete grátis", "produto importado", "dropshipping", "pronta entrega", "oferta exclusiva", "loja"],
-  "Comércio Local": ["pizzaria", "clínica", "restaurante", "aqui perto", "na sua região", "retire na loja", "endereço", "bairro", "cidade", "agende seu horário"],
-  "Moda": ["roupa", "vestido", "calçado", "sapato", "acessório", "look", "moda", "coleção"],
-  "Eletrônicos": ["smartphone", "celular", "fone", "gadget", "tecnologia", "computador", "notebook"],
-  "Serviços": ["consultoria", "seguro", "plano de saúde", "advogado", "contabilidade", "serviço"]
+  "Infoproduto": ["curso", "treinamento", "método", "fórmula", "acesso vitalício", "baixe agora", "aprenda", "workshop", "e-book", "mentoria", "aula", "digital", "online", "vagas", "inscrição", "conteúdo"],
+  "Suplementos/Nutra": ["cápsula", "comprimido", "fórmula natural", "emagrecedor", "vitamina", "probiótico", "detox", "encapsulado", "nutra", "pote", "frasco", "saúde", "suplemento", "queima", "gordura"],
+  "Dropshipping": ["envio direto da fábrica", "estoque limitado", "frete grátis", "produto importado", "dropshipping", "pronta entrega", "oferta exclusiva", "loja", "comprar", "promoção", "unidades", "desconto"],
+  "Comércio Local": ["pizzaria", "clínica", "restaurante", "aqui perto", "na sua região", "retire na loja", "endereço", "bairro", "cidade", "agende seu horário", "visite", "local", "unidade"],
+  "Moda": ["roupa", "vestido", "calçado", "sapato", "acessório", "look", "moda", "coleção", "estilo", "vestuário", "peças"],
+  "Eletrônicos": ["smartphone", "celular", "fone", "gadget", "tecnologia", "computador", "notebook", "iphone", "android", "tech"],
+  "Serviços": ["consultoria", "seguro", "plano de saúde", "advogado", "contabilidade", "serviço", "atendimento", "suporte", "profissional"]
 };
 
-// Configuração de Classificação de Estrutura de Funil
+// Configuração de Classificação de Estrutura de Funil (Regras expandidas)
 const FUNNEL_STRUCTURE_RULES = {
-  "TSL": ["r$", "oferta", "desconto", "garantia", "depoimento", "preço", "9,90", "47", "97"],
-  "VSL": ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora"],
-  "X1": ["webinar", "apresentação ao vivo", "evento online", "vagas limitadas", "participe", "aula ao vivo"],
-  "Landing Page": ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera"],
-  "Quiz": ["quiz", "teste", "descubra", "perguntas", "resultado personalizado", "perfil"],
-  "Type Bot": ["converse comigo", "chat", "bot", "whatsapp", "messenger", "envie uma mensagem", "falar com consultor"]
+  "TSL": ["r$", "oferta", "desconto", "garantia", "depoimento", "preço", "9,90", "47", "97", "comprar agora", "checkout", "pagamento"],
+  "VSL": ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas"],
+  "X1": ["webinar", "apresentação ao vivo", "evento online", "vagas limitadas", "participe", "aula ao vivo", "whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado"],
+  "Landing Page": ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera", "saiba mais", "página", "site"],
+  "Quiz": ["quiz", "teste", "descubra", "perguntas", "resultado personalizado", "perfil", "escolha", "responda"],
+  "Type Bot": ["converse comigo", "chat", "bot", "whatsapp", "messenger", "envie uma mensagem", "falar com consultor", "assistente", "automático"]
 };
 
 function classifyAd(ad: any) {
@@ -130,13 +130,26 @@ export async function searchAds(params: SearchAdsParams) {
       const hash = generateCreativeHash(ad);
       const pageDetails = await getPageDetails(ad.page_id, accessToken);
 
+      // Tentar extrair o link real de destino dos corpos criativos ou legendas
+      const creativeTexts = [
+        ...(ad.ad_creative_bodies || []),
+        ...(ad.ad_creative_link_captions || []),
+        ...(ad.ad_creative_link_descriptions || []),
+        ...(ad.ad_creative_link_titles || [])
+      ].join(" ");
+      
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const foundUrls = creativeTexts.match(urlRegex);
+      const destinationUrl = foundUrls && foundUrls.length > 0 ? foundUrls[0] : ad.ad_snapshot_url;
+
       return {
         ...ad,
         detectedTypes: classification.types,
         detectedFunnels: classification.funnels,
         frequency: creativeGroups.get(hash) || 1,
         creativeHash: hash,
-        pageDetails: pageDetails
+        pageDetails: pageDetails,
+        destination_url: destinationUrl // Novo campo para o link real de destino
       };
     }));
 
