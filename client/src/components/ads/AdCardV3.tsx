@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat, Download, Clock } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
+import { cn } from "../../lib/utils";
 
 interface AdCardProps {
   ad: any;
@@ -67,6 +68,50 @@ export function AdCardV3({ ad }: AdCardProps) {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(officialLibraryUrl);
     toast.success("Link da biblioteca copiado!");
+  };
+
+  const downloadMedia = async () => {
+    if (!media || !media.url) return;
+    
+    const url = Array.isArray(media.url) ? media.url[0] : media.url;
+    const extension = media.type === 'video' ? 'mp4' : 'jpg';
+    const fileName = `ad-${ad.id}.${extension}`;
+
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      
+      toast.success("Download iniciado!");
+    } catch (error) {
+      // Fallback para abrir em nova aba se o fetch falhar (CORS)
+      window.open(url, '_blank');
+      toast.info("Abrindo mídia em nova aba para download.");
+    }
+  };
+
+  // Função para calcular tempo ativo
+  const calculateActiveTime = (startTime: string) => {
+    if (!startTime) return "N/A";
+    const start = new Date(startTime);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - start.getTime());
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      if (diffHours === 0) return "Ativo agora";
+      return `Ativo há ${diffHours}h`;
+    }
+    return `Ativo há ${diffDays} dias`;
   };
   
   const renderMedia = () => {
@@ -201,6 +246,17 @@ export function AdCardV3({ ad }: AdCardProps) {
               <LinkIcon className="w-4 h-4" />
             </a>
           </Button>
+          {media && (
+            <Button 
+              size="icon" 
+              variant="secondary" 
+              className="w-10 h-10 rounded-full bg-white text-black hover:bg-white/90"
+              onClick={downloadMedia}
+              title="Baixar Criativo"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -213,9 +269,16 @@ export function AdCardV3({ ad }: AdCardProps) {
             </h3>
             <span className="text-[8px] font-bold text-white/20 ml-3 tabular-nums">ID: {ad.id}</span>
           </div>
-          <div className="flex items-center gap-2 text-[8px] font-bold text-white/40 uppercase tracking-widest">
-            <Calendar className="w-2.5 h-2.5 opacity-50" />
-            {ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time).toLocaleDateString('pt-BR') : 'N/A'}
+          <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest">
+            <div className="flex items-center gap-1.5 text-emerald-500">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {calculateActiveTime(ad.ad_delivery_start_time)}
+            </div>
+            <span className="text-white/10">|</span>
+            <div className="flex items-center gap-1.5 text-white/40">
+              <Calendar className="w-2.5 h-2.5 opacity-50" />
+              {ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time).toLocaleDateString('pt-BR') : 'N/A'}
+            </div>
           </div>
         </div>
 
@@ -225,7 +288,7 @@ export function AdCardV3({ ad }: AdCardProps) {
           </p>
         </div>
 
-        {/* Metrics Grid - Atualizado conforme solicitado */}
+        {/* Metrics Grid */}
         <div className="grid grid-cols-2 gap-2 pt-1">
           <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
             <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
@@ -281,6 +344,17 @@ export function AdCardV3({ ad }: AdCardProps) {
           >
             <LinkIcon className="w-3.5 h-3.5" />
           </Button>
+
+          {media && (
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="w-9 h-9 bg-transparent hover:bg-white/10 border border-white/20 hover:border-white/60 rounded-lg text-white transition-all active:scale-95"
+              onClick={downloadMedia}
+            >
+              <Download className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
       </div>
     </Card>
