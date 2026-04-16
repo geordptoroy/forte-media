@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, AlertCircle, Globe, LayoutGrid, Tag, Package, Clock, Sparkles, ChevronDown, Zap } from "lucide-react";
+import { Search, Filter, Loader2, AlertCircle, Globe, LayoutGrid, Tag, Package, Clock, Sparkles, ChevronDown, Zap, ArrowUpDown, EyeOff, RefreshCw } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
 import DashboardLayout from "../components/DashboardLayout";
 import { AdCardV3 } from "../components/ads/AdCardV3";
 import { AdDetailsModal } from "../components/ads/AdDetailsModal";
@@ -54,11 +55,19 @@ export default function Minerador() {
     activeSince: "anytime"
   });
 
+  const [sortConfig, setSortConfig] = useState({
+    field: "frequency" as "frequency" | "date",
+    direction: "desc" as "asc" | "desc"
+  });
+
+  const [hideLowFrequency, setHideLowFrequency] = useState(false);
   const [allAds, setAllAds] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
+  const [syncKey, setSyncKey] = useState(0); // Para disparar re-extração manual
+  
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
@@ -109,6 +118,27 @@ export default function Minerador() {
     }
   };
 
+  // Lógica de Ordenação e Filtragem de Ocultos
+  const processedAds = useMemo(() => {
+    let filtered = [...allAds];
+
+    if (hideLowFrequency) {
+      filtered = filtered.filter(ad => (ad.frequency || 0) > 2);
+    }
+
+    return filtered.sort((a, b) => {
+      if (sortConfig.field === "frequency") {
+        return sortConfig.direction === "desc" 
+          ? (b.frequency || 0) - (a.frequency || 0)
+          : (a.frequency || 0) - (b.frequency || 0);
+      } else {
+        const dateA = new Date(a.ad_delivery_start_time).getTime();
+        const dateB = new Date(b.ad_delivery_start_time).getTime();
+        return sortConfig.direction === "desc" ? dateB - dateA : dateA - dateB;
+      }
+    });
+  }, [allAds, sortConfig, hideLowFrequency]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -137,11 +167,32 @@ export default function Minerador() {
               <Zap className="w-3.5 h-3.5 text-black" />
             </div>
             <h1 className="text-lg font-black tracking-tighter uppercase italic">Minerador Pro</h1>
-            {allAds.length > 0 && (
+            {processedAds.length > 0 && (
               <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
-                {allAds.length} RESULTADOS
+                {processedAds.length} RESULTADOS
               </Badge>
             )}
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg">
+              <EyeOff className="w-3 h-3 text-white/40" />
+              <span className="text-[9px] font-black uppercase text-white/60">Ocultar Baixa Freq.</span>
+              <Switch 
+                checked={hideLowFrequency} 
+                onCheckedChange={setHideLowFrequency}
+                className="scale-75 data-[state=checked]:bg-emerald-500"
+              />
+            </div>
+
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setSyncKey(prev => prev + 1)}
+              className="h-8 border-white/10 bg-white/5 text-[9px] font-black uppercase hover:bg-white/10"
+            >
+              <RefreshCw className="w-3 h-3 mr-2" /> Sincronizar Tudo
+            </Button>
           </div>
         </div>
 
@@ -162,6 +213,30 @@ export default function Minerador() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:flex items-end gap-2 w-full lg:w-auto">
+              <div className="space-y-0">
+                <MiniLabel>Ordenação</MiniLabel>
+                <Select 
+                  value={`${sortConfig.field}-${sortConfig.direction}`} 
+                  onValueChange={(v) => {
+                    const [field, direction] = v.split("-");
+                    setSortConfig({ field: field as any, direction: direction as any });
+                  }}
+                >
+                  <SelectTrigger className="w-full lg:w-[130px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <ArrowUpDown className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Ordenar" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                    <SelectItem value="frequency-desc" className="text-[10px] font-black uppercase py-2">Mais Frequentes</SelectItem>
+                    <SelectItem value="frequency-asc" className="text-[10px] font-black uppercase py-2">Menos Frequentes</SelectItem>
+                    <SelectItem value="date-desc" className="text-[10px] font-black uppercase py-2">Mais Recentes</SelectItem>
+                    <SelectItem value="date-asc" className="text-[10px] font-black uppercase py-2">Mais Antigos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-0">
                 <MiniLabel>País</MiniLabel>
                 <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
@@ -231,23 +306,6 @@ export default function Minerador() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-0">
-                <MiniLabel>Categoria</MiniLabel>
-                <Select value={filters.adType} onValueChange={(v: any) => updateFilter("adType", v)}>
-                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                    <div className="flex items-center gap-2 truncate">
-                      <Filter className="w-3 h-3 text-white/20 shrink-0" />
-                      <SelectValue placeholder="Cat." />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                    <SelectItem value="ALL" className="text-[10px] font-black uppercase py-2">Todos</SelectItem>
-                    <SelectItem value="NON_POLITICAL" className="text-[10px] font-black uppercase py-2">Comercial</SelectItem>
-                    <SelectItem value="POLITICAL_AND_ISSUE_ADS" className="text-[10px] font-black uppercase py-2">Político</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
             <div className="w-full lg:w-auto">
@@ -292,7 +350,7 @@ export default function Minerador() {
         )}
 
         {/* Empty State */}
-        {hasSearched && !searchMutation.isLoading && allAds.length === 0 && (
+        {hasSearched && !searchMutation.isLoading && processedAds.length === 0 && (
           <div className="flex flex-col items-center justify-center py-32 border border-dashed border-white/10 rounded-xl space-y-3">
             <Search className="w-6 h-6 text-white/10" />
             <p className="text-[10px] font-black uppercase tracking-widest text-white/20">Nenhum criativo encontrado para estes filtros.</p>
@@ -300,11 +358,11 @@ export default function Minerador() {
         )}
 
         {/* Results Grid */}
-        {allAds.length > 0 && (
+        {processedAds.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-            {allAds.map((ad: any) => (
+            {processedAds.map((ad: any) => (
               <AdCardV3 
-                key={ad.id} 
+                key={`${ad.id}-${syncKey}`} 
                 ad={ad} 
                 onExpand={(ad, media) => setSelectedAd({ ad, media })}
               />

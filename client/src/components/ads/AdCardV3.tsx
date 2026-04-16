@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat, Download, Clock, Maximize2 } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat, Download, Clock, Maximize2, MousePointer2 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
@@ -291,6 +291,20 @@ export function AdCardV3({ ad, onExpand }: AdCardProps) {
               {ad.detectedNiche || 'Outros'}
             </p>
           </div>
+        </div>
+
+        {/* CTA Button (Official Style) */}
+        <div className="pt-2">
+          <Button 
+            className="w-full h-10 bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-white font-black text-[10px] uppercase tracking-widest flex items-center justify-between px-4 group/cta transition-all"
+            asChild
+            onClick={(e) => e.stopPropagation()}
+          >
+            <a href={officialLibraryUrl} target="_blank" rel="noreferrer">
+              <span>{ad.ctaText || 'Saiba Mais'}</span>
+              <MousePointer2 className="w-3.5 h-3.5 text-white/40 group-hover/cta:text-white transition-colors" />
+            </a>
+          </Button>
         </div>
 
         <div className="flex gap-2 mt-auto pt-2">

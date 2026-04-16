@@ -12,7 +12,6 @@ const ALL_FIELDS = [
   'target_gender', 'target_locations', 'age_country_gender_reach_breakdown', 'bylines'
 ];
 
-// Dicionário de Nichos com Palavras-Chave Estratégicas para Busca e Classificação
 const NICHE_CONFIG: Record<string, { keywords: string[], searchTerms: string[] }> = {
   "Relacionamento": {
     keywords: ["namoro", "casamento", "conquista", "relacionamento", "ex", "seduzir", "reconquista", "parceiro", "esposa", "marido"],
@@ -92,7 +91,7 @@ export interface SearchAdsParams {
   niche?: string;
   productType?: string;
   activeSince?: string;
-  after?: string; // Para paginação
+  after?: string;
 }
 
 function classifyAd(ad: any) {
@@ -117,22 +116,24 @@ function classifyAd(ad: any) {
     }
   }
 
-  return { niche: detectedNiche, productType: detectedType };
+  // Simulação de CTA (Botão) baseado no conteúdo
+  let ctaText = "Saiba Mais";
+  if (combinedText.includes("comprar") || combinedText.includes("oferta") || combinedText.includes("desconto")) ctaText = "Comprar Agora";
+  if (combinedText.includes("whatsapp") || combinedText.includes("contato") || combinedText.includes("mensagem")) ctaText = "Enviar Mensagem";
+  if (combinedText.includes("baixar") || combinedText.includes("download") || combinedText.includes("ebook")) ctaText = "Baixar";
+  if (combinedText.includes("inscreva") || combinedText.includes("vagas")) ctaText = "Cadastre-se";
+
+  return { niche: detectedNiche, productType: detectedType, ctaText };
 }
 
 export async function searchAds(params: SearchAdsParams) {
   const accessToken = params.accessToken || process.env.META_ACCESS_TOKEN || FALLBACK_TOKEN;
   const { country = 'BR', adType = 'ALL', limit = 100, activeSince, after } = params;
 
-  // Construção inteligente dos termos de busca
   let finalSearchTerms = params.searchTerms;
-  
-  // Se o usuário selecionou um nicho mas não digitou palavra-chave, usamos os termos do nicho
   if (!finalSearchTerms && params.niche && NICHE_CONFIG[params.niche]) {
     finalSearchTerms = NICHE_CONFIG[params.niche].searchTerms[0];
   }
-  
-  // Se selecionou tipo de produto, adicionamos termos do tipo para refinar
   if (params.productType && PRODUCT_TYPE_CONFIG[params.productType]) {
     finalSearchTerms = `${finalSearchTerms} ${PRODUCT_TYPE_CONFIG[params.productType].searchTerms[0]}`.trim();
   }
@@ -156,14 +157,11 @@ export async function searchAds(params: SearchAdsParams) {
   const MAX_ATTEMPTS = 3;
 
   try {
-    // Loop de Busca Mínima Garantida
     while (allAds.length < MIN_RESULTS && attempts < MAX_ATTEMPTS) {
-      logger.info(`[MetaAds] Tentativa ${attempts + 1}: Buscando "${finalSearchTerms}" | After: ${currentAfter}`);
-      
       const response = await axios.get(url, {
         params: {
           access_token: accessToken,
-          search_terms: finalSearchTerms,
+          search_terms: finalSearchTerms || "marketing",
           ad_type: adType,
           ad_reached_countries: `['${country}']`,
           fields: ALL_FIELDS.join(','),
@@ -183,11 +181,11 @@ export async function searchAds(params: SearchAdsParams) {
           ...ad,
           detectedNiche: classification.niche,
           detectedProductType: classification.productType,
-          frequency: Math.floor(Math.random() * 8) + 1
+          ctaText: classification.ctaText,
+          frequency: Math.floor(Math.random() * 15) + 1 // Frequência simulada para ordenação
         };
       });
 
-      // Filtragem de precisão
       let filtered = processed;
       if (params.niche && params.niche !== "Todos") {
         filtered = filtered.filter((ad: any) => ad.detectedNiche === params.niche);
@@ -197,15 +195,11 @@ export async function searchAds(params: SearchAdsParams) {
       }
 
       allAds = [...allAds, ...filtered];
-      
       if (!paging?.next || filtered.length >= MIN_RESULTS) break;
-      
       currentAfter = paging.cursors?.after;
       attempts++;
     }
 
-    logger.info(`[MetaAds] Busca finalizada com ${allAds.length} anúncios.`);
-    
     return {
       data: allAds,
       paging: {
