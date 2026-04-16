@@ -37,6 +37,13 @@ const NICHES = [
 
 const PRODUCT_TYPES = ["Infoproduto", "Nutra", "Encapsulado", "Todos"];
 
+// Componente de Label Compacto
+const MiniLabel = ({ children }: { children: React.ReactNode }) => (
+  <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30 mb-1.5 ml-1 block font-mono">
+    {children}
+  </label>
+);
+
 export default function Minerador() {
   const [filters, setFilters] = useState({
     searchTerms: "",
@@ -95,117 +102,137 @@ export default function Minerador() {
           </div>
         </div>
 
-        {/* Barra de Filtros de Alta Densidade */}
-        <Card className="p-3 bg-[#0A0A0A] border-white/[0.08] rounded-xl shadow-xl">
-          <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+        {/* Barra de Filtros de Alta Densidade com Labels */}
+        <Card className="p-4 bg-[#0A0A0A] border-white/[0.08] rounded-xl shadow-xl">
+          <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-end gap-3">
             
-            {/* Busca Principal - Compacta */}
-            <div className="flex-1 relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20 group-focus-within:text-white/60 transition-colors" />
-              <Input
-                placeholder="Palavra-chave..."
-                value={filters.searchTerms}
-                onChange={(e) => updateFilter("searchTerms", e.target.value)}
-                className="pl-9 bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-xs font-medium focus:border-white/20 focus:ring-0 transition-all placeholder:text-white/10"
-              />
+            {/* Busca Principal */}
+            <div className="flex-1 w-full space-y-0">
+              <MiniLabel>Palavra-chave</MiniLabel>
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20 group-focus-within:text-white/60 transition-colors" />
+                <Input
+                  placeholder="Ex: Emagrecimento..."
+                  value={filters.searchTerms}
+                  onChange={(e) => updateFilter("searchTerms", e.target.value)}
+                  className="pl-9 bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-xs font-medium focus:border-white/20 focus:ring-0 transition-all placeholder:text-white/10"
+                />
+              </div>
             </div>
 
-            {/* Filtros Dropdown - Compactos */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:flex items-center gap-2">
+            {/* Filtros Dropdown */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:flex items-end gap-2 w-full lg:w-auto">
               
               {/* País */}
-              <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
-                <SelectTrigger className="w-full lg:w-[100px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                  <div className="flex items-center gap-2 truncate">
-                    <Globe className="w-3 h-3 text-white/20 shrink-0" />
-                    <SelectValue placeholder="País" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                  {COUNTRIES.map((c) => (
-                    <SelectItem key={c.code} value={c.code} className="text-[10px] font-black uppercase py-2">{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-0">
+                <MiniLabel>País</MiniLabel>
+                <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
+                  <SelectTrigger className="w-full lg:w-[90px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <Globe className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="País" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code} className="text-[10px] font-black uppercase py-2">{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Nicho */}
-              <Select value={filters.niche} onValueChange={(v) => updateFilter("niche", v)}>
-                <SelectTrigger className="w-full lg:w-[130px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                  <div className="flex items-center gap-2 truncate">
-                    <Tag className="w-3 h-3 text-white/20 shrink-0" />
-                    <SelectValue placeholder="Nicho" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg max-h-[300px]">
-                  <SelectItem value="Todos" className="text-[10px] font-black uppercase py-2">Todos Nichos</SelectItem>
-                  {NICHES.map((n) => (
-                    <SelectItem key={n} value={n} className="text-[10px] font-black uppercase py-2">{n}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-0">
+                <MiniLabel>Nicho</MiniLabel>
+                <Select value={filters.niche} onValueChange={(v) => updateFilter("niche", v)}>
+                  <SelectTrigger className="w-full lg:w-[120px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <Tag className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Nicho" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg max-h-[300px]">
+                    <SelectItem value="Todos" className="text-[10px] font-black uppercase py-2">Todos Nichos</SelectItem>
+                    {NICHES.map((n) => (
+                      <SelectItem key={n} value={n} className="text-[10px] font-black uppercase py-2">{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Tipo */}
-              <Select value={filters.productType} onValueChange={(v) => updateFilter("productType", v)}>
-                <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                  <div className="flex items-center gap-2 truncate">
-                    <Package className="w-3 h-3 text-white/20 shrink-0" />
-                    <SelectValue placeholder="Tipo" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                  {PRODUCT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t} className="text-[10px] font-black uppercase py-2">{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-0">
+                <MiniLabel>Tipo</MiniLabel>
+                <Select value={filters.productType} onValueChange={(v) => updateFilter("productType", v)}>
+                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <Package className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Tipo" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                    {PRODUCT_TYPES.map((t) => (
+                      <SelectItem key={t} value={t} className="text-[10px] font-black uppercase py-2">{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Tempo */}
-              <Select value={filters.activeSince} onValueChange={(v) => updateFilter("activeSince", v)}>
-                <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                  <div className="flex items-center gap-2 truncate">
-                    <Clock className="w-3 h-3 text-white/20 shrink-0" />
-                    <SelectValue placeholder="Tempo" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                  <SelectItem value="anytime" className="text-[10px] font-black uppercase py-2">Qualquer</SelectItem>
-                  <SelectItem value="7" className="text-[10px] font-black uppercase py-2">7 Dias</SelectItem>
-                  <SelectItem value="30" className="text-[10px] font-black uppercase py-2">30 Dias</SelectItem>
-                  <SelectItem value="90" className="text-[10px] font-black uppercase py-2">90 Dias</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-0">
+                <MiniLabel>Tempo</MiniLabel>
+                <Select value={filters.activeSince} onValueChange={(v) => updateFilter("activeSince", v)}>
+                  <SelectTrigger className="w-full lg:w-[100px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <Clock className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Tempo" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                    <SelectItem value="anytime" className="text-[10px] font-black uppercase py-2">Qualquer</SelectItem>
+                    <SelectItem value="7" className="text-[10px] font-black uppercase py-2">7 Dias</SelectItem>
+                    <SelectItem value="30" className="text-[10px] font-black uppercase py-2">30 Dias</SelectItem>
+                    <SelectItem value="90" className="text-[10px] font-black uppercase py-2">90 Dias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Categoria */}
-              <Select value={filters.adType} onValueChange={(v: any) => updateFilter("adType", v)}>
-                <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                  <div className="flex items-center gap-2 truncate">
-                    <Filter className="w-3 h-3 text-white/20 shrink-0" />
-                    <SelectValue placeholder="Cat." />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                  <SelectItem value="ALL" className="text-[10px] font-black uppercase py-2">Todos</SelectItem>
-                  <SelectItem value="NON_POLITICAL" className="text-[10px] font-black uppercase py-2">Comercial</SelectItem>
-                  <SelectItem value="POLITICAL_AND_ISSUE_ADS" className="text-[10px] font-black uppercase py-2">Político</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-0">
+                <MiniLabel>Categoria</MiniLabel>
+                <Select value={filters.adType} onValueChange={(v: any) => updateFilter("adType", v)}>
+                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2 truncate">
+                      <Filter className="w-3 h-3 text-white/20 shrink-0" />
+                      <SelectValue placeholder="Cat." />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                    <SelectItem value="ALL" className="text-[10px] font-black uppercase py-2">Todos</SelectItem>
+                    <SelectItem value="NON_POLITICAL" className="text-[10px] font-black uppercase py-2">Comercial</SelectItem>
+                    <SelectItem value="POLITICAL_AND_ISSUE_ADS" className="text-[10px] font-black uppercase py-2">Político</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Botão de Busca - Compacto e Rápido */}
-            <Button 
-              type="submit" 
-              disabled={isLoading}
-              className="h-10 px-6 bg-white text-black hover:bg-white/90 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shrink-0"
-            >
-              {isLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-3 h-3" />
-                  <span>Minerar</span>
-                </div>
-              )}
-            </Button>
+            {/* Botão de Busca */}
+            <div className="w-full lg:w-auto">
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full lg:w-auto h-10 px-6 bg-white text-black hover:bg-white/90 rounded-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 shrink-0"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3 h-3" />
+                    <span>Minerar</span>
+                  </div>
+                )}
+              </Button>
+            </div>
           </form>
         </Card>
 
