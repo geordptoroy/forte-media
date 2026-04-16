@@ -37,7 +37,7 @@ const FUNNEL_STRUCTURES = [
 ];
 
 const MiniLabel = ({ children }: { children: React.ReactNode }) => (
-  <label className="text-[8px] font-black uppercase tracking-[0.2em] text-white/60 mb-1.5 ml-1 block font-mono">
+  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90 mb-1.5 ml-1 block font-mono">
     {children}
   </label>
 );
@@ -258,7 +258,7 @@ export default function Minerador() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col space-y-6 max-w-[1600px] mx-auto px-4 md:px-6">
+      <div className="flex flex-col space-y-5 max-w-[1600px] mx-auto px-4 md:px-6 scale-[0.95] origin-top">
         
         {/* Header Compacto */}
         <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
@@ -275,9 +275,9 @@ export default function Minerador() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-lg min-w-[380px]">
+            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-lg min-w-[400px]">
               <Filter className="w-3.5 h-3.5 text-white/40" />
-              <span className="text-[10px] font-black uppercase text-white/70 whitespace-nowrap">
+              <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
                 {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
               </span>
               <Switch 
@@ -289,8 +289,8 @@ export default function Minerador() {
 
             <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg">
               <div className="flex flex-col">
-                <span className="text-[8px] font-black uppercase text-white/40 leading-none mb-1">Auto-Load</span>
-                <span className="text-[9px] font-black uppercase text-white/70 leading-none">Até {autoLoadLimit} Ads</span>
+                <span className="text-[9px] font-black uppercase text-white/60 leading-none mb-1">Auto-Load</span>
+                <span className="text-[10px] font-black uppercase text-white/90 leading-none">Até {autoLoadLimit} Ads</span>
               </div>
               <Switch 
                 checked={autoLoad} 
@@ -321,7 +321,7 @@ export default function Minerador() {
                   placeholder="Ex: Emagrecimento..."
                   value={filters.searchTerms}
                   onChange={(e) => updateFilter("searchTerms", e.target.value)}
-                  className="pl-9 bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-xs font-medium focus:border-white/20 focus:ring-0 transition-all placeholder:text-white/10"
+                  className="pl-9 bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[13px] font-medium focus:border-white/20 focus:ring-0 transition-all placeholder:text-white/20"
                 />
               </div>
             </div>
@@ -336,17 +336,17 @@ export default function Minerador() {
                     setSortConfig({ field: field as any, direction: direction as any });
                   }}
                 >
-                  <SelectTrigger className="w-full lg:w-[130px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full lg:w-[130px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
                       <ArrowUpDown className="w-3 h-3 text-white/20 shrink-0" />
                       <SelectValue placeholder="Ordenar" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                    <SelectItem value="frequency-desc" className="text-[10px] font-black uppercase py-2">Mais Frequentes</SelectItem>
-                    <SelectItem value="frequency-asc" className="text-[10px] font-black uppercase py-2">Menos Frequentes</SelectItem>
-                    <SelectItem value="date-desc" className="text-[10px] font-black uppercase py-2">Mais Recentes</SelectItem>
-                    <SelectItem value="date-asc" className="text-[10px] font-black uppercase py-2">Mais Antigos</SelectItem>
+                    <SelectItem value="frequency-desc" className="text-[11px] font-black uppercase py-2">Mais Frequentes</SelectItem>
+                    <SelectItem value="frequency-asc" className="text-[11px] font-black uppercase py-2">Menos Frequentes</SelectItem>
+                    <SelectItem value="date-desc" className="text-[11px] font-black uppercase py-2">Mais Recentes</SelectItem>
+                    <SelectItem value="date-asc" className="text-[11px] font-black uppercase py-2">Mais Antigos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -354,7 +354,7 @@ export default function Minerador() {
               <div className="space-y-0">
                 <MiniLabel>País</MiniLabel>
                 <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
-                  <SelectTrigger className="w-full lg:w-[90px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full lg:w-[90px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
                       <Globe className="w-3 h-3 text-white/20 shrink-0" />
                       <SelectValue placeholder="País" />
@@ -362,7 +362,7 @@ export default function Minerador() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                     {COUNTRIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code} className="text-[10px] font-black uppercase py-2">{c.name}</SelectItem>
+                      <SelectItem key={c.code} value={c.code} className="text-[11px] font-black uppercase py-2">{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -371,7 +371,7 @@ export default function Minerador() {
               <div className="space-y-0">
                 <MiniLabel>Tipo Produto</MiniLabel>
                 <Select value={filters.selectedType} onValueChange={(v) => updateFilter("selectedType", v)}>
-                  <SelectTrigger className="w-full lg:w-[120px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full lg:w-[120px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
                       <Package className="w-3 h-3 text-white/20 shrink-0" />
                       <SelectValue placeholder="Tipo" />
@@ -379,7 +379,7 @@ export default function Minerador() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                     {PRODUCT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t} className="text-[10px] font-black uppercase py-2">{t}</SelectItem>
+                      <SelectItem key={t} value={t} className="text-[11px] font-black uppercase py-2">{t}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -388,7 +388,7 @@ export default function Minerador() {
               <div className="space-y-0">
                 <MiniLabel>Funil</MiniLabel>
                 <Select value={filters.selectedFunnel} onValueChange={(v) => updateFilter("selectedFunnel", v)}>
-                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full lg:w-[110px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
                       <Layers className="w-3 h-3 text-white/20 shrink-0" />
                       <SelectValue placeholder="Funil" />
@@ -396,7 +396,7 @@ export default function Minerador() {
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                     {FUNNEL_STRUCTURES.map((f) => (
-                      <SelectItem key={f} value={f} className="text-[10px] font-black uppercase py-2">{f}</SelectItem>
+                      <SelectItem key={f} value={f} className="text-[11px] font-black uppercase py-2">{f}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
