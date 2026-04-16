@@ -57,6 +57,7 @@ export default function Minerador() {
     direction: "desc" as "asc" | "desc"
   });
 
+  const [hidePolitical, setHidePolitical] = useState(true);
   const [hideLowFrequency, setHideLowFrequency] = useState(false);
   const [allAds, setAllAds] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
@@ -75,7 +76,7 @@ export default function Minerador() {
     { 
       searchTerms: filters.searchTerms, 
       country: filters.country, 
-      adType: filters.adType === "NON_POLITICAL" ? "ALL" : filters.adType,
+      adType: hidePolitical ? "ALL" : "POLITICAL_AND_ISSUE_ADS",
       after: nextCursor
     },
     { 
@@ -180,11 +181,11 @@ export default function Minerador() {
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg">
-              <EyeOff className="w-3 h-3 text-white/40" />
-              <span className="text-[9px] font-black uppercase text-white/60">Ocultar Baixa Freq.</span>
+              <Filter className="w-3 h-3 text-white/40" />
+              <span className="text-[9px] font-black uppercase text-white/60">Ocultar Políticos</span>
               <Switch 
-                checked={hideLowFrequency} 
-                onCheckedChange={setHideLowFrequency}
+                checked={hidePolitical} 
+                onCheckedChange={setHidePolitical}
                 className="scale-75 data-[state=checked]:bg-emerald-500"
               />
             </div>
@@ -292,21 +293,7 @@ export default function Minerador() {
                 </Select>
               </div>
 
-              <div className="space-y-0">
-                <MiniLabel>Categoria</MiniLabel>
-                <Select value={filters.adType} onValueChange={(v) => updateFilter("adType", v as any)}>
-                  <SelectTrigger className="w-full lg:w-[130px] bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[10px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
-                    <div className="flex items-center gap-2 truncate">
-                      <Filter className="w-3 h-3 text-white/20 shrink-0" />
-                      <SelectValue placeholder="Categoria" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                    <SelectItem value="ALL" className="text-[10px] font-black uppercase py-2">Não Políticos</SelectItem>
-                    <SelectItem value="POLITICAL_AND_ISSUE_ADS" className="text-[10px] font-black uppercase py-2">Políticos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
 
               <Button 
                 type="submit"
