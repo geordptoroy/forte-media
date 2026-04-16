@@ -106,9 +106,9 @@ export async function searchAds(params: SearchAdsParams) {
     const response = await axios.get(url, {
       params: {
         access_token: accessToken,
-        search_terms: params.searchTerms || "marketing",
+        search_terms: params.searchTerms || "",
         ad_type: adType,
-        ad_reached_countries: `['${country}']`,
+        ad_reached_countries: country === "ALL" ? undefined : `['${country}']`,
         fields: ALL_FIELDS.join(','),
         limit: limit,
         ad_active_status: 'ACTIVE',

@@ -12,6 +12,7 @@ import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { Badge } from "../components/ui/badge";
 
 const COUNTRIES = [
+  { code: "ALL", name: "Todos" },
   { code: "BR", name: "Brasil" },
   { code: "US", name: "EUA" },
   { code: "PT", name: "Portugal" },
@@ -72,7 +73,7 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [syncKey, setSyncKey] = useState(0);
-  const [autoLoad, setAutoLoad] = useState(false);
+  const [autoLoad, setAutoLoad] = useState(true);
   const [autoLoadLimit, setAutoLoadLimit] = useState(20);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   
@@ -275,7 +276,7 @@ export default function Minerador() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-lg min-w-[400px]">
+            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-lg w-fit">
               <Filter className="w-3.5 h-3.5 text-white/40" />
               <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
                 {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
@@ -286,27 +287,6 @@ export default function Minerador() {
                 className="scale-90 data-[state=checked]:bg-emerald-500"
               />
             </div>
-
-            <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.08] px-3 py-1.5 rounded-lg">
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase text-white/60 leading-none mb-1">Auto-Load</span>
-                <span className="text-[10px] font-black uppercase text-white/90 leading-none">Até {autoLoadLimit} Ads</span>
-              </div>
-              <Switch 
-                checked={autoLoad} 
-                onCheckedChange={setAutoLoad}
-                className="scale-75 data-[state=checked]:bg-blue-500"
-              />
-            </div>
-
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setSyncKey(prev => prev + 1)}
-              className="h-8 border-white/10 bg-white/5 text-[9px] font-black uppercase hover:bg-white/10"
-            >
-              <RefreshCw className="w-3 h-3 mr-2" /> Sincronizar Tudo
-            </Button>
           </div>
         </div>
 
