@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, DollarSign, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon } from "lucide-react";
 import { trpc } from "../../lib/trpc";
+import { toast } from "sonner";
 
 interface AdCardProps {
   ad: any;
@@ -21,8 +22,7 @@ export function AdCardV3({ ad }: AdCardProps) {
   const [isVisible, setIsVisible] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   
-  // Tenta pegar uma miniatura inicial da API da Meta se disponível
-  const initialThumbnail = ad.ad_snapshot_url ? `https://graph.facebook.com/v22.0/${ad.id}/thumbnails` : null;
+  const officialLibraryUrl = `https://www.facebook.com/ads/library/?id=${ad.id}`;
 
   const extractMutation = trpc.ads.extractMedia.useMutation({
     onSuccess: (data) => {
@@ -36,7 +36,6 @@ export function AdCardV3({ ad }: AdCardProps) {
     }
   });
 
-  // Intersection Observer para Lazy Loading da extração
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -55,7 +54,6 @@ export function AdCardV3({ ad }: AdCardProps) {
     return () => observer.disconnect();
   }, []);
 
-  // Extração Automática apenas quando visível
   useEffect(() => {
     if (isVisible && !media && !isExtracting) {
       setIsExtracting(true);
@@ -65,11 +63,15 @@ export function AdCardV3({ ad }: AdCardProps) {
 
   const platforms = ad.publisher_platforms || [];
   const body = ad.ad_creative_bodies?.[0] || "Sem descrição disponível.";
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(officialLibraryUrl);
+    toast.success("Link da biblioteca copiado!");
+  };
   
   const renderMedia = () => {
     if (!isVisible) return null;
 
-    // Se já temos a mídia extraída, renderiza o player/imagem final
     if (media) {
       if (media.type === 'video') {
         return (
@@ -116,49 +118,35 @@ export function AdCardV3({ ad }: AdCardProps) {
       }
     }
 
-    // Enquanto extrai, mostra um estado de carregamento com a miniatura de fundo se possível
     if (isExtracting) {
       return (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/[0.01]">
-          {/* Camada de fundo com blur se houver miniatura (simulada ou real) */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent animate-pulse" />
-          
-          <div className="relative z-10 flex flex-col items-center space-y-4">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-full border-2 border-white/5" />
-              <div className="absolute inset-0 w-12 h-12 border-t-2 border-white/40 rounded-full animate-spin" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px]">
+          <div className="relative flex flex-col items-center space-y-4">
+            <div className="w-10 h-10 rounded-full border-2 border-white/5 flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
             </div>
             <div className="space-y-1 text-center">
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 animate-pulse">
+              <p className="text-[8px] font-black uppercase tracking-[0.3em] text-white/60 animate-pulse">
                 Sincronizando
               </p>
-              <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Otimizando Mídia...</p>
             </div>
           </div>
         </div>
       );
     }
 
-    // Fallback se falhar
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 bg-white/[0.01]">
-        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-          <AlertCircle className="w-5 h-5 text-white/10" />
-        </div>
-        <div className="space-y-1">
-          <p className="text-[9px] font-black uppercase tracking-widest text-white/20">
-            Mídia Indisponível
-          </p>
-          <button 
-            onClick={() => {
-              setIsExtracting(true);
-              extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
-            }}
-            className="text-[8px] font-bold text-white/40 hover:text-white underline uppercase tracking-tighter transition-colors"
-          >
-            Tentar Novamente
-          </button>
-        </div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 bg-white/[0.02]">
+        <AlertCircle className="w-5 h-5 text-white/10" />
+        <button 
+          onClick={() => {
+            setIsExtracting(true);
+            extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
+          }}
+          className="text-[8px] font-bold text-white/40 hover:text-white underline uppercase tracking-tighter transition-colors"
+        >
+          Tentar Novamente
+        </button>
       </div>
     );
   };
@@ -166,99 +154,118 @@ export function AdCardV3({ ad }: AdCardProps) {
   return (
     <Card 
       ref={cardRef}
-      className="overflow-hidden flex flex-col bg-black border-white/[0.06] hover:border-white/20 transition-all duration-500 group rounded-none"
+      className="overflow-hidden flex flex-col bg-[#0A0A0A] border-white/[0.06] hover:border-white/20 transition-all duration-500 group rounded-xl shadow-2xl"
     >
       {/* Media Preview Container */}
       <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06] overflow-hidden">
         {renderMedia()}
         
-        {/* Platform Badges */}
-        <div className="absolute top-4 left-4 flex gap-1.5 z-10">
+        {/* Top Overlay Badges */}
+        <div className="absolute top-3 left-3 flex gap-1.5 z-10">
           {platforms.map((p: string) => (
-            <Badge key={p} variant="secondary" className="bg-black/60 backdrop-blur-md text-[8px] px-2 py-0.5 border-white/10 uppercase font-black rounded-none">
+            <Badge key={p} variant="secondary" className="bg-black/80 backdrop-blur-md text-[7px] px-2 py-0.5 border-white/10 uppercase font-black rounded-md">
               {p}
             </Badge>
           ))}
         </div>
 
-        {/* Media Type Badge */}
         {media && (
-          <div className="absolute top-4 right-4 z-10">
-            <Badge className="bg-white text-black text-[8px] px-2 py-0.5 uppercase font-black border-none rounded-none shadow-lg">
-              {media.type === 'video' && <Play className="w-2.5 h-2.5 mr-1.5 fill-black" />}
-              {media.type === 'image' && <ImageIcon className="w-2.5 h-2.5 mr-1.5" />}
-              {media.type === 'carousel' && <Layers className="w-2.5 h-2.5 mr-1.5" />}
+          <div className="absolute top-3 right-3 z-10">
+            <Badge className="bg-white text-black text-[7px] px-2 py-0.5 uppercase font-black border-none rounded-md shadow-lg">
+              {media.type === 'video' && <Play className="w-2 h-2 mr-1 fill-black" />}
+              {media.type === 'image' && <ImageIcon className="w-2 h-2 mr-1" />}
+              {media.type === 'carousel' && <Layers className="w-2 h-2 mr-1" />}
               {media.type}
             </Badge>
           </div>
         )}
+
+        {/* Action Overlay (Visible on Hover) */}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 z-20">
+          <Button 
+            size="icon" 
+            variant="secondary" 
+            className="w-10 h-10 rounded-full bg-white text-black hover:bg-white/90"
+            onClick={copyToClipboard}
+            title="Copiar Link Oficial"
+          >
+            <Share2 className="w-4 h-4" />
+          </Button>
+          <Button 
+            size="icon" 
+            variant="secondary" 
+            className="w-10 h-10 rounded-full bg-white text-black hover:bg-white/90"
+            asChild
+          >
+            <a href={officialLibraryUrl} target="_blank" rel="noreferrer" title="Ver na Biblioteca">
+              <LinkIcon className="w-4 h-4" />
+            </a>
+          </Button>
+        </div>
       </div>
 
       {/* Content Section */}
-      <div className="p-5 flex-1 flex flex-col space-y-5">
-        <div className="space-y-1.5">
+      <div className="p-5 flex-1 flex flex-col space-y-4">
+        <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <h3 className="font-black text-xs uppercase tracking-tight text-white truncate flex-1 group-hover:text-white/90 transition-colors">
+            <h3 className="font-black text-[11px] uppercase tracking-tight text-white truncate flex-1 group-hover:text-white/90 transition-colors">
               {ad.page_name}
             </h3>
-            <span className="text-[9px] font-bold text-white/20 ml-3 tabular-nums">#{ad.id}</span>
+            <span className="text-[8px] font-bold text-white/20 ml-3 tabular-nums">ID: {ad.id}</span>
           </div>
-          <div className="flex items-center gap-2 text-[9px] font-bold text-white/40 uppercase tracking-widest">
-            <Calendar className="w-3 h-3 opacity-50" />
-            Início: {ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time).toLocaleDateString('pt-BR') : 'N/A'}
+          <div className="flex items-center gap-2 text-[8px] font-bold text-white/40 uppercase tracking-widest">
+            <Calendar className="w-2.5 h-2.5 opacity-50" />
+            {ad.ad_delivery_start_time ? new Date(ad.ad_delivery_start_time).toLocaleDateString('pt-BR') : 'N/A'}
           </div>
         </div>
 
-        <p className="text-[11px] leading-relaxed text-white/60 line-clamp-4 font-medium italic group-hover:text-white/80 transition-colors">
-          "{body}"
-        </p>
+        <div className="relative">
+          <p className="text-[10px] leading-relaxed text-white/60 line-clamp-3 font-medium italic group-hover:text-white/80 transition-colors">
+            "{body}"
+          </p>
+        </div>
 
         {/* Metrics Grid */}
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <div className="bg-white/[0.02] border border-white/[0.04] p-3 space-y-1.5 group-hover:bg-white/[0.04] transition-colors">
-            <div className="flex items-center gap-2 text-[8px] font-black text-white/30 uppercase tracking-widest">
-              <DollarSign className="w-3 h-3" /> Gasto
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
+            <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
+              <DollarSign className="w-2.5 h-2.5" /> Gasto
             </div>
-            <p className="text-[11px] font-black text-white tabular-nums">
+            <p className="text-[10px] font-black text-white tabular-nums">
               {ad.currency} {ad.spend?.lower_bound || 0} - {ad.spend?.upper_bound || '100+'}
             </p>
           </div>
-          <div className="bg-white/[0.02] border border-white/[0.04] p-3 space-y-1.5 group-hover:bg-white/[0.04] transition-colors">
-            <div className="flex items-center gap-2 text-[8px] font-black text-white/30 uppercase tracking-widest">
-              <Eye className="w-3 h-3" /> Impressões
+          <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1 group-hover:bg-white/[0.05] transition-colors">
+            <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
+              <Eye className="w-2.5 h-2.5" /> Impressões
             </div>
-            <p className="text-[11px] font-black text-white tabular-nums">
+            <p className="text-[10px] font-black text-white tabular-nums">
               {ad.impressions?.lower_bound || 0} - {ad.impressions?.upper_bound || '1k+'}
-            </p>
-          </div>
-          <div className="bg-white/[0.02] border border-white/[0.04] p-3 space-y-1.5 group-hover:bg-white/[0.04] transition-colors">
-            <div className="flex items-center gap-2 text-[8px] font-black text-white/30 uppercase tracking-widest">
-              <Users className="w-3 h-3" /> Público
-            </div>
-            <p className="text-[11px] font-black text-white tabular-nums">
-              {ad.estimated_audience_size?.lower_bound || 'N/A'}
-            </p>
-          </div>
-          <div className="bg-white/[0.02] border border-white/[0.04] p-3 space-y-1.5 group-hover:bg-white/[0.04] transition-colors">
-            <div className="flex items-center gap-2 text-[8px] font-black text-white/30 uppercase tracking-widest">
-              <Globe className="w-3 h-3" /> Região
-            </div>
-            <p className="text-[11px] font-black text-white truncate uppercase tracking-tighter">
-              {ad.delivery_by_region?.[0]?.region || 'Brasil'}
             </p>
           </div>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full h-10 bg-white text-black hover:bg-white/90 border-none rounded-none font-black text-[10px] uppercase tracking-[0.2em] mt-auto transition-all active:scale-95"
-          asChild
-        >
-          <a href={`https://www.facebook.com/ads/library/?id=${ad.id}`} target="_blank" rel="noreferrer">
-            Analisar Criativo <ExternalLink className="w-3.5 h-3.5 ml-2.5" />
-          </a>
-        </Button>
+        <div className="flex gap-2 mt-auto pt-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 h-9 bg-white text-black hover:bg-white/90 border-none rounded-lg font-black text-[9px] uppercase tracking-[0.1em] transition-all active:scale-95"
+            asChild
+          >
+            <a href={officialLibraryUrl} target="_blank" rel="noreferrer">
+              Analisar Criativo <ExternalLink className="w-3 h-3 ml-2" />
+            </a>
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="w-9 h-9 bg-white/[0.05] hover:bg-white/[0.1] border-white/[0.1] rounded-lg text-white transition-all active:scale-95"
+            onClick={copyToClipboard}
+          >
+            <LinkIcon className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
     </Card>
   );
