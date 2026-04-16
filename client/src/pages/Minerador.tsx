@@ -7,6 +7,7 @@ import { Card } from "../components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import DashboardLayout from "../components/DashboardLayout";
 import { AdCardV3 } from "../components/ads/AdCardV3";
+import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { cn } from "../lib/utils";
 
 const COUNTRIES = [
@@ -57,6 +58,7 @@ export default function Minerador() {
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
@@ -107,7 +109,6 @@ export default function Minerador() {
     }
   };
 
-  // Intersection Observer para Scroll Infinito
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -302,7 +303,11 @@ export default function Minerador() {
         {allAds.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
             {allAds.map((ad: any) => (
-              <AdCardV3 key={ad.id} ad={ad} />
+              <AdCardV3 
+                key={ad.id} 
+                ad={ad} 
+                onExpand={(ad, media) => setSelectedAd({ ad, media })}
+              />
             ))}
           </div>
         )}
@@ -316,6 +321,14 @@ export default function Minerador() {
             </div>
           )}
         </div>
+
+        {/* Ad Details Modal */}
+        <AdDetailsModal 
+          ad={selectedAd?.ad}
+          media={selectedAd?.media}
+          isOpen={!!selectedAd}
+          onClose={() => setSelectedAd(null)}
+        />
       </div>
     </DashboardLayout>
   );

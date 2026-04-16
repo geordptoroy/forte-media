@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat, Download, Clock } from "lucide-react";
+import { ExternalLink, Calendar, Users, Eye, Globe, Play, Loader2, Image as ImageIcon, Layers, AlertCircle, Share2, Link as LinkIcon, Tag, Package, Repeat, Download, Clock, Maximize2 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
 interface AdCardProps {
   ad: any;
+  onExpand?: (ad: any, media: ExtractionResult | null) => void;
 }
 
 interface ExtractionResult {
@@ -17,7 +18,7 @@ interface ExtractionResult {
   thumbnail?: string;
 }
 
-export function AdCardV3({ ad }: AdCardProps) {
+export function AdCardV3({ ad, onExpand }: AdCardProps) {
   const [media, setMedia] = useState<ExtractionResult | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -65,12 +66,14 @@ export function AdCardV3({ ad }: AdCardProps) {
   const platforms = ad.publisher_platforms || [];
   const body = ad.ad_creative_bodies?.[0] || "Sem descrição disponível.";
 
-  const copyToClipboard = () => {
+  const copyToClipboard = (e: React.MouseEvent) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(officialLibraryUrl);
     toast.success("Link da biblioteca copiado!");
   };
 
-  const downloadMedia = async () => {
+  const downloadMedia = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!media || !media.url) return;
     
     const url = Array.isArray(media.url) ? media.url[0] : media.url;
@@ -92,13 +95,11 @@ export function AdCardV3({ ad }: AdCardProps) {
       
       toast.success("Download iniciado!");
     } catch (error) {
-      // Fallback para abrir em nova aba se o fetch falhar (CORS)
       window.open(url, '_blank');
       toast.info("Abrindo mídia em nova aba para download.");
     }
   };
 
-  // Função para calcular tempo ativo
   const calculateActiveTime = (startTime: string) => {
     if (!startTime) return "N/A";
     const start = new Date(startTime);
@@ -184,7 +185,8 @@ export function AdCardV3({ ad }: AdCardProps) {
       <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-3 bg-white/[0.02]">
         <AlertCircle className="w-5 h-5 text-white/10" />
         <button 
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             setIsExtracting(true);
             extractMutation.mutate({ snapshotUrl: ad.ad_snapshot_url });
           }}
@@ -199,7 +201,8 @@ export function AdCardV3({ ad }: AdCardProps) {
   return (
     <Card 
       ref={cardRef}
-      className="overflow-hidden flex flex-col bg-[#0A0A0A] border-white/[0.06] hover:border-white/20 transition-all duration-500 group rounded-xl shadow-2xl"
+      onClick={() => onExpand?.(ad, media)}
+      className="overflow-hidden flex flex-col bg-[#0A0A0A] border-white/[0.06] hover:border-white/20 transition-all duration-500 group rounded-xl shadow-2xl cursor-pointer"
     >
       {/* Media Preview Container */}
       <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06] overflow-hidden">
@@ -224,40 +227,6 @@ export function AdCardV3({ ad }: AdCardProps) {
             </Badge>
           </div>
         )}
-
-        {/* Action Overlay (Visible on Hover) */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3 z-20">
-          <Button 
-            size="icon" 
-            variant="secondary" 
-            className="w-10 h-10 rounded-full bg-white text-black hover:bg-white/90"
-            onClick={copyToClipboard}
-            title="Copiar Link Oficial"
-          >
-            <Share2 className="w-4 h-4" />
-          </Button>
-          <Button 
-            size="icon" 
-            variant="secondary" 
-            className="w-10 h-10 rounded-full bg-white text-black hover:bg-white/90"
-            asChild
-          >
-            <a href={officialLibraryUrl} target="_blank" rel="noreferrer" title="Ver na Biblioteca">
-              <LinkIcon className="w-4 h-4" />
-            </a>
-          </Button>
-          {media && (
-            <Button 
-              size="icon" 
-              variant="secondary" 
-              className="w-10 h-10 rounded-full bg-white text-black hover:bg-white/90"
-              onClick={downloadMedia}
-              title="Baixar Criativo"
-            >
-              <Download className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
       </div>
 
       {/* Content Section */}
@@ -330,6 +299,7 @@ export function AdCardV3({ ad }: AdCardProps) {
             size="sm" 
             className="flex-1 h-9 bg-transparent text-white hover:bg-white/10 border border-white/20 hover:border-white/60 rounded-lg font-black text-[9px] uppercase tracking-[0.1em] transition-all active:scale-95"
             asChild
+            onClick={(e) => e.stopPropagation()}
           >
             <a href={officialLibraryUrl} target="_blank" rel="noreferrer">
               Analisar Criativo <ExternalLink className="w-3 h-3 ml-2" />
