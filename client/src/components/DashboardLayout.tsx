@@ -302,16 +302,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Menu className="w-4 h-4" />
             </Button>
             
-            <div className="flex flex-col">
-              <h2 className="text-xs font-black text-white tracking-tight flex items-center gap-2">
-                {currentPageLabel}
-                <span className="text-gray-700">·</span>
-                <span className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Painel</span>
-              </h2>
-              <p className="text-[9px] text-gray-700 font-bold uppercase tracking-tighter">
-                {currentItem?.description || "Inteligência & Performance"}
-              </p>
-            </div>
+            <div className="flex-1" />
           </div>
 
           <div className="flex items-center gap-3">
