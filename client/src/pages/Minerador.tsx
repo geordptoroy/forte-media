@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, AlertCircle, Globe, Package, Zap, Layers, X } from "lucide-react";
+import { Search, Filter, Loader2, AlertCircle, Globe, Package, Diamond, Layers, X, ArrowUpDown } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -197,7 +197,7 @@ export default function Minerador() {
         <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 bg-white rounded flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-black" />
+              <Diamond className="w-3.5 h-3.5 text-black fill-black/20" />
             </div>
             <h1 className="text-lg font-black tracking-tighter uppercase italic">Minerador Pro</h1>
             {processedAds.length > 0 && (
@@ -208,8 +208,8 @@ export default function Minerador() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded-lg w-fit">
-              <Filter className="w-3.5 h-3.5 text-white/40" />
+            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
+              <Filter className="w-3.5 h-3.5 text-white/80" />
               <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
                 {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
               </span>
@@ -223,17 +223,17 @@ export default function Minerador() {
         </div>
 
         {/* Barra de Filtros Refatorada */}
-        <Card className="p-4 bg-[#0A0A0A] border-white/[0.08] rounded-xl shadow-xl">
+        <Card className="p-4 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
           <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-end gap-3">
             <div className="w-full lg:w-[25%] space-y-0">
               <MiniLabel>Palavra-chave</MiniLabel>
               <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20 group-focus-within:text-white/60 transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60 group-focus-within:text-white transition-colors" />
                 <Input
                   placeholder="Ex: Emagrecimento..."
                   value={filters.searchTerms}
                   onChange={(e) => updateFilter("searchTerms", e.target.value)}
-                  className="pl-9 bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[13px] font-medium focus:border-white/20 focus:ring-0 transition-all placeholder:text-white/20"
+                  className="pl-9 bg-white/[0.03] border-white/20 rounded-lg h-10 text-[13px] font-medium focus:border-white/40 focus:ring-0 transition-all placeholder:text-white/40"
                 />
                 {filters.searchTerms && (
                   <button 
@@ -251,9 +251,9 @@ export default function Minerador() {
               <div className="flex-1 space-y-0">
                 <MiniLabel>País</MiniLabel>
                 <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
-                  <SelectTrigger className="w-full bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
-                      <Globe className="w-3 h-3 text-white/20 shrink-0" />
+                      <Globe className="w-3 h-3 text-white/60 shrink-0" />
                       <SelectValue placeholder="País" />
                     </div>
                   </SelectTrigger>
@@ -268,9 +268,9 @@ export default function Minerador() {
               <div className="flex-1 space-y-0">
                 <MiniLabel>Tipo Produto</MiniLabel>
                 <Select value={filters.selectedType} onValueChange={(v) => updateFilter("selectedType", v)}>
-                  <SelectTrigger className="w-full bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
-                      <Package className="w-3 h-3 text-white/20 shrink-0" />
+                      <Package className="w-3 h-3 text-white/60 shrink-0" />
                       <SelectValue placeholder="Tipo" />
                     </div>
                   </SelectTrigger>
@@ -285,9 +285,9 @@ export default function Minerador() {
               <div className="flex-1 space-y-0">
                 <MiniLabel>Funil</MiniLabel>
                 <Select value={filters.selectedFunnel} onValueChange={(v) => updateFilter("selectedFunnel", v)}>
-                  <SelectTrigger className="w-full bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                  <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2 truncate">
-                      <Layers className="w-3 h-3 text-white/20 shrink-0" />
+                      <Layers className="w-3 h-3 text-white/60 shrink-0" />
                       <SelectValue placeholder="Funil" />
                     </div>
                   </SelectTrigger>

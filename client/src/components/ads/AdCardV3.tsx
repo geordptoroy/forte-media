@@ -89,7 +89,7 @@ export function AdCardV3({ ad, onExpand }: AdCardProps) {
     <Card 
       ref={cardRef}
       onClick={() => onExpand?.(ad, media)}
-      className="overflow-hidden flex flex-col bg-[#0A0A0A] border-white/[0.06] hover:border-white/20 transition-all duration-500 group rounded-xl shadow-2xl cursor-pointer"
+      className="overflow-hidden flex flex-col bg-[#0A0A0A] border-white/20 hover:border-white/40 transition-all duration-500 group rounded-xl shadow-2xl cursor-pointer"
     >
       {/* Media Preview */}
       <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06] overflow-hidden">
