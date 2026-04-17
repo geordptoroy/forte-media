@@ -196,8 +196,8 @@ export default function Minerador() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-white rounded flex items-center justify-center overflow-hidden">
-              <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" alt="Minerador" className="w-4 h-4 object-contain" />
+            <div className="w-7 h-7 bg-transparent flex items-center justify-center overflow-hidden">
+              <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" alt="Minerador" className="w-6 h-6 object-contain" />
             </div>
             {processedAds.length > 0 && (
               <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
