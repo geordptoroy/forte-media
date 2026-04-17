@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, AlertCircle, Globe, Package, Diamond, Layers, X, ArrowUpDown } from "lucide-react";
+import { Search, Filter, Loader2, Globe, Package, Layers, X } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -10,7 +10,9 @@ import DashboardLayout from "../components/DashboardLayout";
 import { AdCardV3 } from "../components/ads/AdCardV3";
 import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { Badge } from "../components/ui/badge";
+import { cn } from "@/lib/utils";
 
+// --- CONSTANTES E CONFIGURAÇÕES ---
 const COUNTRIES = [
   { code: "ALL", name: "Todos" },
   { code: "BR", name: "Brasil" },
@@ -29,20 +31,51 @@ const COUNTRIES = [
   { code: "CL", name: "Chile" },
 ];
 
-const PRODUCT_TYPES = [
-  "Todos", "Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"
-];
+const PRODUCT_TYPES = ["Todos", "Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"];
+const FUNNEL_STRUCTURES = ["Todos", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
+const AUTO_LOAD_LIMIT = 20;
 
-const FUNNEL_STRUCTURES = [
-  "Todos", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"
-];
-
-const MiniLabel = ({ children }: { children: React.ReactNode }) => (
+// --- SUB-COMPONENTES AUXILIARES ---
+const MiniLabel = memo(({ children }: { children: React.ReactNode }) => (
   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90 mb-1.5 ml-1 block font-mono">
     {children}
   </label>
-);
+));
 
+const PageHeader = memo(({ resultsCount, hidePolitical, onTogglePolitical }: { 
+  resultsCount: number, 
+  hidePolitical: boolean, 
+  onTogglePolitical: (val: boolean) => void 
+}) => (
+  <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+    <div className="flex items-center gap-3">
+      <div className="w-7 h-7 bg-transparent flex items-center justify-center overflow-hidden">
+        <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" alt="Minerador" className="w-6 h-6 object-contain" />
+      </div>
+      {resultsCount > 0 && (
+        <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
+          {resultsCount} RESULTADOS
+        </Badge>
+      )}
+    </div>
+
+    <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
+        <Filter className="w-3.5 h-3.5 text-white/80" />
+        <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
+          {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
+        </span>
+        <Switch 
+          checked={hidePolitical} 
+          onCheckedChange={onTogglePolitical}
+          className="scale-90 data-[state=checked]:bg-emerald-500"
+        />
+      </div>
+    </div>
+  </div>
+));
+
+// --- COMPONENTE PRINCIPAL ---
 export default function Minerador() {
   // --- ESTADO ---
   const [filters, setFilters] = useState({
@@ -62,9 +95,7 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
-  const [autoLoadLimit] = useState(20);
   
-  const loaderRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // --- PERSISTÊNCIA ---
@@ -83,7 +114,7 @@ export default function Minerador() {
     { enabled: false, retry: false }
   );
 
-  const startAutoLoad = async (currentCount: number, cursor: string) => {
+  const startAutoLoad = useCallback(async (currentCount: number, cursor: string) => {
     setIsAutoLoading(true);
     let totalLoaded = currentCount;
     let currentCursor: string | undefined = cursor;
@@ -92,8 +123,8 @@ export default function Minerador() {
     abortControllerRef.current = controller;
 
     try {
-      while (totalLoaded < autoLoadLimit && currentCursor && !controller.signal.aborted) {
-        await new Promise(resolve => setTimeout(resolve, 400)); // Delay preventivo
+      while (totalLoaded < AUTO_LOAD_LIMIT && currentCursor && !controller.signal.aborted) {
+        await new Promise(resolve => setTimeout(resolve, 400));
         if (controller.signal.aborted) break;
 
         const result = await searchMutation.refetch();
@@ -113,7 +144,7 @@ export default function Minerador() {
       setIsAutoLoading(false);
       abortControllerRef.current = null;
     }
-  };
+  }, [searchMutation]);
 
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -132,52 +163,39 @@ export default function Minerador() {
       const cursor = result.data.paging?.next_cursor;
       setNextCursor(cursor);
 
-      // Auto-load padrão até o limite
-      if (ads.length < autoLoadLimit && cursor) {
+      if (ads.length < AUTO_LOAD_LIMIT && cursor) {
         startAutoLoad(ads.length, cursor);
       }
     }
-  }, [filters.searchTerms, filters.country, searchMutation, autoLoadLimit]);
+  }, [searchMutation, startAutoLoad]);
 
   // --- REATIVIDADE ---
-  // Debounce para busca por palavra-chave
   useEffect(() => {
     const timer = setTimeout(() => {
       if (filters.searchTerms || hasSearched) handleSearch();
     }, 600);
     return () => clearTimeout(timer);
-  }, [filters.searchTerms]);
+  }, [filters.searchTerms, handleSearch, hasSearched]);
 
-  // Atualização imediata para País e Ads Políticos (Filtros Globais)
   useEffect(() => {
     if (hasSearched) handleSearch();
-  }, [filters.country, hidePolitical]);
+  }, [filters.country, hidePolitical, handleSearch, hasSearched]);
 
   // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
   const processedAds = useMemo(() => {
-    let filtered = [...allAds];
-
-    // 1. Filtro de Ads Políticos/Sociais
-    filtered = filtered.filter(ad => {
+    let filtered = allAds.filter(ad => {
       const isPolitical = !!ad.bylines;
-      return hidePolitical ? !isPolitical : isPolitical;
+      const matchesPolitical = hidePolitical ? !isPolitical : isPolitical;
+      
+      const matchesType = filters.selectedType === "Todos" || 
+        ad.detectedTypes?.some((t: string) => t === filters.selectedType);
+        
+      const matchesFunnel = filters.selectedFunnel === "Todos" || 
+        ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel);
+
+      return matchesPolitical && matchesType && matchesFunnel;
     });
 
-    // 2. Filtro de Tipo de Produto (Heurística de inclusão)
-    if (filters.selectedType !== "Todos") {
-      filtered = filtered.filter(ad => 
-        ad.detectedTypes?.some((t: string) => t === filters.selectedType)
-      );
-    }
-
-    // 3. Filtro de Estrutura de Funil (Heurística de inclusão)
-    if (filters.selectedFunnel !== "Todos") {
-      filtered = filtered.filter(ad => 
-        ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel)
-      );
-    }
-
-    // 4. Ordenação Padrão (Mais Frequentes / Recentes)
     return filtered.sort((a, b) => {
       const freqDiff = (b.frequency || 0) - (a.frequency || 0);
       if (freqDiff !== 0) return freqDiff;
@@ -185,9 +203,9 @@ export default function Minerador() {
     });
   }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel]);
 
-  const updateFilter = (key: keyof typeof filters, value: string) => {
+  const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
   return (
     <DashboardLayout>
@@ -202,35 +220,13 @@ export default function Minerador() {
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta</p>
         </div>
         
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-transparent flex items-center justify-center overflow-hidden">
-              <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" alt="Minerador" className="w-6 h-6 object-contain" />
-            </div>
-            {processedAds.length > 0 && (
-              <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
-                {processedAds.length} RESULTADOS
-              </Badge>
-            )}
-          </div>
+        <PageHeader 
+          resultsCount={processedAds.length} 
+          hidePolitical={hidePolitical} 
+          onTogglePolitical={setHidePolitical} 
+        />
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
-              <Filter className="w-3.5 h-3.5 text-white/80" />
-              <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
-                {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
-              </span>
-              <Switch 
-                checked={hidePolitical} 
-                onCheckedChange={setHidePolitical}
-                className="scale-90 data-[state=checked]:bg-emerald-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Barra de Filtros Refatorada */}
+        {/* Barra de Filtros */}
         <Card className="p-4 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
           <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-end gap-3">
             <div className="w-full lg:w-[25%] space-y-0">
@@ -306,53 +302,94 @@ export default function Minerador() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <Button 
-                type="submit"
-                disabled={searchMutation.isLoading}
-                className="w-full lg:w-10 h-10 bg-white text-black hover:bg-white/90 rounded-lg shadow-lg shadow-white/5 transition-all active:scale-95 flex items-center justify-center p-0 shrink-0"
-              >
-                {searchMutation.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              </Button>
             </div>
+
+            <Button 
+              type="submit"
+              disabled={searchMutation.isFetching || isAutoLoading}
+              className="w-full lg:w-auto h-10 bg-white text-black hover:bg-white/90 font-black uppercase text-[11px] tracking-widest px-8 rounded-lg shadow-lg shadow-white/5 transition-all disabled:opacity-50"
+            >
+              {searchMutation.isFetching || isAutoLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Minerar"
+              )}
+            </Button>
           </form>
         </Card>
 
-        {/* Grid de Resultados */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {processedAds.map((ad) => (
-            <AdCardV3 key={ad.id} ad={ad} />
-          ))}
-        </div>
-
-        {/* Loading State */}
-        <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
-          {(searchMutation.isLoading || isAutoLoading) && (
-            <>
-              <Loader2 className="w-6 h-6 text-white/20 animate-spin" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
-                {isAutoLoading ? `Sincronizando: ${allAds.length} de ${autoLoadLimit} anúncios...` : "Buscando criativos..."}
-              </p>
-            </>
-          )}
-          {!searchMutation.isLoading && hasSearched && processedAds.length === 0 && (
-            <div className="flex flex-col items-center gap-3 text-white/20">
-              <AlertCircle className="w-8 h-8" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em]">Nenhum anúncio encontrado</p>
+        {/* Resultados */}
+        <div className="flex-1 min-h-0">
+          {searchMutation.isFetching && allAds.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 space-y-4">
+              <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Iniciando Mineração...</p>
+            </div>
+          ) : processedAds.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+              {processedAds.map((ad) => (
+                <AdCardV3 
+                  key={ad.id} 
+                  ad={ad} 
+                  onExpand={(ad, media) => setSelectedAd({ ad, media })} 
+                />
+              ))}
+            </div>
+          ) : hasSearched && !searchMutation.isFetching ? (
+            <div className="flex flex-col items-center justify-center py-32 space-y-4 bg-white/[0.02] border border-dashed border-white/10 rounded-3xl">
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center">
+                <Search className="w-6 h-6 text-white/20" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-black text-white uppercase tracking-tight">Nenhum anúncio encontrado</p>
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Tente mudar as palavras-chave ou filtros</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 space-y-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-white/5 blur-3xl rounded-full" />
+                <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" className="w-20 h-20 relative opacity-10" alt="Minerador" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-xs font-black text-white/30 uppercase tracking-[0.4em]">Pronto para minerar?</p>
+                <p className="text-[10px] text-white/10 font-bold uppercase tracking-widest">Insira uma palavra-chave para começar a busca</p>
+              </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Modal de Detalhes */}
-      {selectedAd && (
+        {/* Indicador de Auto-Load */}
+        {isAutoLoading && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-black/80 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center gap-4">
+              <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                Auto-carregando: {allAds.length} de {AUTO_LOAD_LIMIT} anúncios...
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-[9px] font-black uppercase text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                onClick={() => {
+                  if (abortControllerRef.current) abortControllerRef.current.abort();
+                  setIsAutoLoading(false);
+                }}
+              >
+                Parar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Detalhes */}
         <AdDetailsModal 
-          ad={selectedAd.ad} 
-          media={selectedAd.media} 
+          ad={selectedAd?.ad} 
+          media={selectedAd?.media} 
           isOpen={!!selectedAd} 
           onClose={() => setSelectedAd(null)} 
         />
-      )}
+      </div>
     </DashboardLayout>
   );
 }
