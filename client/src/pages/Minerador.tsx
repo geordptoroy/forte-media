@@ -193,6 +193,15 @@ export default function Minerador() {
     <DashboardLayout>
       <div className="flex flex-col space-y-5 max-w-[1600px] mx-auto px-4 md:px-6 scale-[0.95] origin-top">
         
+        {/* Título Principal */}
+        <div className="mb-6">
+          <h1 className="text-5xl font-black uppercase tracking-tighter text-white flex items-center gap-4">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">Minerador</span>
+            <span className="text-white/20 font-light text-xl">Pro</span>
+          </h1>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta</p>
+        </div>
+        
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
           <div className="flex items-center gap-3">
