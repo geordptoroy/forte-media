@@ -39,25 +39,68 @@ async function getPageDetails(pageId: string, accessToken: string) {
   }
 }
 
-// Configuração de Classificação de Tipo de Produto (Regras expandidas para maior abrangência)
-const PRODUCT_TYPE_RULES = {
-  "Infoproduto": ["curso", "treinamento", "método", "fórmula", "acesso vitalício", "baixe agora", "aprenda", "workshop", "e-book", "mentoria", "aula", "digital", "online", "vagas", "inscrição", "conteúdo"],
-  "Suplementos/Nutra": ["cápsula", "comprimido", "fórmula natural", "emagrecedor", "vitamina", "probiótico", "detox", "encapsulado", "nutra", "pote", "frasco", "saúde", "suplemento", "queima", "gordura"],
-  "Dropshipping": ["envio direto da fábrica", "estoque limitado", "frete grátis", "produto importado", "dropshipping", "pronta entrega", "oferta exclusiva", "loja", "comprar", "promoção", "unidades", "desconto"],
-  "Comércio Local": ["pizzaria", "clínica", "restaurante", "aqui perto", "na sua região", "retire na loja", "endereço", "bairro", "cidade", "agende seu horário", "visite", "local", "unidade"],
-  "Moda": ["roupa", "vestido", "calçado", "sapato", "acessório", "look", "moda", "coleção", "estilo", "vestuário", "peças"],
-  "Eletrônicos": ["smartphone", "celular", "fone", "gadget", "tecnologia", "computador", "notebook", "iphone", "android", "tech"],
-  "Serviços": ["consultoria", "seguro", "plano de saúde", "advogado", "contabilidade", "serviço", "atendimento", "suporte", "profissional"]
-};
-
-// Configuração de Classificação de Estrutura de Funil (Regras expandidas)
-const FUNNEL_STRUCTURE_RULES = {
-  "TSL": ["r$", "oferta", "desconto", "garantia", "depoimento", "preço", "9,90", "47", "97", "comprar agora", "checkout", "pagamento"],
-  "VSL": ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas"],
-  "X1": ["webinar", "apresentação ao vivo", "evento online", "vagas limitadas", "participe", "aula ao vivo", "whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado"],
-  "Landing Page": ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera", "saiba mais", "página", "site"],
-  "Quiz": ["quiz", "teste", "descubra", "perguntas", "resultado personalizado", "perfil", "escolha", "responda"],
-  "Type Bot": ["converse comigo", "chat", "bot", "whatsapp", "messenger", "envie uma mensagem", "falar com consultor", "assistente", "automático"]
+/**
+ * Motor de Classificação Inteligente (Baseado em Pesos)
+ * Em vez de um simples "includes", usamos um sistema de pontuação para evitar falsos positivos
+ * e garantir que o anúncio seja classificado no tipo mais provável.
+ */
+const CLASSIFICATION_ENGINE = {
+  PRODUCT_TYPES: {
+    "Infoproduto": {
+      high: ["curso", "treinamento", "método", "fórmula", "mentoria", "workshop", "e-book", "aula gratuita", "vagas abertas", "inscrição"],
+      medium: ["digital", "online", "aprenda", "conteúdo", "acesso", "vitalício", "baixe agora", "módulo"]
+    },
+    "Suplementos/Nutra": {
+      high: ["cápsula", "comprimido", "emagrecedor", "vitamina", "probiótico", "detox", "encapsulado", "nutra", "frasco", "pote"],
+      medium: ["natural", "saúde", "suplemento", "queima", "gordura", "fórmula", "corpo", "resultado"]
+    },
+    "Dropshipping": {
+      high: ["frete grátis", "estoque limitado", "pronta entrega", "importado", "loja virtual", "comprar agora", "oferta exclusiva", "unidades"],
+      medium: ["promoção", "desconto", "oferta", "envio", "entrega", "produto", "site", "garantia"]
+    },
+    "Comércio Local": {
+      high: ["pizzaria", "clínica", "restaurante", "agende seu horário", "visite nossa", "endereço", "bairro", "cidade", "unidade"],
+      medium: ["aqui perto", "na sua região", "retire na loja", "local", "atendimento", "serviço"]
+    },
+    "Moda": {
+      high: ["roupa", "vestido", "calçado", "sapato", "look", "coleção", "vestuário", "peças", "estilo"],
+      medium: ["moda", "acessório", "feminino", "masculino", "tamanho", "cor", "tecido"]
+    },
+    "Eletrônicos": {
+      high: ["smartphone", "celular", "gadget", "iphone", "android", "notebook", "computador", "fone de ouvido"],
+      medium: ["tecnologia", "tech", "eletrônico", "dispositivo", "carregador", "bluetooth"]
+    },
+    "Serviços": {
+      high: ["consultoria", "seguro", "plano de saúde", "advogado", "contabilidade", "atendimento profissional", "suporte"],
+      medium: ["serviço", "solução", "especialista", "ajuda", "empresa", "negócio"]
+    }
+  },
+  FUNNELS: {
+    "TSL": {
+      high: ["checkout", "pagamento", "r$", "preço", "9,90", "47", "97", "oferta irresistível", "garantia de 7 dias"],
+      medium: ["comprar", "desconto", "promoção", "oferta", "depoimento", "venda"]
+    },
+    "VSL": {
+      high: ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas"],
+      medium: ["explicativo", "apresentação", "vídeo", "play", "veja"]
+    },
+    "X1": {
+      high: ["whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado", "fale conosco"],
+      medium: ["chat", "mensagem", "contato", "dúvida", "suporte", "equipe"]
+    },
+    "Landing Page": {
+      high: ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera", "saiba mais", "página oficial"],
+      medium: ["site", "link", "acesso", "informação", "detalhes"]
+    },
+    "Quiz": {
+      high: ["quiz", "teste", "descubra seu", "perguntas", "resultado personalizado", "perfil", "responda"],
+      medium: ["escolha", "descubra", "veja seu", "análise"]
+    },
+    "Type Bot": {
+      high: ["converse comigo", "bot", "assistente virtual", "automático", "chat inteligente", "falar com consultor"],
+      medium: ["conversa", "interativo", "mensagem", "digital"]
+    }
+  }
 };
 
 function classifyAd(ad: any) {
@@ -66,25 +109,30 @@ function classifyAd(ad: any) {
   const desc = (ad.ad_creative_link_descriptions?.[0] || "").toLowerCase();
   const combinedText = `${body} ${title} ${desc}`;
 
-  const types: string[] = [];
-  const funnels: string[] = [];
-
-  for (const [type, keywords] of Object.entries(PRODUCT_TYPE_RULES)) {
-    if (keywords.some(k => combinedText.includes(k))) {
-      types.push(type);
+  const getScore = (rules: any) => {
+    const scores: Record<string, number> = {};
+    for (const [category, keywords] of Object.entries(rules)) {
+      let score = 0;
+      // @ts-ignore
+      keywords.high.forEach(k => { if (combinedText.includes(k)) score += 3; });
+      // @ts-ignore
+      keywords.medium.forEach(k => { if (combinedText.includes(k)) score += 1; });
+      if (score > 0) scores[category] = score;
     }
-  }
+    return scores;
+  };
 
-  for (const [funnel, keywords] of Object.entries(FUNNEL_STRUCTURE_RULES)) {
-    if (keywords.some(k => combinedText.includes(k))) {
-      funnels.push(funnel);
-    }
-  }
+  const typeScores = getScore(CLASSIFICATION_ENGINE.PRODUCT_TYPES);
+  const funnelScores = getScore(CLASSIFICATION_ENGINE.FUNNELS);
 
-  if (types.length === 0) types.push("Outros");
-  if (funnels.length === 0) funnels.push("Indefinido");
+  // Pegamos as categorias com maior pontuação, ou "Outros" se nada for detectado
+  const types = Object.keys(typeScores).sort((a, b) => typeScores[b] - typeScores[a]);
+  const funnels = Object.keys(funnelScores).sort((a, b) => funnelScores[b] - funnelScores[a]);
 
-  return { types, funnels };
+  return { 
+    types: types.length > 0 ? types : ["Outros"], 
+    funnels: funnels.length > 0 ? funnels : ["Indefinido"] 
+  };
 }
 
 export interface SearchAdsParams {
@@ -130,7 +178,7 @@ export async function searchAds(params: SearchAdsParams) {
       const hash = generateCreativeHash(ad);
       const pageDetails = await getPageDetails(ad.page_id, accessToken);
 
-      // Tentar extrair o link real de destino dos corpos criativos ou legendas
+      // Extração de URL aprimorada (Regex mais robusto)
       const creativeTexts = [
         ...(ad.ad_creative_bodies || []),
         ...(ad.ad_creative_link_captions || []),
@@ -138,9 +186,13 @@ export async function searchAds(params: SearchAdsParams) {
         ...(ad.ad_creative_link_titles || [])
       ].join(" ");
       
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const urlRegex = /(https?:\/\/[^\s"'<>]+)/g;
       const foundUrls = creativeTexts.match(urlRegex);
-      const destinationUrl = foundUrls && foundUrls.length > 0 ? foundUrls[0] : ad.ad_snapshot_url;
+      
+      // Filtrar URLs que não sejam da própria Meta/Facebook se possível
+      const destinationUrl = foundUrls?.find(u => !u.includes('facebook.com') && !u.includes('fb.me')) || 
+                           foundUrls?.[0] || 
+                           ad.ad_snapshot_url;
 
       return {
         ...ad,
@@ -149,7 +201,7 @@ export async function searchAds(params: SearchAdsParams) {
         frequency: creativeGroups.get(hash) || 1,
         creativeHash: hash,
         pageDetails: pageDetails,
-        destination_url: destinationUrl // Novo campo para o link real de destino
+        destination_url: destinationUrl
       };
     }));
 

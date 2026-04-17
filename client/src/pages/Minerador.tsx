@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, AlertCircle, Globe, LayoutGrid, Tag, Package, Clock, Sparkles, ChevronDown, Zap, ArrowUpDown, EyeOff, RefreshCw, Layers } from "lucide-react";
+import { Search, Filter, Loader2, AlertCircle, Globe, Package, Zap, Layers, X } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -44,109 +44,44 @@ const MiniLabel = ({ children }: { children: React.ReactNode }) => (
 );
 
 export default function Minerador() {
+  // --- ESTADO ---
   const [filters, setFilters] = useState({
     searchTerms: "",
     country: "BR",
-    adType: "ALL" as "ALL" | "POLITICAL_AND_ISSUE_ADS" | "NON_POLITICAL",
     selectedType: "Todos",
     selectedFunnel: "Todos",
-    activeSince: "anytime"
-  });
-
-  const [sortConfig] = useState({
-    field: "frequency" as "frequency" | "date",
-    direction: "desc" as "asc" | "desc"
   });
 
   const [hidePolitical, setHidePolitical] = useState(() => {
     const saved = localStorage.getItem("hidePolitical");
     return saved !== null ? JSON.parse(saved) : true;
   });
-  const [hideLowFrequency, setHideLowFrequency] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem("hidePolitical", JSON.stringify(hidePolitical));
-  }, [hidePolitical]);
   const [allAds, setAllAds] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
-  const [syncKey, setSyncKey] = useState(0);
-  const [autoLoad, setAutoLoad] = useState(true);
-  const [autoLoadLimit, setAutoLoadLimit] = useState(20);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
+  const [autoLoadLimit] = useState(20);
   
   const loaderRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
-
-  // Debounce para busca por palavra-chave
+  // --- PERSISTÊNCIA ---
   useEffect(() => {
-    if (!filters.searchTerms) return;
-    const timer = setTimeout(() => {
-      handleSearch();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [filters.searchTerms]);
-
-  // Atualização automática para filtros globais (País)
-  useEffect(() => {
-    if (hasSearched) {
-      handleSearch();
-    }
-  }, [filters.country]);
-
-  // Atualização automática para o filtro de Ads Políticos (Global)
-  useEffect(() => {
-    if (hasSearched) {
-      handleSearch();
-    }
+    localStorage.setItem("hidePolitical", JSON.stringify(hidePolitical));
   }, [hidePolitical]);
 
-  // Buscamos sempre ambos os tipos na API para permitir a filtragem local instantânea e precisa
+  // --- BUSCA (API) ---
   const searchMutation = trpc.ads.search.useQuery(
     { 
       searchTerms: filters.searchTerms, 
       country: filters.country, 
-      adType: "ALL", // Sempre buscamos todos para filtrar localmente conforme a regra de "APENAS" ou "OCULTAR"
+      adType: "ALL",
       after: nextCursor
     },
-    { 
-      enabled: false,
-      retry: false,
-    }
+    { enabled: false, retry: false }
   );
-
-  const handleSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    
-    // Cancelar qualquer auto-carregamento em curso
-    setIsAutoLoading(false);
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-
-    setHasSearched(true);
-    setAllAds([]);
-    setNextCursor(undefined);
-    
-    const result = await searchMutation.refetch();
-    if (result.data) {
-      const ads = result.data.data;
-      setAllAds(ads);
-      const cursor = result.data.paging?.next_cursor;
-      setNextCursor(cursor);
-
-      // Se autoLoad estiver ativo e não atingiu o limite, inicia o loop
-      if (autoLoad && ads.length < autoLoadLimit && cursor) {
-        startAutoLoad(ads.length, cursor);
-      }
-    }
-  };
 
   const startAutoLoad = async (currentCount: number, cursor: string) => {
     setIsAutoLoading(true);
@@ -158,9 +93,7 @@ export default function Minerador() {
 
     try {
       while (totalLoaded < autoLoadLimit && currentCursor && !controller.signal.aborted) {
-        // Pequeno delay para evitar rate limit
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
+        await new Promise(resolve => setTimeout(resolve, 400)); // Delay preventivo
         if (controller.signal.aborted) break;
 
         const result = await searchMutation.refetch();
@@ -182,86 +115,85 @@ export default function Minerador() {
     }
   };
 
-  // NOTA: Filtros locais (Tipo Produto, Funil, Ordenacao) nao disparam chamadas a API
-  // Eles sao reaplicados automaticamente no useMemo(processedAds) sem necessidade de refetch
-  // Apenas filtros globais (Palavra-chave, Pais, Ads Politicos) disparam novas requisicoes a API
-
-  const fetchMore = async () => {
-    if (isFetchingMore || !nextCursor) return;
-    setIsFetchingMore(true);
+  const handleSearch = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     
-    try {
-      const result = await searchMutation.refetch();
-      if (result.data) {
-        setAllAds(prev => [...prev, ...result.data.data]);
-        setNextCursor(result.data.paging?.next_cursor);
-      }
-    } finally {
-      setIsFetchingMore(false);
-    }
-  };
+    setIsAutoLoading(false);
+    if (abortControllerRef.current) abortControllerRef.current.abort();
 
-  // Lógica de Filtragem Local (Multi-Select Heurística)
+    setHasSearched(true);
+    setAllAds([]);
+    setNextCursor(undefined);
+    
+    const result = await searchMutation.refetch();
+    if (result.data) {
+      const ads = result.data.data;
+      setAllAds(ads);
+      const cursor = result.data.paging?.next_cursor;
+      setNextCursor(cursor);
+
+      // Auto-load padrão até o limite
+      if (ads.length < autoLoadLimit && cursor) {
+        startAutoLoad(ads.length, cursor);
+      }
+    }
+  }, [filters.searchTerms, filters.country, searchMutation, autoLoadLimit]);
+
+  // --- REATIVIDADE ---
+  // Debounce para busca por palavra-chave
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filters.searchTerms || hasSearched) handleSearch();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [filters.searchTerms]);
+
+  // Atualização imediata para País e Ads Políticos (Filtros Globais)
+  useEffect(() => {
+    if (hasSearched) handleSearch();
+  }, [filters.country, hidePolitical]);
+
+  // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
   const processedAds = useMemo(() => {
     let filtered = [...allAds];
 
-    // Lógica de filtragem de anúncios políticos/sociais
-    // Se hidePolitical for true: remove anúncios que têm 'bylines' (indicador de anúncio político/social na Meta API)
-    // Se hidePolitical for false: mantém APENAS anúncios que têm 'bylines'
+    // 1. Filtro de Ads Políticos/Sociais
     filtered = filtered.filter(ad => {
       const isPolitical = !!ad.bylines;
       return hidePolitical ? !isPolitical : isPolitical;
     });
 
-    if (hideLowFrequency) {
-      filtered = filtered.filter(ad => (ad.frequency || 0) > 2);
-    }
-
-    // Filtro de Tipo de Produto
+    // 2. Filtro de Tipo de Produto (Heurística de inclusão)
     if (filters.selectedType !== "Todos") {
-      filtered = filtered.filter(ad => ad.detectedTypes?.includes(filters.selectedType));
+      filtered = filtered.filter(ad => 
+        ad.detectedTypes?.some((t: string) => t === filters.selectedType)
+      );
     }
 
-    // Filtro de Estrutura de Funil
+    // 3. Filtro de Estrutura de Funil (Heurística de inclusão)
     if (filters.selectedFunnel !== "Todos") {
-      filtered = filtered.filter(ad => ad.detectedFunnels?.includes(filters.selectedFunnel));
+      filtered = filtered.filter(ad => 
+        ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel)
+      );
     }
 
+    // 4. Ordenação Padrão (Mais Frequentes / Recentes)
     return filtered.sort((a, b) => {
-      if (sortConfig.field === "frequency") {
-        return sortConfig.direction === "desc" 
-          ? (b.frequency || 0) - (a.frequency || 0)
-          : (a.frequency || 0) - (b.frequency || 0);
-      } else {
-        const dateA = new Date(a.ad_delivery_start_time).getTime();
-        const dateB = new Date(b.ad_delivery_start_time).getTime();
-        return sortConfig.direction === "desc" ? dateB - dateA : dateA - dateB;
-      }
+      const freqDiff = (b.frequency || 0) - (a.frequency || 0);
+      if (freqDiff !== 0) return freqDiff;
+      return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
     });
-  }, [allAds, sortConfig, hideLowFrequency, filters.selectedType, filters.selectedFunnel]);
+  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel]);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && nextCursor && !isFetchingMore) {
-          fetchMore();
-        }
-      },
-      { threshold: 1.0 }
-    );
-
-    if (loaderRef.current) {
-      observer.observe(loaderRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [nextCursor, isFetchingMore]);
+  const updateFilter = (key: keyof typeof filters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
 
   return (
     <DashboardLayout>
       <div className="flex flex-col space-y-5 max-w-[1600px] mx-auto px-4 md:px-6 scale-[0.95] origin-top">
         
-        {/* Header Compacto */}
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 bg-white rounded flex items-center justify-center">
@@ -290,7 +222,7 @@ export default function Minerador() {
           </div>
         </div>
 
-        {/* Barra de Filtros */}
+        {/* Barra de Filtros Refatorada */}
         <Card className="p-4 bg-[#0A0A0A] border-white/[0.08] rounded-xl shadow-xl">
           <form onSubmit={handleSearch} className="flex flex-col lg:flex-row items-end gap-3">
             <div className="w-full lg:w-[25%] space-y-0">
@@ -303,6 +235,15 @@ export default function Minerador() {
                   onChange={(e) => updateFilter("searchTerms", e.target.value)}
                   className="pl-9 bg-white/[0.03] border-white/[0.08] rounded-lg h-10 text-[13px] font-medium focus:border-white/20 focus:ring-0 transition-all placeholder:text-white/20"
                 />
+                {filters.searchTerms && (
+                  <button 
+                    type="button"
+                    onClick={() => updateFilter("searchTerms", "")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -358,8 +299,6 @@ export default function Minerador() {
                 </Select>
               </div>
 
-
-
               <Button 
                 type="submit"
                 disabled={searchMutation.isLoading}
@@ -374,34 +313,21 @@ export default function Minerador() {
         {/* Grid de Resultados */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {processedAds.map((ad) => (
-            <AdCardV3 key={ad.id} ad={ad} syncKey={syncKey} />
+            <AdCardV3 key={ad.id} ad={ad} />
           ))}
         </div>
 
-        {/* Loading State & Infinite Scroll Target */}
+        {/* Loading State */}
         <div ref={loaderRef} className="py-20 flex flex-col items-center justify-center gap-4">
-          {(isFetchingMore || isAutoLoading) && (
+          {(searchMutation.isLoading || isAutoLoading) && (
             <>
               <Loader2 className="w-6 h-6 text-white/20 animate-spin" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">
-                {isAutoLoading ? `Auto-carregando: ${allAds.length} de ${autoLoadLimit} anúncios...` : "Carregando mais criativos..."}
+                {isAutoLoading ? `Sincronizando: ${allAds.length} de ${autoLoadLimit} anúncios...` : "Buscando criativos..."}
               </p>
-              {isAutoLoading && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => {
-                    setIsAutoLoading(false);
-                    if (abortControllerRef.current) abortControllerRef.current.abort();
-                  }}
-                  className="text-[8px] font-black uppercase text-red-500/50 hover:text-red-500 hover:bg-red-500/10"
-                >
-                  Parar Carregamento
-                </Button>
-              )}
             </>
           )}
-          {!isFetchingMore && hasSearched && processedAds.length === 0 && (
+          {!searchMutation.isLoading && hasSearched && processedAds.length === 0 && (
             <div className="flex flex-col items-center gap-3 text-white/20">
               <AlertCircle className="w-8 h-8" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em]">Nenhum anúncio encontrado</p>
