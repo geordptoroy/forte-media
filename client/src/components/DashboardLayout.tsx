@@ -26,7 +26,7 @@ const menuItems = [
     section: "FERRAMENTAS",
     items: [
       { 
-        icon: () => <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" className="w-4 h-4 shrink-0 invert opacity-50 group-hover:opacity-100 transition-opacity" alt="Minerador" />, 
+        icon: () => <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" className="w-4 h-4 shrink-0 invert opacity-80 group-hover:opacity-100 transition-opacity" alt="Minerador" />, 
         label: "Minerador", 
         href: "/minerador", 
         description: "Busca de anúncios Meta" 
@@ -109,7 +109,7 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
         </AnimatePresence>
 
         <div className="w-7 h-7 bg-white flex items-center justify-center shrink-0 overflow-hidden">
-          <img src="https://img.icons8.com/comic/100/skull.png" alt="Logo" className="w-5 h-5 object-contain" />
+          <img src="https://img.icons8.com/comic/100/skull.png" alt="Logo" className="w-6 h-6 object-contain" />
         </div>
         {!isCollapsed && (
           <motion.span
