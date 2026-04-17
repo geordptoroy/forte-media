@@ -88,9 +88,11 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
   // Memoização de URLs e Textos para evitar re-cálculos
   const urls = useMemo(() => {
     const official = `https://www.facebook.com/ads/library/?id=${ad.id}`;
+    // Prioridade: destination_url (vem do backend com ad_creative_link_captions) > official
+    const destination = ad.destination_url && ad.destination_url !== official ? ad.destination_url : official;
     return {
       official,
-      destination: ad.destination_url || official
+      destination
     };
   }, [ad.id, ad.destination_url]);
 

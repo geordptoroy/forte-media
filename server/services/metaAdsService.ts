@@ -178,21 +178,30 @@ export async function searchAds(params: SearchAdsParams) {
       const hash = generateCreativeHash(ad);
       const pageDetails = await getPageDetails(ad.page_id, accessToken);
 
-      // Extração de URL aprimorada (Regex mais robusto)
-      const creativeTexts = [
-        ...(ad.ad_creative_bodies || []),
-        ...(ad.ad_creative_link_captions || []),
-        ...(ad.ad_creative_link_descriptions || []),
-        ...(ad.ad_creative_link_titles || [])
-      ].join(" ");
-      
+      // Extração de URL aprimorada: Prioridade total para ad_creative_link_captions
+      // conforme documentação oficial da Meta para o destino real do anunciante.
+      const captions = ad.ad_creative_link_captions || [];
+      const bodies = ad.ad_creative_bodies || [];
+      const titles = ad.ad_creative_link_titles || [];
+      const descs = ad.ad_creative_link_descriptions || [];
+
       const urlRegex = /(https?:\/\/[^\s"'<>]+)/g;
-      const foundUrls = creativeTexts.match(urlRegex);
       
-      // Filtrar URLs que não sejam da própria Meta/Facebook se possível
-      const destinationUrl = foundUrls?.find(u => !u.includes('facebook.com') && !u.includes('fb.me')) || 
-                           foundUrls?.[0] || 
-                           ad.ad_snapshot_url;
+      // 1. Tentar pegar diretamente do caption (campo oficial de destino)
+      let destinationUrl = captions.find((c: string) => c.match(urlRegex));
+      
+      // 2. Se não achou no caption, buscar em outros campos de texto
+      if (!destinationUrl) {
+        const allTexts = [...bodies, ...titles, ...descs].join(" ");
+        const foundUrls = allTexts.match(urlRegex);
+        // Filtrar URLs que não sejam da própria Meta/Facebook
+        destinationUrl = foundUrls?.find(u => !u.includes('facebook.com') && !u.includes('fb.me')) || foundUrls?.[0];
+      }
+
+      // 3. Fallback final para a biblioteca de anúncios
+      if (!destinationUrl) {
+        destinationUrl = ad.ad_snapshot_url;
+      }
 
       return {
         ...ad,
