@@ -13,6 +13,13 @@ import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
+const SCALE_RANGES = [
+  { min: 1, max: 5, label: "1-5" },
+  { min: 6, max: 10, label: "6-10" },
+  { min: 11, max: 20, label: "11-20" },
+  { min: 21, max: 50, label: "21-50" }
+];
+
 const COUNTRIES = [
   { code: "ALL", name: "Todos" },
   { code: "BR", name: "Brasil" },
@@ -95,6 +102,8 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
+  const [scaleRange, setScaleRange] = useState([1, 50]);
+  const [durationRange, setDurationRange] = useState([1, 300]);
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -193,7 +202,15 @@ export default function Minerador() {
       const matchesFunnel = filters.selectedFunnel === "Todos" || 
         ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel);
 
-      return matchesPolitical && matchesType && matchesFunnel;
+      const frequency = ad.frequency || 1;
+      const matchesScale = frequency >= scaleRange[0] && frequency <= scaleRange[1];
+      
+      const startDate = new Date(ad.ad_delivery_start_time);
+      const now = new Date();
+      const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const matchesDuration = daysActive >= durationRange[0] && daysActive <= durationRange[1];
+
+      return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
     });
 
     return filtered.sort((a, b) => {
@@ -201,7 +218,7 @@ export default function Minerador() {
       if (freqDiff !== 0) return freqDiff;
       return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
     });
-  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel]);
+  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleRange, durationRange];
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -316,6 +333,48 @@ export default function Minerador() {
               )}
             </Button>
           </form>
+        </Card>
+
+        {/* Filtros de Slider */}
+        <Card className="p-6 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl space-y-8">
+          {/* Filtro de Escala */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <MiniLabel>Escala de Anúncios Repetidos</MiniLabel>
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
+                {scaleRange[0]} - {scaleRange[1]} anúncios
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <input type="range" min="1" max="50" value={scaleRange[0]} onChange={(e) => setScaleRange([Math.min(parseInt(e.target.value), scaleRange[1]), scaleRange[1]])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+              <input type="range" min="1" max="50" value={scaleRange[1]} onChange={(e) => setScaleRange([scaleRange[0], Math.max(parseInt(e.target.value), scaleRange[0])])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {SCALE_RANGES.map((range) => (
+                <Button key={range.label} variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", scaleRange[0] === range.min && scaleRange[1] === range.max ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setScaleRange([range.min, range.max])}>{range.label}</Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Filtro de Duração */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <MiniLabel>Duração da Veiculação</MiniLabel>
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
+                {durationRange[0]} - {durationRange[1]} dias
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <input type="range" min="1" max="300" value={durationRange[0]} onChange={(e) => setDurationRange([Math.min(parseInt(e.target.value), durationRange[1]), durationRange[1]])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+              <input type="range" min="1" max="300" value={durationRange[1]} onChange={(e) => setDurationRange([durationRange[0], Math.max(parseInt(e.target.value), durationRange[0])])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 1 && durationRange[1] === 7 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([1, 7])}>1-7 dias</Button>
+              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 7 && durationRange[1] === 30 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([7, 30])}>7-30 dias</Button>
+              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 30 && durationRange[1] === 90 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([30, 90])}>30-90 dias</Button>
+              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 90 && durationRange[1] === 300 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([90, 300])}>90+ dias</Button>
+            </div>
+          </div>
         </Card>
 
         {/* Resultados */}
