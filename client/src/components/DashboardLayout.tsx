@@ -108,8 +108,8 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
           )}
         </AnimatePresence>
 
-        <div className="w-7 h-7 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
-          <img src="https://img.icons8.com/comic/100/skull.png" alt="Logo" className="w-7 h-7 object-contain" />
+        <div className="w-8 h-8 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
+          <img src="https://img.icons8.com/comic/100/skull.png" alt="Logo" className="w-8 h-8 object-contain" />
         </div>
         {!isCollapsed && (
           <motion.span
@@ -212,8 +212,8 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
         {!isCollapsed && (
           <div className="mt-3 px-3 py-3 bg-white/[0.02] border border-white/[0.06]">
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
-                <span className="text-[10px] font-black text-white">{user?.name?.charAt(0) || 'U'}</span>
+              <div className="w-7 h-7 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
+                <img src="https://img.icons8.com/comic/100/skull.png" alt="User" className="w-6 h-6 object-contain" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-white truncate">{user?.name || "Usuário"}</p>
