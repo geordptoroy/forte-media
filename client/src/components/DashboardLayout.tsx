@@ -25,7 +25,12 @@ const menuItems = [
   { 
     section: "FERRAMENTAS",
     items: [
-      { icon: Search, label: "Minerador", href: "/minerador", description: "Busca de anúncios Meta" },
+      { 
+        icon: () => <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" className="w-4 h-4 shrink-0 invert opacity-50 group-hover:opacity-100 transition-opacity" alt="Minerador" />, 
+        label: "Minerador", 
+        href: "/minerador", 
+        description: "Busca de anúncios Meta" 
+      },
     ]
   }
 ];
@@ -103,8 +108,8 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
           )}
         </AnimatePresence>
 
-        <div className="w-7 h-7 bg-white flex items-center justify-center shrink-0">
-          <span className="text-black font-black text-[10px] tracking-tighter">FM</span>
+        <div className="w-7 h-7 bg-white flex items-center justify-center shrink-0 overflow-hidden">
+          <img src="https://img.icons8.com/comic/100/skull.png" alt="Logo" className="w-5 h-5 object-contain" />
         </div>
         {!isCollapsed && (
           <motion.span
@@ -141,12 +146,16 @@ function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, tog
                           : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
                       )}
                     >
-                      <item.icon
-                        className={cn(
-                          "w-4 h-4 shrink-0",
-                          isActive ? "text-black" : "text-gray-500"
-                        )}
-                      />
+                      {typeof item.icon === 'function' ? (
+                        <item.icon />
+                      ) : (
+                        <item.icon
+                          className={cn(
+                            "w-4 h-4 shrink-0",
+                            isActive ? "text-black" : "text-gray-500"
+                          )}
+                        />
+                      )}
                       {!isCollapsed && (
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs leading-tight">{item.label}</span>
