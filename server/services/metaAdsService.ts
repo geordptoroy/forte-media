@@ -15,6 +15,10 @@ const ALL_FIELDS = [
 
 const pageCache = new Map<string, any>();
 
+// Monitoramento de rate limit
+let currentRateLimitUsage = 0;
+let lastRateLimitWarning = 0;
+
 function generateCreativeHash(ad: any) {
   const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase().trim();
   const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase().trim();
@@ -77,28 +81,28 @@ const CLASSIFICATION_ENGINE = {
   },
   FUNNELS: {
     "TSL": {
-      high: ["checkout", "pagamento", "r$", "preço", "9,90", "47", "97", "oferta irresistível", "garantia de 7 dias"],
-      medium: ["comprar", "desconto", "promoção", "oferta", "depoimento", "venda"]
+      high: ["checkout", "pagamento", "compre agora", "clique aqui", "botão de compra", "carrinho", "finalizar compra", "confirmar pedido", "r$", "preço", "oferta irresistível", "garantia de 7 dias", "devolução garantida", "satisfação garantida"],
+      medium: ["comprar", "desconto", "promoção", "oferta", "depoimento", "venda", "cliente satisfeito", "resultado comprovado", "investimento"]
     },
     "VSL": {
-      high: ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas"],
-      medium: ["explicativo", "apresentação", "vídeo", "play", "veja"]
+      high: ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas", "reproduzir vídeo", "clique para assistir", "vídeo completo"],
+      medium: ["explicativo", "apresentação", "vídeo", "play", "veja", "visualize", "confira", "demonstração"]
     },
     "X1": {
-      high: ["whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado", "fale conosco"],
-      medium: ["chat", "mensagem", "contato", "dúvida", "suporte", "equipe"]
+      high: ["whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado", "fale conosco", "clique para conversar", "chat agora", "envie mensagem", "contate-nos"],
+      medium: ["chat", "mensagem", "contato", "dúvida", "suporte", "equipe", "especialista", "consultor"]
     },
     "Landing Page": {
-      high: ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera", "saiba mais", "página oficial"],
-      medium: ["site", "link", "acesso", "informação", "detalhes"]
+      high: ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera", "saiba mais", "página oficial", "acesso exclusivo", "inscrição gratuita", "receba agora"],
+      medium: ["site", "link", "acesso", "informação", "detalhes", "formulário", "dados", "email"]
     },
     "Quiz": {
-      high: ["quiz", "teste", "descubra seu", "perguntas", "resultado personalizado", "perfil", "responda"],
-      medium: ["escolha", "descubra", "veja seu", "análise"]
+      high: ["quiz", "teste", "descubra seu", "perguntas", "resultado personalizado", "perfil", "responda", "faça o teste", "descubra agora", "resultado do quiz"],
+      medium: ["escolha", "descubra", "veja seu", "análise", "diagnóstico", "avaliação", "questionário"]
     },
     "Type Bot": {
-      high: ["converse comigo", "bot", "assistente virtual", "automático", "chat inteligente", "falar com consultor"],
-      medium: ["conversa", "interativo", "mensagem", "digital"]
+      high: ["converse comigo", "bot", "assistente virtual", "automático", "chat inteligente", "falar com consultor", "conversa automática", "bot de atendimento", "ia assistente"],
+      medium: ["conversa", "interativo", "mensagem", "digital", "automação", "inteligência artificial"]
     }
   }
 };
@@ -164,6 +168,23 @@ export async function searchAds(params: SearchAdsParams) {
       }
     });
 
+    // Extrair informações de rate limit dos headers
+    const xAppUsage = response.headers['x-app-usage'];
+    if (xAppUsage) {
+      try {
+        const usage = JSON.parse(xAppUsage);
+        currentRateLimitUsage = usage.call_count || 0;
+        
+        // Log de aviso se atingirmos 70% do limite
+        if (currentRateLimitUsage >= 70 && Date.now() - lastRateLimitWarning > 60000) {
+          logger.warn(`[MetaAds] Rate limit em ${currentRateLimitUsage}%. Recomenda-se reduzir frequência de requisições.`);
+          lastRateLimitWarning = Date.now();
+        }
+      } catch (e) {
+        // Ignorar erros ao parsear header
+      }
+    }
+    
     const rawAds = response.data.data || [];
     const paging = response.data.paging;
     
