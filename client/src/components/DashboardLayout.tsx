@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useCallback, memo } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Settings,
@@ -7,7 +7,6 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  Search,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -20,20 +19,207 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-// Menu atualizado com Minerador
-const menuItems = [
-  { 
+// --- CONSTANTES ---
+const MENU_ITEMS = [
+  {
     section: "FERRAMENTAS",
     items: [
-      { 
-        icon: () => <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" className="w-4 h-4 shrink-0 object-contain" alt="Minerador" />, 
-        label: "Minerador", 
-        href: "/minerador", 
-        description: "Busca de anúncios Meta" 
+      {
+        icon: () => (
+          <img
+            src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png"
+            className="w-4 h-4 shrink-0 object-contain"
+            alt="Minerador"
+          />
+        ),
+        label: "Minerador",
+        href: "/minerador",
+        description: "Busca de anúncios Meta",
       },
-    ]
-  }
+    ],
+  },
 ];
+
+const LOGO_URL = "https://img.icons8.com/comic/100/skull.png";
+const SIDEBAR_STORAGE_KEY = "sidebar-collapsed";
+
+// --- SUB-COMPONENTES MEMOIZADOS ---
+
+interface CollapseButtonProps {
+  isCollapsed: boolean;
+  onToggle: () => void;
+  isHovered: boolean;
+}
+
+const CollapseButton = memo(({ isCollapsed, onToggle, isHovered }: CollapseButtonProps) => (
+  <AnimatePresence>
+    {isHovered && (
+      <motion.button
+        key="collapse-btn"
+        data-collapse-btn
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        transition={{ duration: 0.15 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className={cn(
+          "absolute inset-0 w-full h-full bg-black/80 backdrop-blur-sm",
+          "hidden lg:flex items-center justify-center z-10",
+          "cursor-pointer group/collapse-btn border-b border-white/[0.06]"
+        )}
+        title={isCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-white flex items-center justify-center shadow-xl">
+            {isCollapsed ? (
+              <ChevronRight className="w-3.5 h-3.5 text-black" />
+            ) : (
+              <ChevronLeft className="w-3.5 h-3.5 text-black" />
+            )}
+          </div>
+          {!isCollapsed && (
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">
+              Colapsar
+            </span>
+          )}
+        </div>
+      </motion.button>
+    )}
+  </AnimatePresence>
+));
+
+interface LogoProps {
+  isCollapsed: boolean;
+}
+
+const Logo = memo(({ isCollapsed }: LogoProps) => (
+  <div
+    className={cn(
+      "px-6 py-6 flex items-center gap-3 shrink-0 border-b border-white/[0.06] relative",
+      isCollapsed && "px-4 justify-center"
+    )}
+  >
+    <div className="w-8 h-8 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
+      <img src={LOGO_URL} alt="Logo" className="w-8 h-8 object-contain" />
+    </div>
+    {!isCollapsed && (
+      <motion.span
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="font-black text-base tracking-tighter text-white"
+      >
+        FORTE<span className="text-gray-500">MEDIA</span>
+      </motion.span>
+    )}
+  </div>
+));
+
+interface NavItemProps {
+  item: (typeof MENU_ITEMS)[0]["items"][0];
+  isActive: boolean;
+  isCollapsed: boolean;
+  onNavigate?: () => void;
+}
+
+const NavItem = memo(({ item, isActive, isCollapsed, onNavigate }: NavItemProps) => (
+  <Link href={item.href}>
+    <a
+      data-nav-link
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150 relative group",
+        isActive ? "bg-white text-black" : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
+      )}
+    >
+      {typeof item.icon === "function" ? (
+        <item.icon />
+      ) : (
+        <item.icon
+          className={cn(
+            "w-4 h-4 shrink-0",
+            isActive ? "text-black" : "text-gray-500"
+          )}
+        />
+      )}
+      {!isCollapsed && (
+        <div className="flex flex-col min-w-0">
+          <span className="text-xs leading-tight">{item.label}</span>
+          <span
+            className={cn(
+              "text-[9px] font-medium truncate",
+              isActive ? "text-black/60" : "text-gray-600"
+            )}
+          >
+            {item.description}
+          </span>
+        </div>
+      )}
+      {isCollapsed && isActive && <div className="absolute left-0 w-0.5 h-5 bg-white" />}
+    </a>
+  </Link>
+));
+
+interface UserFooterProps {
+  user: { name?: string | null; email?: string | null } | null;
+  isCollapsed: boolean;
+  onLogout: () => void;
+  location: string;
+}
+
+const UserFooter = memo(({ user, isCollapsed, onLogout, location }: UserFooterProps) => (
+  <div
+    className={cn(
+      "p-4 border-t border-white/[0.06] space-y-1 shrink-0",
+      isCollapsed && "px-3"
+    )}
+  >
+    <Link href="/settings">
+      <a
+        data-nav-link
+        className={cn(
+          "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150",
+          location === "/settings"
+            ? "bg-white text-black"
+            : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
+        )}
+      >
+        <Settings className="w-4 h-4 shrink-0" />
+        {!isCollapsed && <span className="text-xs">Configurações</span>}
+      </a>
+    </Link>
+
+    <button
+      data-logout
+      onClick={onLogout}
+      className={cn(
+        "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-500/70 hover:bg-red-500/[0.06] hover:text-red-400 transition-all duration-150",
+        isCollapsed && "justify-center"
+      )}
+    >
+      <LogOut className="w-4 h-4 shrink-0" />
+      {!isCollapsed && <span className="text-xs">Sair da Conta</span>}
+    </button>
+
+    {!isCollapsed && (
+      <div className="mt-3 px-3 py-3 bg-white/[0.02] border border-white/[0.06]">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
+            <img src={LOGO_URL} alt="User" className="w-6 h-6 object-contain" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-black text-white truncate">{user?.name || "Usuário"}</p>
+            <p className="text-[9px] text-gray-600 font-bold uppercase tracking-tighter">
+              Plano Pro
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+));
 
 interface SidebarContentProps {
   location: string;
@@ -44,189 +230,149 @@ interface SidebarContentProps {
   toggleCollapse: () => void;
 }
 
-function SidebarContent({ location, user, onLogout, onNavigate, isCollapsed, toggleCollapse }: SidebarContentProps) {
-  const [isHovered, setIsHovered] = useState(false);
+const SidebarContent = memo(
+  ({
+    location,
+    user,
+    onLogout,
+    onNavigate,
+    isCollapsed,
+    toggleCollapse,
+  }: SidebarContentProps) => {
+    const [isHovered, setIsHovered] = useState(false);
 
-  const handleSidebarClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isCollapsed) return;
-    const target = e.target as HTMLElement;
-    const navLink = target.closest("a[data-nav-link]");
-    const logoutBtn = target.closest("button[data-logout]");
-    const collapseBtn = target.closest("button[data-collapse-btn]");
-    if (navLink || logoutBtn || collapseBtn) return;
-    toggleCollapse();
-  };
+    const handleSidebarClick = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isCollapsed) return;
+        const target = e.target as HTMLElement;
+        const navLink = target.closest("a[data-nav-link]");
+        const logoutBtn = target.closest("button[data-logout]");
+        const collapseBtn = target.closest("button[data-collapse-btn]");
+        if (navLink || logoutBtn || collapseBtn) return;
+        toggleCollapse();
+      },
+      [isCollapsed, toggleCollapse]
+    );
 
-  return (
-    <div
-      className="flex flex-col h-full bg-black border-r border-white/[0.06] relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={handleSidebarClick}
-    >
-      {/* Logo area */}
+    return (
       <div
-        className={cn(
-          "px-6 py-6 flex items-center gap-3 shrink-0 border-b border-white/[0.06] relative",
-          isCollapsed && "px-4 justify-center"
-        )}
+        className="flex flex-col h-full bg-black border-r border-white/[0.06] relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={handleSidebarClick}
       >
-        <AnimatePresence>
-          {isHovered && (
-            <motion.button
-              key="collapse-btn"
-              data-collapse-btn
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.15 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCollapse();
-              }}
-              className={cn(
-                "absolute inset-0 w-full h-full bg-black/80 backdrop-blur-sm",
-                "hidden lg:flex items-center justify-center z-10",
-                "cursor-pointer group/collapse-btn border-b border-white/[0.06]"
-              )}
-              title={isCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-white flex items-center justify-center shadow-xl">
-                  {isCollapsed
-                    ? <ChevronRight className="w-3.5 h-3.5 text-black" />
-                    : <ChevronLeft className="w-3.5 h-3.5 text-black" />
-                  }
-                </div>
-                {!isCollapsed && (
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/60">
-                    Colapsar
-                  </span>
-                )}
-              </div>
-            </motion.button>
-          )}
-        </AnimatePresence>
-
-        <div className="w-8 h-8 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
-          <img src="https://img.icons8.com/comic/100/skull.png" alt="Logo" className="w-8 h-8 object-contain" />
+        <div className="relative">
+          <Logo isCollapsed={isCollapsed} />
+          <CollapseButton
+            isCollapsed={isCollapsed}
+            onToggle={toggleCollapse}
+            isHovered={isHovered}
+          />
         </div>
-        {!isCollapsed && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="font-black text-base tracking-tighter text-white"
-          >
-            FORTE<span className="text-gray-500">MEDIA</span>
-          </motion.span>
-        )}
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-6 overflow-y-auto mt-4 custom-scrollbar">
-        {menuItems.map((section, idx) => (
-          <div key={idx} className="space-y-1">
-            {!isCollapsed && (
-              <p className="px-3 text-[9px] font-black uppercase tracking-[0.25em] mb-2 text-white/50">
-                {section.section}
-              </p>
-            )}
-            <div className="space-y-0.5">
-              {section.items.map((item) => {
-                const isActive = location === item.href;
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <a
-                      data-nav-link
-                      onClick={onNavigate}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150 relative group",
-                        isActive
-                          ? "bg-white text-black"
-                          : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
-                      )}
-                    >
-                      {typeof item.icon === 'function' ? (
-                        <item.icon />
-                      ) : (
-                        <item.icon
-                          className={cn(
-                            "w-4 h-4 shrink-0",
-                            isActive ? "text-black" : "text-gray-500"
-                          )}
-                        />
-                      )}
-                      {!isCollapsed && (
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs leading-tight">{item.label}</span>
-                          <span className={cn(
-                            "text-[9px] font-medium truncate",
-                            isActive ? "text-black/60" : "text-gray-600"
-                          )}>
-                            {item.description}
-                          </span>
-                        </div>
-                      )}
-                      {isCollapsed && isActive && (
-                        <div className="absolute left-0 w-0.5 h-5 bg-white" />
-                      )}
-                    </a>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      {/* User Footer */}
-      <div className={cn("p-4 border-t border-white/[0.06] space-y-1 shrink-0", isCollapsed && "px-3")}>
-        <Link href="/settings">
-          <a
-            data-nav-link
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 text-sm font-bold transition-all duration-150",
-              location === "/settings"
-                ? "bg-white text-black"
-                : "text-gray-500 hover:text-white hover:bg-white/[0.04]"
-            )}
-          >
-            <Settings className="w-4 h-4 shrink-0" />
-            {!isCollapsed && <span className="text-xs">Configurações</span>}
-          </a>
-        </Link>
-
-        <button
-          data-logout
-          onClick={onLogout}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-red-500/70 hover:bg-red-500/[0.06] hover:text-red-400 transition-all duration-150",
-            isCollapsed && "justify-center"
-          )}
-        >
-          <LogOut className="w-4 h-4 shrink-0" />
-          {!isCollapsed && <span className="text-xs">Sair da Conta</span>}
-        </button>
-
-        {!isCollapsed && (
-          <div className="mt-3 px-3 py-3 bg-white/[0.02] border border-white/[0.06]">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 bg-transparent flex items-center justify-center shrink-0 overflow-hidden">
-                <img src="https://img.icons8.com/comic/100/skull.png" alt="User" className="w-6 h-6 object-contain" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-white truncate">{user?.name || "Usuário"}</p>
-                <p className="text-[9px] text-gray-600 font-bold uppercase tracking-tighter">Plano Pro</p>
+        {/* Navigation */}
+        <nav className="flex-1 px-3 space-y-6 overflow-y-auto mt-4 custom-scrollbar">
+          {MENU_ITEMS.map((section, idx) => (
+            <div key={idx} className="space-y-1">
+              {!isCollapsed && (
+                <p className="px-3 text-[9px] font-black uppercase tracking-[0.25em] mb-2 text-white/50">
+                  {section.section}
+                </p>
+              )}
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const isActive = location === item.href;
+                  return (
+                    <NavItem
+                      key={item.href}
+                      item={item}
+                      isActive={isActive}
+                      isCollapsed={isCollapsed}
+                      onNavigate={onNavigate}
+                    />
+                  );
+                })}
               </div>
             </div>
-          </div>
-        )}
+          ))}
+        </nav>
+
+        <UserFooter
+          user={user}
+          isCollapsed={isCollapsed}
+          onLogout={onLogout}
+          location={location}
+        />
       </div>
-    </div>
-  );
+    );
+  }
+);
+
+interface HeaderProps {
+  unreadCount: number;
+  onMobileMenuOpen: () => void;
 }
 
+const Header = memo(({ unreadCount, onMobileMenuOpen }: HeaderProps) => (
+  <header className="h-14 border-b border-white/[0.06] flex items-center justify-between px-6 bg-black z-40 shrink-0">
+    <div className="flex items-center gap-4">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="lg:hidden text-gray-400 hover:text-white hover:bg-white/[0.04] rounded-none w-8 h-8"
+        onClick={onMobileMenuOpen}
+      >
+        <Menu className="w-4 h-4" />
+      </Button>
+
+      <div className="flex-1" />
+    </div>
+
+    <div className="flex items-center gap-3">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative w-8 h-8 rounded-none bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05] transition-all"
+      >
+        <Bell className="w-3.5 h-3.5 text-gray-500" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-white text-black text-[8px] font-black flex items-center justify-center">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </Button>
+
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/[0.06]">
+        <div className="relative">
+          <div className="w-1.5 h-1.5 bg-green-500" />
+          <div className="absolute inset-0 w-1.5 h-1.5 bg-green-500 animate-ping opacity-40" />
+        </div>
+        <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+          Ativo
+        </span>
+      </div>
+    </div>
+  </header>
+));
+
+interface PageContentProps {
+  children: ReactNode;
+}
+
+const PageContent = memo(({ children }: PageContentProps) => (
+  <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="p-6 lg:p-8"
+    >
+      <div className="max-w-[1600px] mx-auto">{children}</div>
+    </motion.div>
+  </div>
+));
+
+// --- COMPONENTE PRINCIPAL ---
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -234,24 +380,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // --- PERSISTÊNCIA DE ESTADO ---
   useEffect(() => {
-    const saved = localStorage.getItem("sidebar-collapsed");
+    const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
     if (saved) setIsCollapsed(saved === "true");
   }, []);
 
-  const toggleCollapse = () => {
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
-    localStorage.setItem("sidebar-collapsed", String(newState));
-  };
+  // --- CALLBACKS MEMOIZADOS ---
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed((prev) => {
+      const newState = !prev;
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(newState));
+      return newState;
+    });
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout();
     window.location.href = "/login";
-  };
+  }, [logout]);
 
-  const currentItem = menuItems.flatMap(s => s.items).find(i => i.href === location);
-  const currentPageLabel = currentItem?.label || (location === "/settings" ? "Configurações" : "Forte Media");
+  const handleMobileMenuOpen = useCallback(() => {
+    setMobileOpen(true);
+  }, []);
+
+  const handleMobileMenuClose = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans selection:bg-white selection:text-black">
@@ -272,7 +427,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* Mobile Sidebar */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+      <Sheet open={mobileOpen} onOpenChange={handleMobileMenuClose}>
         <SheetContent
           side="left"
           className="w-64 p-0 bg-black border-r border-white/[0.06] [&>button]:hidden"
@@ -281,7 +436,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             location={location}
             user={user}
             onLogout={handleLogout}
-            onNavigate={() => setMobileOpen(false)}
+            onNavigate={handleMobileMenuClose}
             isCollapsed={false}
             toggleCollapse={() => {}}
           />
@@ -290,54 +445,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#020202] min-w-0 relative">
-        {/* Header */}
-        <header className="h-14 border-b border-white/[0.06] flex items-center justify-between px-6 bg-black z-40 shrink-0">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden text-gray-400 hover:text-white hover:bg-white/[0.04] rounded-none w-8 h-8"
-              onClick={() => setMobileOpen(true)}
-            >
-              <Menu className="w-4 h-4" />
-            </Button>
-            
-            <div className="flex-1" />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="relative w-8 h-8 rounded-none bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.05] transition-all">
-              <Bell className="w-3.5 h-3.5 text-gray-500" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-white text-black text-[8px] font-black flex items-center justify-center">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </Button>
-
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.03] border border-white/[0.06]">
-              <div className="relative">
-                <div className="w-1.5 h-1.5 bg-green-500" />
-                <div className="absolute inset-0 w-1.5 h-1.5 bg-green-500 animate-ping opacity-40" />
-              </div>
-              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
-                Ativo
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="p-6 lg:p-8"
-          >
-            <div className="max-w-[1600px] mx-auto">{children}</div>
-          </motion.div>
-        </div>
+        <Header unreadCount={unreadCount} onMobileMenuOpen={handleMobileMenuOpen} />
+        <PageContent>{children}</PageContent>
       </main>
     </div>
   );
