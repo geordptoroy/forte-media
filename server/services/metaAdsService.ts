@@ -2,6 +2,7 @@ import axios from 'axios';
 import { logger } from '../_core/logger';
 import crypto from 'crypto';
 
+// --- CONFIGURAÇÕES E CONSTANTES ---
 const FALLBACK_TOKEN = 'EAAMuA4Ly8N0BRDKepZCBlJHotAvkItUfEP9TCXte3TnxTCGqHOEYiNGL23vg41TyXBdwgEDKy24TKLxRuOsDlZBSqWAzFwO1fBmZA0Al6IkwPCOHZCvG52BFD7aR84bao78XIDdpDJwK46Gf40ays9aZAONQvHLTSonUp2yYdRnTcwkJhIjvG5BtwjZBR3SPGoKF4zGGIBvLAGpm68Du44hubWZCAZC3zcKqbjZC6s5IOOUUmfNNYaBiMMUOCKPCZCwLXLLxGTBAdsBIZAcbIABwFZCVSzZAiZBzj8HlWiGwZDZD';
 
 const ALL_FIELDS = [
@@ -13,13 +14,19 @@ const ALL_FIELDS = [
   'target_gender', 'target_locations', 'age_country_gender_reach_breakdown', 'bylines'
 ];
 
-const pageCache = new Map<string, any>();
+// --- CACHE E MONITORAMENTO ---
+const pageCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 
-// Monitoramento de rate limit
 let currentRateLimitUsage = 0;
 let lastRateLimitWarning = 0;
 
-function generateCreativeHash(ad: any) {
+// --- UTILITÁRIOS ---
+
+/**
+ * Gera um hash único para o criativo do anúncio para agrupar duplicatas
+ */
+function generateCreativeHash(ad: any): string {
   const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase().trim();
   const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase().trim();
   const caption = (ad.ad_creative_link_captions?.[0] || "").toLowerCase().trim();
@@ -27,8 +34,15 @@ function generateCreativeHash(ad: any) {
   return crypto.createHash('md5').update(normalized).digest('hex');
 }
 
+/**
+ * Busca detalhes da página com cache inteligente
+ */
 async function getPageDetails(pageId: string, accessToken: string) {
-  if (pageCache.has(pageId)) return pageCache.get(pageId);
+  const cached = pageCache.get(pageId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
   try {
     const response = await axios.get(`https://graph.facebook.com/v22.0/${pageId}`, {
       params: {
@@ -36,18 +50,16 @@ async function getPageDetails(pageId: string, accessToken: string) {
         fields: 'category,verification_status,fan_count,about,description,created_time,instagram_accounts{username,followed_by_count,is_verified}'
       }
     });
-    pageCache.set(pageId, response.data);
+    
+    pageCache.set(pageId, { data: response.data, timestamp: Date.now() });
     return response.data;
   } catch (error) {
     return null;
   }
 }
 
-/**
- * Motor de Classificação Inteligente (Baseado em Pesos)
- * Em vez de um simples "includes", usamos um sistema de pontuação para evitar falsos positivos
- * e garantir que o anúncio seja classificado no tipo mais provável.
- */
+// --- MOTOR DE CLASSIFICAÇÃO ---
+
 const CLASSIFICATION_ENGINE = {
   PRODUCT_TYPES: {
     "Infoproduto": {
@@ -107,6 +119,9 @@ const CLASSIFICATION_ENGINE = {
   }
 };
 
+/**
+ * Classifica o anúncio com base em pesos de palavras-chave
+ */
 function classifyAd(ad: any) {
   const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase();
   const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase();
@@ -117,10 +132,8 @@ function classifyAd(ad: any) {
     const scores: Record<string, number> = {};
     for (const [category, keywords] of Object.entries(rules)) {
       let score = 0;
-      // @ts-ignore
-      keywords.high.forEach(k => { if (combinedText.includes(k)) score += 3; });
-      // @ts-ignore
-      keywords.medium.forEach(k => { if (combinedText.includes(k)) score += 1; });
+      (keywords as any).high.forEach((k: string) => { if (combinedText.includes(k)) score += 3; });
+      (keywords as any).medium.forEach((k: string) => { if (combinedText.includes(k)) score += 1; });
       if (score > 0) scores[category] = score;
     }
     return scores;
@@ -129,7 +142,6 @@ function classifyAd(ad: any) {
   const typeScores = getScore(CLASSIFICATION_ENGINE.PRODUCT_TYPES);
   const funnelScores = getScore(CLASSIFICATION_ENGINE.FUNNELS);
 
-  // Pegamos as categorias com maior pontuação, ou "Outros" se nada for detectado
   const types = Object.keys(typeScores).sort((a, b) => typeScores[b] - typeScores[a]);
   const funnels = Object.keys(funnelScores).sort((a, b) => funnelScores[b] - funnelScores[a]);
 
@@ -138,6 +150,8 @@ function classifyAd(ad: any) {
     funnels: funnels.length > 0 ? funnels : ["Indefinido"] 
   };
 }
+
+// --- SERVIÇO PRINCIPAL ---
 
 export interface SearchAdsParams {
   searchTerms: string;
@@ -148,6 +162,9 @@ export interface SearchAdsParams {
   after?: string;
 }
 
+/**
+ * Busca anúncios na biblioteca da Meta com processamento avançado
+ */
 export async function searchAds(params: SearchAdsParams) {
   const accessToken = params.accessToken || process.env.META_ACCESS_TOKEN || FALLBACK_TOKEN;
   const { country = 'BR', adType = 'ALL', limit = 100, after } = params;
@@ -168,60 +185,44 @@ export async function searchAds(params: SearchAdsParams) {
       }
     });
 
-    // Extrair informações de rate limit dos headers
+    // Monitoramento de Rate Limit
     const xAppUsage = response.headers['x-app-usage'];
     if (xAppUsage) {
       try {
         const usage = JSON.parse(xAppUsage);
         currentRateLimitUsage = usage.call_count || 0;
-        
-        // Log de aviso se atingirmos 70% do limite
         if (currentRateLimitUsage >= 70 && Date.now() - lastRateLimitWarning > 60000) {
-          logger.warn(`[MetaAds] Rate limit em ${currentRateLimitUsage}%. Recomenda-se reduzir frequência de requisições.`);
+          logger.warn(`[MetaAds] Rate limit em ${currentRateLimitUsage}%.`);
           lastRateLimitWarning = Date.now();
         }
-      } catch (e) {
-        // Ignorar erros ao parsear header
-      }
+      } catch (e) {}
     }
-    
+
     const rawAds = response.data.data || [];
     const paging = response.data.paging;
     
+    // Agrupamento por criativo para cálculo de frequência
     const creativeGroups = new Map<string, number>();
     rawAds.forEach((ad: any) => {
       const hash = generateCreativeHash(ad);
       creativeGroups.set(hash, (creativeGroups.get(hash) || 0) + 1);
     });
 
+    // Processamento paralelo dos anúncios
     const processed = await Promise.all(rawAds.map(async (ad: any) => {
       const classification = classifyAd(ad);
       const hash = generateCreativeHash(ad);
       const pageDetails = await getPageDetails(ad.page_id, accessToken);
 
-      // Extração de URL aprimorada: Prioridade total para ad_creative_link_captions
-      // conforme documentação oficial da Meta para o destino real do anunciante.
+      // Extração de URL de destino (Prioridade: ad_creative_link_captions)
       const captions = ad.ad_creative_link_captions || [];
-      const bodies = ad.ad_creative_bodies || [];
-      const titles = ad.ad_creative_link_titles || [];
-      const descs = ad.ad_creative_link_descriptions || [];
-
+      const allTexts = [...(ad.ad_creative_bodies || []), ...(ad.ad_creative_link_titles || []), ...(ad.ad_creative_link_descriptions || [])].join(" ");
       const urlRegex = /(https?:\/\/[^\s"'<>]+)/g;
       
-      // 1. Tentar pegar diretamente do caption (campo oficial de destino)
       let destinationUrl = captions.find((c: string) => c.match(urlRegex));
-      
-      // 2. Se não achou no caption, buscar em outros campos de texto
       if (!destinationUrl) {
-        const allTexts = [...bodies, ...titles, ...descs].join(" ");
         const foundUrls = allTexts.match(urlRegex);
-        // Filtrar URLs que não sejam da própria Meta/Facebook
         destinationUrl = foundUrls?.find(u => !u.includes('facebook.com') && !u.includes('fb.me')) || foundUrls?.[0];
-      }
-
-      // 3. Fallback final para a biblioteca de anúncios
-      if (!destinationUrl) {
-        destinationUrl = ad.ad_snapshot_url;
       }
 
       return {
@@ -231,7 +232,7 @@ export async function searchAds(params: SearchAdsParams) {
         frequency: creativeGroups.get(hash) || 1,
         creativeHash: hash,
         pageDetails: pageDetails,
-        destination_url: destinationUrl
+        destination_url: destinationUrl || ad.ad_snapshot_url
       };
     }));
 

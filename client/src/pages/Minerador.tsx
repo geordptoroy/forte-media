@@ -218,7 +218,7 @@ export default function Minerador() {
       if (freqDiff !== 0) return freqDiff;
       return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
     });
-  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleRange, durationRange];
+  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleRange, durationRange]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
