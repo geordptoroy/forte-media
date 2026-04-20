@@ -25,12 +25,22 @@ interface AdCardProps {
 
 // --- SUB-COMPONENTES MEMOIZADOS PARA PERFORMANCE ---
 
-const AdMediaPreview = memo(({ isVisible, media, isExtracting, platforms }: { 
+const AdMediaPreview = memo(({ isVisible, media, isExtracting, platforms, collationCount }: { 
   isVisible: boolean, 
   media: ExtractionResult | null, 
   isExtracting: boolean,
-  platforms: string[]
-}) => (
+  platforms: string[],
+  collationCount?: number
+}) => {
+  const scaleInfo = useMemo(() => {
+    const count = collationCount || 1;
+    if (count >= 40) return { color: "bg-red-500/90 text-white", icon: "🔥", label: "Escala Viral" };
+    if (count >= 20) return { color: "bg-orange-500/90 text-white", icon: null, label: "Alta Escala" };
+    if (count >= 10) return { color: "bg-emerald-400/90 text-black", icon: null, label: "Média Escala" };
+    return { color: "bg-emerald-500/90 text-black", icon: null, label: "Baixa Escala" };
+  }, [collationCount]);
+
+  return (
   <div className="aspect-[4/5] bg-white/[0.02] relative flex items-center justify-center border-b border-white/[0.06] overflow-hidden">
     {isVisible && media ? (
       media.type === 'video' ? (
@@ -56,15 +66,23 @@ const AdMediaPreview = memo(({ isVisible, media, isExtracting, platforms }: {
       <AlertCircle className="w-5 h-5 text-white/10" />
     )}
     
-    <div className="absolute top-3 left-3 flex gap-1.5 z-10">
-      {platforms.map((p) => (
-        <Badge key={p} variant="secondary" className="bg-black/80 backdrop-blur-md text-[7px] px-2 py-0.5 border-white/10 uppercase font-black rounded-md">
-          {p}
+    <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+      <div className="flex gap-1.5">
+        {platforms.map((p) => (
+          <Badge key={p} variant="secondary" className="bg-black/80 backdrop-blur-md text-[7px] px-2 py-0.5 border-white/10 uppercase font-black rounded-md">
+            {p}
+          </Badge>
+        ))}
+      </div>
+      {(collationCount || 1) > 1 && (
+        <Badge className={cn("text-[8px] font-black px-2 py-0.5 border-none rounded-md shadow-lg", scaleInfo.color)}>
+          {scaleInfo.icon} {collationCount} ADS EM ESCALA
         </Badge>
-      ))}
+      )}
     </div>
   </div>
-));
+  );
+});
 
 const AdMetricItem = memo(({ icon: Icon, label, value }: { icon: any, label: string, value: string | number }) => (
   <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1">
@@ -168,7 +186,9 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
       onClick={() => onExpand?.(ad, media)}
       className={cn(
         "overflow-hidden flex flex-col bg-[#0A0A0A] border-white/20 hover:border-white/40",
-        "transition-all duration-500 group rounded-xl shadow-2xl cursor-pointer h-full"
+        "transition-all duration-500 group rounded-xl shadow-2xl cursor-pointer h-full",
+        (ad.collationCount || 1) > 10 && "shadow-[0_0_20px_rgba(16,185,129,0.05)]",
+        (ad.collationCount || 1) > 40 && "shadow-[0_0_30px_rgba(239,68,68,0.1)]"
       )}
     >
       <AdMediaPreview 
@@ -176,6 +196,7 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
         media={media} 
         isExtracting={isExtracting} 
         platforms={ad.publisher_platforms || []} 
+        collationCount={ad.collationCount}
       />
 
       <div className="p-5 flex-1 flex flex-col space-y-4">
@@ -215,8 +236,8 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
           />
           <AdMetricItem 
             icon={Repeat} 
-            label="Frequência" 
-            value={`${ad.frequency || 1} Anúncios`} 
+            label="Escala Real" 
+            value={`${ad.collationCount || 1} Cópias`} 
           />
           <AdMetricItem 
             icon={Package} 

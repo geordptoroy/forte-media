@@ -13,11 +13,11 @@ import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
-const SCALE_RANGES = [
-  { min: 1, max: 5, label: "1-5" },
-  { min: 6, max: 10, label: "6-10" },
-  { min: 11, max: 20, label: "11-20" },
-  { min: 21, max: 50, label: "21-50" }
+const SCALE_LEVELS = [
+  { min: 1, max: 9, label: "Baixa Escala", color: "text-emerald-400 bg-emerald-400/10", icon: null },
+  { min: 10, max: 19, label: "Média Escala", color: "text-emerald-300 bg-emerald-300/10", icon: null },
+  { min: 20, max: 39, label: "Alta Escala", color: "text-orange-400 bg-orange-400/10", icon: null },
+  { min: 40, max: 999, label: "Escala Viral", color: "text-red-500 bg-red-500/10", icon: "🔥" }
 ];
 
 const COUNTRIES = [
@@ -229,9 +229,37 @@ export default function Minerador() {
     if (hasSearched) executeSearch(true);
   }, [filters.country, hidePolitical]);
 
-  // --- FILTRAGEM LOCAL ---
+  // --- FILTRAGEM LOCAL E AGRUPAMENTO ---
   const processedAds = useMemo(() => {
-    let filtered = allAds.filter(ad => {
+    // 1. Gerar Chave Única para Agrupamento (Baseado no conteúdo real)
+    const getCreativeKey = (ad: any) => {
+      const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase().trim();
+      const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase().trim();
+      const caption = (ad.ad_creative_link_captions?.[0] || "").toLowerCase().trim();
+      return `${body}|${title}|${caption}`;
+    };
+
+    // 2. Agrupar e Calcular collationCount (Escala Real por Conteúdo)
+    const groups = new Map<string, any[]>();
+    allAds.forEach(ad => {
+      const key = getCreativeKey(ad);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)?.push(ad);
+    });
+
+    // 3. Mapear anúncios com a nova contagem de escala
+    const adsWithCollation = allAds.map(ad => {
+      const key = getCreativeKey(ad);
+      const group = groups.get(key) || [];
+      return {
+        ...ad,
+        collationCount: group.length,
+        isFirstInGroup: group[0].id === ad.id
+      };
+    });
+
+    // 4. Filtrar
+    let filtered = adsWithCollation.filter(ad => {
       const isPolitical = !!ad.bylines;
       const matchesPolitical = hidePolitical ? !isPolitical : isPolitical;
       
@@ -241,8 +269,8 @@ export default function Minerador() {
       const matchesFunnel = filters.selectedFunnel === "Todos" || 
         ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel);
 
-      const frequency = ad.frequency || 1;
-      const matchesScale = frequency <= scaleMax;
+      const scale = ad.collationCount || 1;
+      const matchesScale = scale <= scaleMax;
       
       const startDate = new Date(ad.ad_delivery_start_time);
       const now = new Date();
@@ -252,9 +280,10 @@ export default function Minerador() {
       return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
     });
 
+    // 5. Ordenar por Escala (collationCount) e Data
     return filtered.sort((a, b) => {
-      const freqDiff = (b.frequency || 0) - (a.frequency || 0);
-      if (freqDiff !== 0) return freqDiff;
+      const scaleDiff = (b.collationCount || 0) - (a.collationCount || 0);
+      if (scaleDiff !== 0) return scaleDiff;
       return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
     });
   }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
