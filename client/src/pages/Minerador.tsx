@@ -105,10 +105,9 @@ export default function Minerador() {
   const [scaleMax, setScaleMax] = useState(50);
   const [durationMax, setDurationMax] = useState(300);
   
-  // Trigger para busca - evita loops infinitos
-  const [searchTrigger, setSearchTrigger] = useState(0);
-  
+  // Refs para controle de fluxo e prevenção de loops
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isFetchingRef = useRef(false);
   const adsCountRef = useRef(0);
   const nextCursorRef = useRef<string | undefined>(undefined);
 
@@ -137,8 +136,53 @@ export default function Minerador() {
     { enabled: false, retry: false }
   );
 
+  const executeSearch = useCallback(async (isNewSearch: boolean = true) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
+    if (isNewSearch) {
+      setIsAutoLoading(false);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      setAllAds([]);
+      setNextCursor(undefined);
+      nextCursorRef.current = undefined;
+      adsCountRef.current = 0;
+    }
+
+    try {
+      const result = await searchMutation.refetch();
+      if (result.data) {
+        const ads = result.data.data;
+        const cursor = result.data.paging?.next_cursor;
+        
+        if (isNewSearch) {
+          setAllAds(ads);
+          setHasSearched(true);
+        } else {
+          setAllAds(prev => [...prev, ...ads]);
+        }
+        
+        setNextCursor(cursor);
+        nextCursorRef.current = cursor;
+        
+        // Gatilho manual para auto-load se necessário
+        if (adsCountRef.current + ads.length < AUTO_LOAD_LIMIT && cursor) {
+          setTimeout(() => {
+            isFetchingRef.current = false;
+            startAutoLoad();
+          }, 500);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Erro na busca:", error);
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, [searchMutation]);
+
   const startAutoLoad = useCallback(async () => {
-    if (isAutoLoading || !nextCursorRef.current || adsCountRef.current >= AUTO_LOAD_LIMIT) return;
+    if (isAutoLoading || !nextCursorRef.current || adsCountRef.current >= AUTO_LOAD_LIMIT || isFetchingRef.current) return;
     
     setIsAutoLoading(true);
     const controller = new AbortController();
@@ -146,10 +190,10 @@ export default function Minerador() {
 
     try {
       while (adsCountRef.current < AUTO_LOAD_LIMIT && nextCursorRef.current && !controller.signal.aborted) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        if (controller.signal.aborted) break;
-
+        isFetchingRef.current = true;
         const result = await searchMutation.refetch();
+        isFetchingRef.current = false;
+        
         if (!result.data || controller.signal.aborted) break;
 
         const newAds = result.data.data;
@@ -157,60 +201,33 @@ export default function Minerador() {
         
         setAllAds(prev => [...prev, ...newAds]);
         setNextCursor(cursor);
+        nextCursorRef.current = cursor;
         
         if (!cursor) break;
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
     } catch (error) {
       console.error("Erro no auto-carregamento:", error);
     } finally {
       setIsAutoLoading(false);
+      isFetchingRef.current = false;
       abortControllerRef.current = null;
     }
   }, [searchMutation, isAutoLoading]);
 
-  const executeSearch = useCallback(async () => {
-    setIsAutoLoading(false);
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-
-    setHasSearched(true);
-    setAllAds([]);
-    setNextCursor(undefined);
-    
-    const result = await searchMutation.refetch();
-    if (result.data) {
-      const ads = result.data.data;
-      const cursor = result.data.paging?.next_cursor;
-      setAllAds(ads);
-      setNextCursor(cursor);
-    }
-  }, [searchMutation]);
-
-  // --- REATIVIDADE CONTROLADA ---
+  // --- REATIVIDADE CONTROLADA (SEM LOOPS) ---
   
-  // 1. Debounce para busca por texto
+  // 1. Busca por texto (Debounce)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (filters.searchTerms) setSearchTrigger(prev => prev + 1);
-    }, 800);
+    if (!filters.searchTerms && !hasSearched) return;
+    const timer = setTimeout(() => executeSearch(true), 800);
     return () => clearTimeout(timer);
   }, [filters.searchTerms]);
 
-  // 2. Gatilho imediato para país e política
+  // 2. Busca por país e política (Imediato)
   useEffect(() => {
-    if (hasSearched) setSearchTrigger(prev => prev + 1);
+    if (hasSearched) executeSearch(true);
   }, [filters.country, hidePolitical]);
-
-  // 3. Execução da busca baseada no trigger
-  useEffect(() => {
-    if (searchTrigger > 0) executeSearch();
-  }, [searchTrigger, executeSearch]);
-
-  // 4. Gatilho de Auto-load
-  useEffect(() => {
-    if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
-      startAutoLoad();
-    }
-  }, [nextCursor, isAutoLoading, hasSearched, allAds.length, startAutoLoad]);
 
   // --- FILTRAGEM LOCAL ---
   const processedAds = useMemo(() => {
@@ -265,7 +282,7 @@ export default function Minerador() {
         />
 
         <Card className="p-4 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
-          <form onSubmit={(e) => { e.preventDefault(); setSearchTrigger(prev => prev + 1); }} className="flex flex-col space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); executeSearch(true); }} className="flex flex-col space-y-4">
             <div className="flex flex-col lg:flex-row items-end gap-3">
               <div className="w-full lg:w-[25%] space-y-0">
                 <MiniLabel>Palavra-chave</MiniLabel>
