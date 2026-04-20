@@ -11,15 +11,7 @@ import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-
-// --- TIPAGEM ---
-interface ExtractionResult {
-  type: 'video' | 'image' | 'carousel' | 'unknown';
-  url: string | string[];
-  thumbnail?: string;
-  title?: string;
-  ctaLink?: string;
-}
+import { type ExtractionResult } from "../../../../shared/adTypes";
 
 interface AdCardProps {
   ad: any;

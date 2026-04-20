@@ -1,17 +1,9 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import axios from 'axios';
+import { type ExtractionResult } from '../../../shared/adTypes';
 
 // Configurar o plugin stealth
 puppeteer.use(StealthPlugin());
-
-export interface ExtractionResult {
-  type: 'video' | 'image' | 'carousel' | 'unknown';
-  url: string | string[];
-  thumbnail?: string;
-  title?: string;
-  ctaLink?: string;
-}
 
 // Cache simples em memória para evitar re-extrações na mesma sessão do servidor
 const extractionCache = new Map<string, { result: ExtractionResult, timestamp: number }>();
@@ -34,7 +26,7 @@ export class StealthExtractorService {
 
     console.log(`[StealthExtractor] Iniciando extração otimizada para: ${snapshotUrl}`);
     
-    // 2. Extração via Puppeteer (Obrigatória agora para pegar Título e CTA com precisão)
+    // 2. Extração via Puppeteer
     let browser;
     try {
       browser = await puppeteer.launch({
@@ -98,32 +90,19 @@ export class StealthExtractorService {
         }
 
         // --- EXTRAÇÃO DE TÍTULO E CTA ---
-        // O título do anúncio geralmente está em um elemento com classe específica ou dentro de uma estrutura de card
-        // Tentamos seletores comuns da Biblioteca de Anúncios da Meta
         const titleElement = document.querySelector('div[role="button"] div > span, h1, h2, h3');
         const title = titleElement?.textContent?.trim() || "";
 
-        // O link de destino (CTA) geralmente está em um link que envolve o botão ou o card
-        // A Meta usa redirecionamentos, então buscamos por links que não sejam internos da Meta
         const allLinks = Array.from(document.querySelectorAll('a'));
-        const externalLink = allLinks.find(a => {
-          const href = a.getAttribute('href') || '';
-          return href.startsWith('http') && 
-                 !href.includes('facebook.com') && 
-                 !href.includes('fb.me') && 
-                 !href.includes('instagram.com') &&
-                 !href.includes('messenger.com') &&
-                 !href.includes('whatsapp.com'); // WhatsApp é externo mas muitas vezes queremos o link direto
-        });
-
-        // Se não achar link externo puro, procura por links de redirecionamento do FB que contenham 'u=' ou 'l.php'
-        let ctaLink = externalLink?.getAttribute('href') || "";
-        if (!ctaLink) {
-          const fbRedirect = allLinks.find(a => a.getAttribute('href')?.includes('l.php?u='));
-          if (fbRedirect) {
-            const urlObj = new URL(fbRedirect.getAttribute('href') || '');
+        const fbRedirect = allLinks.find(a => a.getAttribute('href')?.includes('l.php?u='));
+        
+        let ctaLink = "";
+        if (fbRedirect) {
+          const href = fbRedirect.getAttribute('href') || '';
+          try {
+            const urlObj = new URL(href.startsWith('http') ? href : `https://www.facebook.com${href}`);
             ctaLink = urlObj.searchParams.get('u') || "";
-          }
+          } catch (e) {}
         }
 
         return {
