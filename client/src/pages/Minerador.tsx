@@ -258,7 +258,7 @@ export default function Minerador() {
       setIsAutoLoading(false);
       abortControllerRef.current = null;
     }
-  }, [searchMutation]);
+  }, []);
 
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -278,10 +278,10 @@ export default function Minerador() {
       setNextCursor(cursor);
 
       if (ads.length < AUTO_LOAD_LIMIT && cursor) {
-        startAutoLoad(ads.length, cursor);
+        // Auto-load será disparado via useEffect quando nextCursor mudar
       }
     }
-  }, [searchMutation, startAutoLoad]);
+  }, [searchMutation]);
 
   // --- REATIVIDADE ---
   useEffect(() => {
@@ -289,14 +289,23 @@ export default function Minerador() {
       if (filters.searchTerms || hasSearched) handleSearch();
     }, 600);
     return () => clearTimeout(timer);
-  }, [filters.searchTerms, handleSearch, hasSearched]);
+  }, [filters.searchTerms, hasSearched, handleSearch]);
 
   useEffect(() => {
     if (hasSearched) handleSearch();
-  }, [filters.country, hidePolitical, handleSearch, hasSearched]);
+  }, [filters.country, hidePolitical, hasSearched, handleSearch]);
+
+  // Auto-load quando há um cursor disponível
+  useEffect(() => {
+    if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
+      memoizedStartAutoLoad(allAds.length, nextCursor);
+    }
+  }, [nextCursor, isAutoLoading, hasSearched, allAds.length, memoizedStartAutoLoad]);
 
   // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
   const processedAds = useMemo(() => {
+    if (!allAds.length) return [];
+    
     let filtered = allAds.filter(ad => {
       const isPolitical = !!ad.bylines;
       const matchesPolitical = hidePolitical ? !isPolitical : isPolitical;
@@ -323,7 +332,7 @@ export default function Minerador() {
       if (freqDiff !== 0) return freqDiff;
       return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
     });
-  }, [allAds, hidePolitical, filters]);
+  }, [allAds, hidePolitical, filters.productType, filters.funnelType, filters.scaleMin, filters.scaleMax, filters.durationMin, filters.durationMax]);
 
   // --- HANDLERS DE FILTRO ---
   const updateFilter = useCallback((key: keyof FilterState, value: any) => {
@@ -337,6 +346,8 @@ export default function Minerador() {
   const updateDurationRange = useCallback((range: RangeFilter) => {
     setFilters(prev => ({ ...prev, durationMin: range.min, durationMax: range.max }));
   }, []);
+
+
 
   return (
     <DashboardLayout>
