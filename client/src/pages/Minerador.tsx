@@ -109,7 +109,11 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
+  
+  // Sliders com Range (Min/Max)
+  const [scaleMin, setScaleMin] = useState(1);
   const [scaleMax, setScaleMax] = useState(1000);
+  const [durationMin, setDurationMin] = useState(1);
   const [durationMax, setDurationMax] = useState(365);
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -136,7 +140,9 @@ export default function Minerador() {
       country: filters.country, 
       adType: "ALL",
       after: nextCursor,
+      scaleMin: scaleMin,
       scaleMax: scaleMax,
+      durationMin: durationMin,
       durationMax: durationMax,
       productTypes: filters.selectedType !== "all" ? [t(filters.selectedType)] : undefined,
       funnelTypes: filters.selectedFunnel !== "all" ? [filters.selectedFunnel] : undefined,
@@ -233,7 +239,7 @@ export default function Minerador() {
   // Busca imediata para outros filtros
   useEffect(() => {
     if (hasSearched) executeSearch(true);
-  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
+  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMin, scaleMax, durationMin, durationMax]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -351,18 +357,32 @@ export default function Minerador() {
                 <div className="flex items-center justify-between">
                   <MiniLabel>{t('scale_label')}</MiniLabel>
                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
-                    {scaleMax} {t('copies').toLowerCase()}
+                    {scaleMin}-{scaleMax} {t('copies').toLowerCase()}
                   </span>
                 </div>
-                <div className="space-y-2">
-                  <input 
-                    type="range" 
-                    min="1" 
-                    max="1000" 
-                    value={scaleMax} 
-                    onChange={(e) => setScaleMax(parseInt(e.target.value))} 
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
-                  />
+                <div className="flex gap-4 items-center">
+                  <div className="flex-1 space-y-2">
+                    <MiniLabel>Min: {scaleMin}</MiniLabel>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="1000" 
+                      value={scaleMin} 
+                      onChange={(e) => setScaleMin(Math.min(parseInt(e.target.value), scaleMax))} 
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <MiniLabel>Max: {scaleMax}</MiniLabel>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="1000" 
+                      value={scaleMax} 
+                      onChange={(e) => setScaleMax(Math.max(parseInt(e.target.value), scaleMin))} 
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {SCALE_LEVELS.map((level) => (
@@ -372,11 +392,11 @@ export default function Minerador() {
                       size="sm" 
                       className={cn(
                         "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                        scaleMax === level.max 
+                        scaleMin >= level.min && scaleMax <= level.max
                           ? level.color.replace("text-", "border-").replace("bg-", "bg-opacity-20 ") + " text-white"
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => setScaleMax(level.max)}
+                      onClick={() => { setScaleMin(level.min); setScaleMax(level.max); }}
                     >
                       {level.icon} {t(level.key)}
                     </Button>
@@ -388,25 +408,39 @@ export default function Minerador() {
                 <div className="flex items-center justify-between">
                   <MiniLabel>{t('duration_label')}</MiniLabel>
                   <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
-                    {durationMax} {t('active_days').split(' ')[1]}
+                    {durationMin}-{durationMax} {t('active_days').split(' ')[1]}
                   </span>
                 </div>
-                <div className="space-y-2">
-                  <input 
-                    type="range" 
-                    min="1" 
-                    max="365" 
-                    value={durationMax} 
-                    onChange={(e) => setDurationMax(parseInt(e.target.value))} 
-                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
-                  />
+                <div className="flex gap-4 items-center">
+                  <div className="flex-1 space-y-2">
+                    <MiniLabel>Min: {durationMin}</MiniLabel>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="365" 
+                      value={durationMin} 
+                      onChange={(e) => setDurationMin(Math.min(parseInt(e.target.value), durationMax))} 
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <MiniLabel>Max: {durationMax}</MiniLabel>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="365" 
+                      value={durationMax} 
+                      onChange={(e) => setDurationMax(Math.max(parseInt(e.target.value), durationMin))} 
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {[
-                    { max: 7, label: "1-7 " + t('active_days').split(' ')[1] },
-                    { max: 30, label: "7-30 " + t('active_days').split(' ')[1] },
-                    { max: 90, label: "30-90 " + t('active_days').split(' ')[1] },
-                    { max: 365, label: "90+ " + t('active_days').split(' ')[1] }
+                    { min: 1, max: 7, label: "1-7 " + t('active_days').split(' ')[1] },
+                    { min: 7, max: 30, label: "7-30 " + t('active_days').split(' ')[1] },
+                    { min: 30, max: 90, label: "30-90 " + t('active_days').split(' ')[1] },
+                    { min: 90, max: 365, label: "90+ " + t('active_days').split(' ')[1] }
                   ].map((p) => (
                     <Button 
                       key={p.label}
@@ -414,11 +448,11 @@ export default function Minerador() {
                       size="sm" 
                       className={cn(
                         "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                        durationMax === p.max 
+                        durationMin >= p.min && durationMax <= p.max
                           ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => setDurationMax(p.max)}
+                      onClick={() => { setDurationMin(p.min); setDurationMax(p.max); }}
                     >
                       {p.label}
                     </Button>
