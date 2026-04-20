@@ -13,18 +13,11 @@ import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
-const SCALE_PRESETS = [
+const SCALE_RANGES = [
   { min: 1, max: 5, label: "1-5" },
   { min: 6, max: 10, label: "6-10" },
   { min: 11, max: 20, label: "11-20" },
   { min: 21, max: 50, label: "21-50" }
-];
-
-const DURATION_PRESETS = [
-  { min: 1, max: 7, label: "1-7 dias" },
-  { min: 7, max: 30, label: "7-30 dias" },
-  { min: 30, max: 90, label: "30-90 dias" },
-  { min: 90, max: 300, label: "90+ dias" }
 ];
 
 const COUNTRIES = [
@@ -45,27 +38,9 @@ const COUNTRIES = [
   { code: "CL", name: "Chile" },
 ];
 
-const PRODUCT_TYPES = ["Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"];
-const FUNNEL_STRUCTURES = ["TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
+const PRODUCT_TYPES = ["Todos", "Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"];
+const FUNNEL_STRUCTURES = ["Todos", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
 const AUTO_LOAD_LIMIT = 20;
-
-// --- TIPOS ---
-interface FilterState {
-  searchTerms: string;
-  country: string;
-  scaleMin: number;
-  scaleMax: number;
-  durationMin: number;
-  durationMax: number;
-  productTypes: string[];
-  funnelTypes: string[];
-  excludePolitical: boolean;
-}
-
-interface RangeFilter {
-  min: number;
-  max: number;
-}
 
 // --- SUB-COMPONENTES AUXILIARES ---
 const MiniLabel = memo(({ children }: { children: React.ReactNode }) => (
@@ -95,7 +70,7 @@ const PageHeader = memo(({ resultsCount, hidePolitical, onTogglePolitical }: {
       <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
         <Filter className="w-3.5 h-3.5 text-white/80" />
         <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
-          {hidePolitical ? "Ocultar Ads Políticos" : "Mostrar Todos"}
+          {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
         </span>
         <Switch 
           checked={hidePolitical} 
@@ -107,138 +82,19 @@ const PageHeader = memo(({ resultsCount, hidePolitical, onTogglePolitical }: {
   </div>
 ));
 
-// Componente para Filtro de Range com Presets
-const RangeFilterComponent = memo(({ 
-  label, 
-  value, 
-  min, 
-  max, 
-  onChange, 
-  presets, 
-  badgeColor, 
-  unit 
-}: {
-  label: string;
-  value: RangeFilter;
-  min: number;
-  max: number;
-  onChange: (newValue: RangeFilter) => void;
-  presets: Array<{ min: number; max: number; label: string }>;
-  badgeColor: "emerald" | "blue";
-  unit: string;
-}) => {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <MiniLabel>{label}</MiniLabel>
-        <span className={cn(
-          "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full",
-          badgeColor === "emerald" 
-            ? "text-emerald-500 bg-emerald-500/10" 
-            : "text-blue-500 bg-blue-500/10"
-        )}>
-          {value.max} {unit}
-        </span>
-      </div>
-      
-      <div className="space-y-2">
-        <input 
-          type="range" 
-          min={min} 
-          max={max} 
-          value={value.max} 
-          onChange={(e) => {
-            const newMax = Math.max(parseInt(e.target.value), value.min);
-            onChange({ ...value, max: newMax });
-          }} 
-          className={cn(
-            "w-full h-2 rounded-lg appearance-none cursor-pointer bg-white/10",
-            badgeColor === "emerald" ? "accent-emerald-500" : "accent-blue-500"
-          )}
-        />
-      </div>
-
-      <div className="flex gap-2 flex-wrap">
-        {presets.map((preset) => (
-          <Button 
-            key={preset.label} 
-            variant="outline" 
-            size="sm" 
-            className={cn(
-              "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-              value.min === preset.min && value.max === preset.max
-                ? badgeColor === "emerald"
-                  ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" 
-                  : "bg-blue-500/20 border-blue-500/50 text-blue-500"
-                : "border-white/10 text-white/60 hover:border-white/20"
-            )} 
-            onClick={() => onChange({ min: preset.min, max: preset.max })}
-          >
-            {preset.label}
-          </Button>
-        ))}
-      </div>
-    </div>
-  );
-});
-
-RangeFilterComponent.displayName = "RangeFilterComponent";
-
-// Componente para seleção múltipla de categorias
-const MultiSelectFilter = memo(({ 
-  label, 
-  options, 
-  selected, 
-  onChange 
-}: {
-  label: string;
-  options: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-}) => (
-  <div className="space-y-2">
-    <MiniLabel>{label}</MiniLabel>
-    <div className="flex gap-2 flex-wrap">
-      {options.map((option) => (
-        <Button
-          key={option}
-          variant="outline"
-          size="sm"
-          className={cn(
-            "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all",
-            selected.includes(option)
-              ? "bg-purple-500/20 border-purple-500/50 text-purple-500"
-              : "border-white/10 text-white/60 hover:border-white/20"
-          )}
-          onClick={() => {
-            const newSelected = selected.includes(option)
-              ? selected.filter(s => s !== option)
-              : [...selected, option];
-            onChange(newSelected);
-          }}
-        >
-          {option}
-        </Button>
-      ))}
-    </div>
-  </div>
-));
-
-MultiSelectFilter.displayName = "MultiSelectFilter";
-
 // --- COMPONENTE PRINCIPAL ---
 export default function Minerador() {
-  // --- ESTADO UNIFICADO ---
-  const [filters, setFilters] = useState<FilterState>({
+  // --- ESTADO ---
+  const [filters, setFilters] = useState({
     searchTerms: "",
     country: "BR",
-    scaleMin: 1,
-    scaleMax: 50,
-    durationMin: 1,
-    durationMax: 300,
-    productTypes: [],
-    funnelTypes: [],
-    excludePolitical: true,
+    selectedType: "Todos",
+    selectedFunnel: "Todos",
+  });
+
+  const [hidePolitical, setHidePolitical] = useState(() => {
+    const saved = localStorage.getItem("hidePolitical");
+    return saved !== null ? JSON.parse(saved) : true;
   });
 
   const [allAds, setAllAds] = useState<any[]>([]);
@@ -246,12 +102,16 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
+  const [scaleMin, setScaleMin] = useState(1);
+  const [scaleMax, setScaleMax] = useState(50);
+  const [durationMin, setDurationMin] = useState(1);
+  const [durationMax, setDurationMax] = useState(300);
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const adsCountRef = useRef(0);
   const nextCursorRef = useRef<string | undefined>(undefined);
 
-  // Sincronizar refs com estado
+  // Sincronizar refs para evitar loops em callbacks
   useEffect(() => {
     adsCountRef.current = allAds.length;
   }, [allAds.length]);
@@ -260,18 +120,16 @@ export default function Minerador() {
     nextCursorRef.current = nextCursor;
   }, [nextCursor]);
 
-  // --- BUSCA (API) COM FILTROS SERVER-SIDE ---
+  // --- PERSISTÊNCIA ---
+  useEffect(() => {
+    localStorage.setItem("hidePolitical", JSON.stringify(hidePolitical));
+  }, [hidePolitical]);
+
+  // --- BUSCA (API) ---
   const searchMutation = trpc.ads.search.useQuery(
     { 
       searchTerms: filters.searchTerms, 
-      country: filters.country,
-      scaleMin: filters.scaleMin,
-      scaleMax: filters.scaleMax,
-      durationMin: filters.durationMin,
-      durationMax: filters.durationMax,
-      productTypes: filters.productTypes.length > 0 ? filters.productTypes : undefined,
-      funnelTypes: filters.funnelTypes.length > 0 ? filters.funnelTypes : undefined,
-      excludePolitical: filters.excludePolitical,
+      country: filters.country, 
       adType: "ALL",
       after: nextCursor
     },
@@ -338,26 +196,47 @@ export default function Minerador() {
 
   useEffect(() => {
     if (hasSearched) handleSearch();
-  }, [filters.country, filters.excludePolitical, hasSearched, handleSearch]);
+  }, [filters.country, hidePolitical, hasSearched, handleSearch]);
 
-  // Gatilho de Auto-load
+  // Gatilho de Auto-load estável
   useEffect(() => {
     if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
       startAutoLoad();
     }
   }, [nextCursor, isAutoLoading, hasSearched, allAds.length, startAutoLoad]);
 
-  // --- HANDLERS DE FILTRO ---
-  const updateFilter = useCallback((key: keyof FilterState, value: any) => {
+  // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
+  const processedAds = useMemo(() => {
+    let filtered = allAds.filter(ad => {
+      const isPolitical = !!ad.bylines;
+      const matchesPolitical = hidePolitical ? !isPolitical : isPolitical;
+      
+      const matchesType = filters.selectedType === "Todos" || 
+        ad.detectedTypes?.some((t: string) => t === filters.selectedType);
+        
+      const matchesFunnel = filters.selectedFunnel === "Todos" || 
+        ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel);
+
+      const frequency = ad.frequency || 1;
+      const matchesScale = frequency <= scaleMax;
+      
+      const startDate = new Date(ad.ad_delivery_start_time);
+      const now = new Date();
+      const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const matchesDuration = daysActive <= durationMax;
+
+      return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
+    });
+
+    return filtered.sort((a, b) => {
+      const freqDiff = (b.frequency || 0) - (a.frequency || 0);
+      if (freqDiff !== 0) return freqDiff;
+      return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
+    });
+  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
+
+  const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
-
-  const updateScaleRange = useCallback((range: RangeFilter) => {
-    setFilters(prev => ({ ...prev, scaleMin: range.min, scaleMax: range.max }));
-  }, []);
-
-  const updateDurationRange = useCallback((range: RangeFilter) => {
-    setFilters(prev => ({ ...prev, durationMin: range.min, durationMax: range.max }));
   }, []);
 
   return (
@@ -370,19 +249,19 @@ export default function Minerador() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">Minerador</span>
             <span className="text-white/20 font-light text-xl">Pro</span>
           </h1>
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta com Filtros Server-Side</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta</p>
         </div>
         
         <PageHeader 
-          resultsCount={allAds.length} 
-          hidePolitical={filters.excludePolitical} 
-          onTogglePolitical={(val) => updateFilter("excludePolitical", val)} 
+          resultsCount={processedAds.length} 
+          hidePolitical={hidePolitical} 
+          onTogglePolitical={setHidePolitical} 
         />
 
-        {/* Barra de Filtros Unificada */}
-        <Card className="p-6 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
-          <form onSubmit={handleSearch} className="flex flex-col space-y-6">
-            {/* Linha 1: Busca e Filtros Básicos */}
+        {/* Barra de Filtros */}
+        <Card className="p-4 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
+          <form onSubmit={handleSearch} className="flex flex-col space-y-4">
+            {/* Primeira linha: Palavra-chave, País, Tipo Produto, Funil, Botão Minerar */}
             <div className="flex flex-col lg:flex-row items-end gap-3">
               <div className="w-full lg:w-[25%] space-y-0">
                 <MiniLabel>Palavra-chave</MiniLabel>
@@ -398,7 +277,7 @@ export default function Minerador() {
                     <button 
                       type="button"
                       onClick={() => updateFilter("searchTerms", "")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -406,11 +285,11 @@ export default function Minerador() {
                 </div>
               </div>
 
-              <div className="flex-1 grid grid-cols-2 md:grid-cols-2 lg:flex items-end gap-2 w-full lg:w-auto">
+              <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:flex items-end gap-2 w-full lg:w-auto">
                 <div className="flex-1 space-y-0">
                   <MiniLabel>País</MiniLabel>
                   <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
-                    <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05] transition-colors">
+                    <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                       <div className="flex items-center gap-2 truncate">
                         <Globe className="w-3 h-3 text-white/60 shrink-0" />
                         <SelectValue placeholder="País" />
@@ -419,6 +298,40 @@ export default function Minerador() {
                     <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                       {COUNTRIES.map((c) => (
                         <SelectItem key={c.code} value={c.code} className="text-[11px] font-black uppercase py-2">{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex-1 space-y-0">
+                  <MiniLabel>Tipo Produto</MiniLabel>
+                  <Select value={filters.selectedType} onValueChange={(v) => updateFilter("selectedType", v)}>
+                    <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                      <div className="flex items-center gap-2 truncate">
+                        <Package className="w-3 h-3 text-white/60 shrink-0" />
+                        <SelectValue placeholder="Tipo" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                      {PRODUCT_TYPES.map((t) => (
+                        <SelectItem key={t} value={t} className="text-[11px] font-black uppercase py-2">{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex-1 space-y-0">
+                  <MiniLabel>Funil</MiniLabel>
+                  <Select value={filters.selectedFunnel} onValueChange={(v) => updateFilter("selectedFunnel", v)}>
+                    <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
+                      <div className="flex items-center gap-2 truncate">
+                        <Layers className="w-3 h-3 text-white/60 shrink-0" />
+                        <SelectValue placeholder="Funil" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
+                      {FUNNEL_STRUCTURES.map((f) => (
+                        <SelectItem key={f} value={f} className="text-[11px] font-black uppercase py-2">{f}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -438,49 +351,139 @@ export default function Minerador() {
               </Button>
             </div>
 
-            {/* Linha 2: Filtros Avançados (Range) */}
-            <div className="border-t border-white/10 pt-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <RangeFilterComponent
-                  label="Escala de Anúncios Repetidos"
-                  value={{ min: filters.scaleMin, max: filters.scaleMax }}
-                  min={1}
-                  max={50}
-                  onChange={updateScaleRange}
-                  presets={SCALE_PRESETS}
-                  badgeColor="emerald"
-                  unit="anúncios"
-                />
-
-                <RangeFilterComponent
-                  label="Duração da Veiculação"
-                  value={{ min: filters.durationMin, max: filters.durationMax }}
-                  min={1}
-                  max={300}
-                  onChange={updateDurationRange}
-                  presets={DURATION_PRESETS}
-                  badgeColor="blue"
-                  unit="dias"
-                />
+            {/* Segunda linha: Filtros de Escala e Duração lado a lado */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-white/10">
+              {/* Filtro de Escala */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <MiniLabel>Escala de Anúncios Repetidos</MiniLabel>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
+                    {scaleMax} anúncios
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="50" 
+                    value={scaleMax} 
+                    onChange={(e) => {
+                      const newMax = Math.max(parseInt(e.target.value), scaleMin);
+                      setScaleMax(newMax);
+                    }} 
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                  />
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {SCALE_RANGES.map((range) => (
+                    <Button 
+                      key={range.label} 
+                      variant="outline" 
+                      size="sm" 
+                      className={cn(
+                        "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                        scaleMax === range.max 
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" 
+                          : "border-white/10 text-white/60 hover:border-white/20"
+                      )} 
+                      onClick={() => {
+                        setScaleMin(range.min);
+                        setScaleMax(range.max);
+                      }}
+                    >
+                      {range.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Linha 3: Filtros de Categorias */}
-            <div className="border-t border-white/10 pt-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <MultiSelectFilter
-                  label="Tipos de Produto"
-                  options={PRODUCT_TYPES}
-                  selected={filters.productTypes}
-                  onChange={(selected) => updateFilter("productTypes", selected)}
-                />
-
-                <MultiSelectFilter
-                  label="Tipos de Funil"
-                  options={FUNNEL_STRUCTURES}
-                  selected={filters.funnelTypes}
-                  onChange={(selected) => updateFilter("funnelTypes", selected)}
-                />
+              {/* Filtro de Duração */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <MiniLabel>Duração da Veiculação</MiniLabel>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
+                    {durationMax} dias
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="300" 
+                    value={durationMax} 
+                    onChange={(e) => {
+                      const newMax = Math.max(parseInt(e.target.value), durationMin);
+                      setDurationMax(newMax);
+                    }} 
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
+                  />
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={cn(
+                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                      durationMax === 7 
+                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                        : "border-white/10 text-white/60 hover:border-white/20"
+                    )} 
+                    onClick={() => {
+                      setDurationMin(1);
+                      setDurationMax(7);
+                    }}
+                  >
+                    1-7 dias
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={cn(
+                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                      durationMax === 30 
+                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                        : "border-white/10 text-white/60 hover:border-white/20"
+                    )} 
+                    onClick={() => {
+                      setDurationMin(7);
+                      setDurationMax(30);
+                    }}
+                  >
+                    7-30 dias
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={cn(
+                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                      durationMax === 90 
+                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                        : "border-white/10 text-white/60 hover:border-white/20"
+                    )} 
+                    onClick={() => {
+                      setDurationMin(30);
+                      setDurationMax(90);
+                    }}
+                  >
+                    30-90 dias
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={cn(
+                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                      durationMax === 300 
+                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                        : "border-white/10 text-white/60 hover:border-white/20"
+                    )} 
+                    onClick={() => {
+                      setDurationMin(90);
+                      setDurationMax(300);
+                    }}
+                  >
+                    90+ dias
+                  </Button>
+                </div>
               </div>
             </div>
           </form>
@@ -493,9 +496,9 @@ export default function Minerador() {
               <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Iniciando Mineração...</p>
             </div>
-          ) : allAds.length > 0 ? (
+          ) : processedAds.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-              {allAds.map((ad) => (
+              {processedAds.map((ad) => (
                 <AdCardV3 
                   key={ad.id} 
                   ad={ad} 
