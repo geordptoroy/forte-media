@@ -8,11 +8,11 @@ RUN corepack enable && \
     apk add --no-cache python3 make g++ gcc musl-dev libc6-compat
 
 # Copiar arquivos de dependências
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 COPY patches ./patches
 
 # Instalar dependências
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Copiar código fonte
 COPY . .
