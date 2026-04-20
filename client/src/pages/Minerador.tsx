@@ -102,16 +102,17 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
-  const [scaleMin, setScaleMin] = useState(1);
   const [scaleMax, setScaleMax] = useState(50);
-  const [durationMin, setDurationMin] = useState(1);
   const [durationMax, setDurationMax] = useState(300);
+  
+  // Trigger para busca - evita loops infinitos
+  const [searchTrigger, setSearchTrigger] = useState(0);
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const adsCountRef = useRef(0);
   const nextCursorRef = useRef<string | undefined>(undefined);
 
-  // Sincronizar refs para evitar loops em callbacks
+  // Sincronizar refs
   useEffect(() => {
     adsCountRef.current = allAds.length;
   }, [allAds.length]);
@@ -167,9 +168,7 @@ export default function Minerador() {
     }
   }, [searchMutation, isAutoLoading]);
 
-  const handleSearch = useCallback(async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    
+  const executeSearch = useCallback(async () => {
     setIsAutoLoading(false);
     if (abortControllerRef.current) abortControllerRef.current.abort();
 
@@ -186,26 +185,34 @@ export default function Minerador() {
     }
   }, [searchMutation]);
 
-  // --- REATIVIDADE ---
+  // --- REATIVIDADE CONTROLADA ---
+  
+  // 1. Debounce para busca por texto
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (filters.searchTerms || hasSearched) handleSearch();
-    }, 600);
+      if (filters.searchTerms) setSearchTrigger(prev => prev + 1);
+    }, 800);
     return () => clearTimeout(timer);
-  }, [filters.searchTerms, hasSearched, handleSearch]);
+  }, [filters.searchTerms]);
 
+  // 2. Gatilho imediato para país e política
   useEffect(() => {
-    if (hasSearched) handleSearch();
-  }, [filters.country, hidePolitical, hasSearched, handleSearch]);
+    if (hasSearched) setSearchTrigger(prev => prev + 1);
+  }, [filters.country, hidePolitical]);
 
-  // Gatilho de Auto-load estável
+  // 3. Execução da busca baseada no trigger
+  useEffect(() => {
+    if (searchTrigger > 0) executeSearch();
+  }, [searchTrigger, executeSearch]);
+
+  // 4. Gatilho de Auto-load
   useEffect(() => {
     if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
       startAutoLoad();
     }
   }, [nextCursor, isAutoLoading, hasSearched, allAds.length, startAutoLoad]);
 
-  // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
+  // --- FILTRAGEM LOCAL ---
   const processedAds = useMemo(() => {
     let filtered = allAds.filter(ad => {
       const isPolitical = !!ad.bylines;
@@ -243,7 +250,6 @@ export default function Minerador() {
     <DashboardLayout>
       <div className="flex flex-col space-y-5 max-w-[1600px] mx-auto px-4 md:px-6 scale-[0.95] origin-top">
         
-        {/* Título Principal */}
         <div className="mb-6">
           <h1 className="text-5xl font-black uppercase tracking-tighter text-white flex items-center gap-4">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">Minerador</span>
@@ -258,10 +264,8 @@ export default function Minerador() {
           onTogglePolitical={setHidePolitical} 
         />
 
-        {/* Barra de Filtros */}
         <Card className="p-4 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
-          <form onSubmit={handleSearch} className="flex flex-col space-y-4">
-            {/* Primeira linha: Palavra-chave, País, Tipo Produto, Funil, Botão Minerar */}
+          <form onSubmit={(e) => { e.preventDefault(); setSearchTrigger(prev => prev + 1); }} className="flex flex-col space-y-4">
             <div className="flex flex-col lg:flex-row items-end gap-3">
               <div className="w-full lg:w-[25%] space-y-0">
                 <MiniLabel>Palavra-chave</MiniLabel>
@@ -351,9 +355,7 @@ export default function Minerador() {
               </Button>
             </div>
 
-            {/* Segunda linha: Filtros de Escala e Duração lado a lado */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-white/10">
-              {/* Filtro de Escala */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <MiniLabel>Escala de Anúncios Repetidos</MiniLabel>
@@ -367,10 +369,7 @@ export default function Minerador() {
                     min="1" 
                     max="50" 
                     value={scaleMax} 
-                    onChange={(e) => {
-                      const newMax = Math.max(parseInt(e.target.value), scaleMin);
-                      setScaleMax(newMax);
-                    }} 
+                    onChange={(e) => setScaleMax(parseInt(e.target.value))} 
                     className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
                   />
                 </div>
@@ -386,10 +385,7 @@ export default function Minerador() {
                           ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" 
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => {
-                        setScaleMin(range.min);
-                        setScaleMax(range.max);
-                      }}
+                      onClick={() => setScaleMax(range.max)}
                     >
                       {range.label}
                     </Button>
@@ -397,7 +393,6 @@ export default function Minerador() {
                 </div>
               </div>
 
-              {/* Filtro de Duração */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <MiniLabel>Duração da Veiculação</MiniLabel>
@@ -411,85 +406,38 @@ export default function Minerador() {
                     min="1" 
                     max="300" 
                     value={durationMax} 
-                    onChange={(e) => {
-                      const newMax = Math.max(parseInt(e.target.value), durationMin);
-                      setDurationMax(newMax);
-                    }} 
+                    onChange={(e) => setDurationMax(parseInt(e.target.value))} 
                     className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={cn(
-                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                      durationMax === 7 
-                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
-                        : "border-white/10 text-white/60 hover:border-white/20"
-                    )} 
-                    onClick={() => {
-                      setDurationMin(1);
-                      setDurationMax(7);
-                    }}
-                  >
-                    1-7 dias
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={cn(
-                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                      durationMax === 30 
-                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
-                        : "border-white/10 text-white/60 hover:border-white/20"
-                    )} 
-                    onClick={() => {
-                      setDurationMin(7);
-                      setDurationMax(30);
-                    }}
-                  >
-                    7-30 dias
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={cn(
-                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                      durationMax === 90 
-                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
-                        : "border-white/10 text-white/60 hover:border-white/20"
-                    )} 
-                    onClick={() => {
-                      setDurationMin(30);
-                      setDurationMax(90);
-                    }}
-                  >
-                    30-90 dias
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={cn(
-                      "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                      durationMax === 300 
-                        ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
-                        : "border-white/10 text-white/60 hover:border-white/20"
-                    )} 
-                    onClick={() => {
-                      setDurationMin(90);
-                      setDurationMax(300);
-                    }}
-                  >
-                    90+ dias
-                  </Button>
+                  {[
+                    { max: 7, label: "1-7 dias" },
+                    { max: 30, label: "7-30 dias" },
+                    { max: 90, label: "30-90 dias" },
+                    { max: 300, label: "90+ dias" }
+                  ].map((p) => (
+                    <Button 
+                      key={p.label}
+                      variant="outline" 
+                      size="sm" 
+                      className={cn(
+                        "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                        durationMax === p.max 
+                          ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                          : "border-white/10 text-white/60 hover:border-white/20"
+                      )} 
+                      onClick={() => setDurationMax(p.max)}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
                 </div>
               </div>
             </div>
           </form>
         </Card>
 
-        {/* Resultados */}
         <div className="flex-1 min-h-0">
           {searchMutation.isFetching && allAds.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 space-y-4">
@@ -530,7 +478,6 @@ export default function Minerador() {
           )}
         </div>
 
-        {/* Indicador de Auto-Load */}
         {isAutoLoading && (
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
             <div className="bg-black/80 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center gap-4">
@@ -553,7 +500,6 @@ export default function Minerador() {
           </div>
         )}
 
-        {/* Modal de Detalhes */}
         <AdDetailsModal 
           ad={selectedAd?.ad} 
           media={selectedAd?.media} 
