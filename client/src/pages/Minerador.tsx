@@ -126,8 +126,6 @@ const RangeFilterComponent = memo(({
   badgeColor: "emerald" | "blue";
   unit: string;
 }) => {
-  const isPresetActive = presets.some(p => p.min === value.min && p.max === value.max);
-  
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -211,6 +209,17 @@ export default function Minerador() {
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   
   const abortControllerRef = useRef<AbortController | null>(null);
+  const adsCountRef = useRef(0);
+  const nextCursorRef = useRef<string | undefined>(undefined);
+
+  // Sincronizar refs com estado para uso em callbacks estáveis
+  useEffect(() => {
+    adsCountRef.current = allAds.length;
+  }, [allAds.length]);
+
+  useEffect(() => {
+    nextCursorRef.current = nextCursor;
+  }, [nextCursor]);
 
   // --- PERSISTÊNCIA ---
   useEffect(() => {
@@ -228,29 +237,28 @@ export default function Minerador() {
     { enabled: false, retry: false }
   );
 
-  const startAutoLoad = useCallback(async (currentCount: number, cursor: string) => {
-    setIsAutoLoading(true);
-    let totalLoaded = currentCount;
-    let currentCursor: string | undefined = cursor;
+  const startAutoLoad = useCallback(async () => {
+    if (isAutoLoading || !nextCursorRef.current || adsCountRef.current >= AUTO_LOAD_LIMIT) return;
     
+    setIsAutoLoading(true);
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     try {
-      while (totalLoaded < AUTO_LOAD_LIMIT && currentCursor && !controller.signal.aborted) {
-        await new Promise(resolve => setTimeout(resolve, 400));
+      while (adsCountRef.current < AUTO_LOAD_LIMIT && nextCursorRef.current && !controller.signal.aborted) {
+        await new Promise(resolve => setTimeout(resolve, 500));
         if (controller.signal.aborted) break;
 
         const result = await searchMutation.refetch();
         if (!result.data || controller.signal.aborted) break;
 
         const newAds = result.data.data;
+        const cursor = result.data.paging?.next_cursor;
+        
         setAllAds(prev => [...prev, ...newAds]);
-        totalLoaded += newAds.length;
-        currentCursor = result.data.paging?.next_cursor;
-        setNextCursor(currentCursor);
-
-        if (!currentCursor) break;
+        setNextCursor(cursor);
+        
+        if (!cursor) break;
       }
     } catch (error) {
       console.error("Erro no auto-carregamento:", error);
@@ -258,7 +266,7 @@ export default function Minerador() {
       setIsAutoLoading(false);
       abortControllerRef.current = null;
     }
-  }, []);
+  }, [searchMutation, isAutoLoading]);
 
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -273,13 +281,9 @@ export default function Minerador() {
     const result = await searchMutation.refetch();
     if (result.data) {
       const ads = result.data.data;
-      setAllAds(ads);
       const cursor = result.data.paging?.next_cursor;
+      setAllAds(ads);
       setNextCursor(cursor);
-
-      if (ads.length < AUTO_LOAD_LIMIT && cursor) {
-        // Auto-load será disparado via useEffect quando nextCursor mudar
-      }
     }
   }, [searchMutation]);
 
@@ -295,10 +299,10 @@ export default function Minerador() {
     if (hasSearched) handleSearch();
   }, [filters.country, hidePolitical, hasSearched, handleSearch]);
 
-  // Auto-load quando há um cursor disponível
+  // Gatilho de Auto-load estável
   useEffect(() => {
     if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
-      startAutoLoad(allAds.length, nextCursor);
+      startAutoLoad();
     }
   }, [nextCursor, isAutoLoading, hasSearched, allAds.length, startAutoLoad]);
 
@@ -346,8 +350,6 @@ export default function Minerador() {
   const updateDurationRange = useCallback((range: RangeFilter) => {
     setFilters(prev => ({ ...prev, durationMin: range.min, durationMax: range.max }));
   }, []);
-
-
 
   return (
     <DashboardLayout>
