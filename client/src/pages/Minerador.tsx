@@ -19,7 +19,7 @@ const SCALE_LEVELS = [
   { min: 1, max: 9, key: "low_scale", color: "text-emerald-400 bg-emerald-400/10", icon: null },
   { min: 10, max: 19, key: "medium_scale", color: "text-emerald-300 bg-emerald-300/10", icon: null },
   { min: 20, max: 39, key: "high_scale", color: "text-orange-400 bg-orange-400/10", icon: null },
-  { min: 40, max: 1000, key: "viral_scale", color: "text-red-500 bg-red-500/10", icon: "🔥" }
+  { min: 40, max: 100, key: "viral_scale", color: "text-red-500 bg-red-500/10", icon: "🔥" }
 ];
 
 const COUNTRIES = [
@@ -112,7 +112,7 @@ export default function Minerador() {
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   
   // Sliders Simples (Apenas Max)
-  const [scaleMax, setScaleMax] = useState(1000);
+  const [scaleMax, setScaleMax] = useState(100);
   const [durationMax, setDurationMax] = useState(365);
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -238,7 +238,7 @@ export default function Minerador() {
   // Busca imediata para outros filtros
   useEffect(() => {
     if (hasSearched) executeSearch(true);
-  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
+  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -363,9 +363,10 @@ export default function Minerador() {
                   <input 
                     type="range" 
                     min="1" 
-                    max="1000" 
+                    max="100" 
                     value={scaleMax} 
-                    onChange={(e) => setScaleMax(parseInt(e.target.value))} 
+                    onChange={(e) => setScaleMax(parseInt(e.target.value))}
+                    onMouseUp={() => hasSearched && executeSearch(true)}
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
                   />
                 </div>
@@ -381,7 +382,10 @@ export default function Minerador() {
                           ? level.color.replace("text-", "border-").replace("bg-", "bg-opacity-20 ") + " text-white"
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => setScaleMax(level.max)}
+                      onClick={() => {
+                        setScaleMax(level.max);
+                        if (hasSearched) executeSearch(true);
+                      }}
                     >
                       {level.icon} {t(level.key)}
                     </Button>
@@ -402,7 +406,8 @@ export default function Minerador() {
                     min="1" 
                     max="365" 
                     value={durationMax} 
-                    onChange={(e) => setDurationMax(parseInt(e.target.value))} 
+                    onChange={(e) => setDurationMax(parseInt(e.target.value))}
+                    onMouseUp={() => hasSearched && executeSearch(true)}
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
                   />
                 </div>
@@ -423,7 +428,10 @@ export default function Minerador() {
                           ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => setDurationMax(p.max)}
+                      onClick={() => {
+                        setDurationMax(p.max);
+                        if (hasSearched) executeSearch(true);
+                      }}
                     >
                       {p.label}
                     </Button>
