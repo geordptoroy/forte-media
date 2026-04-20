@@ -280,8 +280,11 @@ export default function Minerador() {
       return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
     });
 
-    // 5. Ordenar por Escala (collationCount) e Data
-    return filtered.sort((a, b) => {
+    // 5. Agrupar Visualmente: Manter apenas o primeiro de cada grupo para exibição
+    const uniqueAds = filtered.filter(ad => ad.isFirstInGroup);
+
+    // 6. Ordenar por Escala (collationCount) e Data
+    return uniqueAds.sort((a, b) => {
       const scaleDiff = (b.collationCount || 0) - (a.collationCount || 0);
       if (scaleDiff !== 0) return scaleDiff;
       return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
