@@ -162,6 +162,8 @@ export interface SearchAdsParams {
   productTypes?: string[];
   funnelTypes?: string[];
   excludePolitical?: boolean;
+  currency?: string;
+  minSpend?: number;
 }
 
 /**
@@ -180,7 +182,9 @@ export async function searchAds(params: SearchAdsParams) {
     durationMax = 365,
     productTypes,
     funnelTypes,
-    excludePolitical = true
+    excludePolitical = true,
+    currency,
+    minSpend = 0
   } = params;
 
   const url = `https://graph.facebook.com/v22.0/ads_archive`;
@@ -287,6 +291,15 @@ export async function searchAds(params: SearchAdsParams) {
       
       // 6. Filtro de anúncios políticos
       if (excludePolitical && ad.bylines) return false;
+
+      // 7. Filtro de Moeda
+      if (currency && ad.currency !== currency) return false;
+
+      // 8. Filtro de Gasto Mínimo (baseado no lower_bound do spend)
+      if (minSpend > 0) {
+        const adSpend = ad.spend?.lower_bound || 0;
+        if (adSpend < minSpend) return false;
+      }
       
       return true;
     });

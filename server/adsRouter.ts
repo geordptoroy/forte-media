@@ -19,6 +19,8 @@ export const adsRouter = router({
         productTypes: z.array(z.string()).optional(),
         funnelTypes: z.array(z.string()).optional(),
         excludePolitical: z.boolean().default(true).optional(),
+        currency: z.string().optional(),
+        minSpend: z.number().optional(),
         after: z.string().optional(), // Suporte a paginação
       })
     )

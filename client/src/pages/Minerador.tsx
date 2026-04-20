@@ -115,6 +115,8 @@ export default function Minerador() {
   const [scaleMax, setScaleMax] = useState(1000);
   const [durationMin, setDurationMin] = useState(1);
   const [durationMax, setDurationMax] = useState(365);
+  const [currency, setCurrency] = useState("ALL");
+  const [minSpend, setMinSpend] = useState(0);
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const isFetchingRef = useRef(false);
@@ -144,6 +146,8 @@ export default function Minerador() {
       scaleMax: scaleMax,
       durationMin: durationMin,
       durationMax: durationMax,
+      currency: currency !== "ALL" ? currency : undefined,
+      minSpend: minSpend > 0 ? minSpend : undefined,
       productTypes: filters.selectedType !== "all" ? [t(filters.selectedType)] : undefined,
       funnelTypes: filters.selectedFunnel !== "all" ? [filters.selectedFunnel] : undefined,
       excludePolitical: hidePolitical
@@ -239,7 +243,7 @@ export default function Minerador() {
   // Busca imediata para outros filtros
   useEffect(() => {
     if (hasSearched) executeSearch(true);
-  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMin, scaleMax, durationMin, durationMax]);
+  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMin, scaleMax, durationMin, durationMax, currency, minSpend]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -352,7 +356,39 @@ export default function Minerador() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-white/10">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pt-4 border-t border-white/10">
+              {/* Filtro de Gasto */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <MiniLabel>Gasto Mínimo (Investimento)</MiniLabel>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded-full">
+                    {currency === 'ALL' ? '' : currency} {minSpend}
+                  </span>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger className="w-[80px] bg-white/[0.03] border-white/20 h-8 text-[10px] font-black">
+                      <SelectValue placeholder="Moeda" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0A0A0A] border-white/10">
+                      <SelectItem value="ALL" className="text-[10px] font-black">TODAS</SelectItem>
+                      <SelectItem value="BRL" className="text-[10px] font-black">BRL (R$)</SelectItem>
+                      <SelectItem value="USD" className="text-[10px] font-black">USD ($)</SelectItem>
+                      <SelectItem value="EUR" className="text-[10px] font-black">EUR (€)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="10000" 
+                    step="100"
+                    value={minSpend} 
+                    onChange={(e) => setMinSpend(parseInt(e.target.value))} 
+                    className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-yellow-500" 
+                  />
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <MiniLabel>{t('scale_label')}</MiniLabel>
