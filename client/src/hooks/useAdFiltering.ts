@@ -2,8 +2,9 @@ import { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Hook para filtragem e agrupamento de anúncios no cliente
- * Sincronizado com a lógica do backend
+ * Hook para filtragem leve de anúncios no cliente
+ * O backend já fez o agrupamento e classificação pesada
+ * Este hook apenas refina a exibição baseado em preferências do usuário
  */
 
 interface FilterState {
@@ -27,41 +28,18 @@ interface Ad {
   detectedFunnels?: string[];
   isNegative?: boolean;
   bylines?: string;
-  ad_creative_bodies?: string[];
-  ad_creative_link_titles?: string[];
-  ad_creative_link_descriptions?: string[];
+  creative_group_id?: string; // Vem do backend
   [key: string]: any;
 }
 
 /**
- * Normaliza texto para comparação
- */
-function normalizeText(text?: string): string {
-  if (!text) return '';
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/[^\w\s\-]/g, '');
-}
-
-/**
- * Gera chave única para criativo
- */
-export function getCreativeKey(ad: Ad): string {
-  const body = normalizeText(ad.ad_creative_bodies?.[0]);
-  const title = normalizeText(ad.ad_creative_link_titles?.[0]);
-  const desc = normalizeText(ad.ad_creative_link_descriptions?.[0]);
-  return `${body}|${title}|${desc}`;
-}
-
-/**
- * Hook principal de filtragem
+ * Hook principal de filtragem - apenas refinamento de UI
+ * O backend já fez o agrupamento e filtragem pesada
  */
 export function useAdFiltering(ads: Ad[], filters: FilterState) {
   const { t } = useTranslation();
 
-  // Filtrar por tipo de produto
+  // Filtrar por tipo de produto (refinamento de UI)
   const filteredByType = useMemo(() => {
     if (filters.selectedType === 'all') return ads;
     return ads.filter((ad) => {
@@ -70,7 +48,7 @@ export function useAdFiltering(ads: Ad[], filters: FilterState) {
     });
   }, [ads, filters.selectedType, t]);
 
-  // Filtrar por funil
+  // Filtrar por funil (refinamento de UI)
   const filteredByFunnel = useMemo(() => {
     if (filters.selectedFunnel === 'all') return filteredByType;
     return filteredByType.filter((ad) => {
@@ -79,7 +57,7 @@ export function useAdFiltering(ads: Ad[], filters: FilterState) {
     });
   }, [filteredByType, filters.selectedFunnel]);
 
-  // Filtrar por escala
+  // Filtrar por escala (refinamento de UI)
   const filteredByScale = useMemo(() => {
     return filteredByFunnel.filter((ad) => {
       const count = ad.collationCount || ad.frequency || 1;
@@ -87,7 +65,7 @@ export function useAdFiltering(ads: Ad[], filters: FilterState) {
     });
   }, [filteredByFunnel, filters.scaleMax]);
 
-  // Filtrar por duração
+  // Filtrar por duração (refinamento de UI)
   const filteredByDuration = useMemo(() => {
     return filteredByScale.filter((ad) => {
       const days = ad.daysActive || 0;
@@ -95,44 +73,39 @@ export function useAdFiltering(ads: Ad[], filters: FilterState) {
     });
   }, [filteredByScale, filters.durationMax]);
 
-  // Filtrar por país (se aplicável)
-  const filteredByCountry = useMemo(() => {
-    if (filters.country === 'ALL') return filteredByDuration;
-    // Filtro de país é aplicado no backend
-    return filteredByDuration;
-  }, [filteredByDuration, filters.country]);
-
-  // Filtrar anúncios políticos
+  // Filtrar anúncios políticos (refinamento de UI)
   const finalFiltered = useMemo(() => {
-    if (!filters.hidePolitical) return filteredByCountry;
-    return filteredByCountry.filter((ad) => !ad.bylines);
-  }, [filteredByCountry, filters.hidePolitical]);
+    if (!filters.hidePolitical) return filteredByDuration;
+    return filteredByDuration.filter((ad) => !ad.bylines);
+  }, [filteredByDuration, filters.hidePolitical]);
 
   return finalFiltered;
 }
 
 /**
- * Hook para agrupamento de criativos repetidos
+ * Hook para agrupar criativos por creative_group_id (vem do backend)
+ * Apenas agrupa para exibição visual, o backend já fez o trabalho pesado
  */
 export function useAdGrouping(ads: Ad[]) {
   return useMemo(() => {
+    // Backend já fornece creative_group_id, apenas usamos para agrupar visualmente
     const groups = new Map<string, Ad[]>();
 
     for (const ad of ads) {
-      const key = getCreativeKey(ad);
-      if (!groups.has(key)) {
-        groups.set(key, []);
+      const groupId = ad.creative_group_id || ad.id; // Fallback para ID se não tiver grupo
+      if (!groups.has(groupId)) {
+        groups.set(groupId, []);
       }
-      groups.get(key)!.push(ad);
+      groups.get(groupId)!.push(ad);
     }
 
-    // Adicionar collationCount a cada anúncio
+    // Sincronizar collationCount com o tamanho do grupo (para UI)
     const adsWithCount = ads.map((ad) => {
-      const key = getCreativeKey(ad);
-      const group = groups.get(key) || [ad];
+      const groupId = ad.creative_group_id || ad.id;
+      const group = groups.get(groupId) || [ad];
       return {
         ...ad,
-        collationCount: group.length,
+        collationCount: group.length, // Sincronizar com tamanho do grupo
       };
     });
 
@@ -142,6 +115,7 @@ export function useAdGrouping(ads: Ad[]) {
 
 /**
  * Hook combinado: agrupa e depois filtra
+ * Operações leves, o backend já fez o trabalho pesado
  */
 export function useFilteredAndGroupedAds(ads: Ad[], filters: FilterState) {
   const grouped = useAdGrouping(ads);
@@ -151,6 +125,7 @@ export function useFilteredAndGroupedAds(ads: Ad[], filters: FilterState) {
 
 /**
  * Hook para estatísticas de filtros
+ * Apenas calcula estatísticas para exibição
  */
 export function useFilterStats(ads: Ad[], filters: FilterState) {
   return useMemo(() => {

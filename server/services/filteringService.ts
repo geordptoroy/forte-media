@@ -47,6 +47,7 @@ export interface AdWithMetadata {
 
 export interface ProcessedAd extends AdWithMetadata {
   creativeHash: string;
+  creative_group_id: string; // ID único do grupo de criativos para o frontend
   frequency: number;
   daysActive: number;
   destination_url?: string;
@@ -151,10 +152,13 @@ export function enrichAdsWithGroupMetadata(
     const group = creativeGroups.get(hash) || [ad];
     const frequency = group.length;
     const daysActive = calculateDaysActive(ad.ad_delivery_start_time);
+    // Gerar um ID único e determinístico para o grupo de criativos
+    const creative_group_id = `group_${hash.substring(0, 12)}`;
 
     return {
       ...ad,
       creativeHash: hash,
+      creative_group_id,
       frequency,
       collationCount: frequency, // Sincronizar frequency com collationCount
       daysActive,

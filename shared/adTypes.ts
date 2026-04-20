@@ -34,6 +34,7 @@ export interface AdData {
   frequency?: number;
   collationCount?: number;
   creativeHash?: string;
+  creative_group_id?: string; // ID único do grupo de criativos (gerado no backend)
   isFirstInGroup?: boolean;
   destination_url?: string;
   daysActive?: number;

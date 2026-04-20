@@ -12,7 +12,7 @@ import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-import { type ExtractionResult } from "../types/adTypes";
+import { type ExtractionResult } from "../../shared/adTypes";
 import { useFilteredAndGroupedAds } from "../hooks/useAdFiltering";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
@@ -137,6 +137,7 @@ export default function Minerador() {
   }, [hidePolitical]);
 
   // --- BUSCA (API) ---
+  // Backend já faz filtragem pesada, frontend apenas refina
   const searchMutation = trpc.ads.search.useQuery(
     { 
       searchTerms: filters.searchTerms, 
@@ -144,9 +145,9 @@ export default function Minerador() {
       adType: "ALL",
       after: nextCursor,
       scaleMin: 1,
-      scaleMax: scaleMax,
+      scaleMax: 1000, // Backend retorna tudo, frontend refina com slider
       durationMin: 1,
-      durationMax: durationMax,
+      durationMax: 365, // Backend retorna tudo, frontend refina com slider
       productTypes: filters.selectedType !== "all" ? [t(filters.selectedType)] : undefined,
       funnelTypes: filters.selectedFunnel !== "all" ? [filters.selectedFunnel] : undefined,
       excludePolitical: hidePolitical
@@ -239,7 +240,8 @@ export default function Minerador() {
     return () => clearTimeout(timer);
   }, [filters.searchTerms]);
 
-  // Busca imediata para outros filtros
+  // Busca imediata para outros filtros (que vêm do backend)
+  // Sliders de escala e duração NÃO disparam nova busca, apenas refinam a UI
   useEffect(() => {
     if (hasSearched) executeSearch(true);
   }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel]);
@@ -370,7 +372,6 @@ export default function Minerador() {
                     max="100" 
                     value={scaleMax} 
                     onChange={(e) => setScaleMax(parseInt(e.target.value))}
-                    onMouseUp={() => hasSearched && executeSearch(true)}
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
                   />
                 </div>
@@ -388,7 +389,6 @@ export default function Minerador() {
                       )} 
                       onClick={() => {
                         setScaleMax(level.max);
-                        if (hasSearched) executeSearch(true);
                       }}
                     >
                       {level.icon} {t(level.key)}
@@ -411,7 +411,6 @@ export default function Minerador() {
                     max="365" 
                     value={durationMax} 
                     onChange={(e) => setDurationMax(parseInt(e.target.value))}
-                    onMouseUp={() => hasSearched && executeSearch(true)}
                     className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
                   />
                 </div>
@@ -434,7 +433,6 @@ export default function Minerador() {
                       )} 
                       onClick={() => {
                         setDurationMax(p.max);
-                        if (hasSearched) executeSearch(true);
                       }}
                     >
                       {p.label}
