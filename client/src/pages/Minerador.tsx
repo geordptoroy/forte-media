@@ -111,13 +111,9 @@ export default function Minerador() {
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: ExtractionResult | null } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   
-  // Sliders com Range (Min/Max)
-  const [scaleMin, setScaleMin] = useState(1);
+  // Sliders Simples (Apenas Max)
   const [scaleMax, setScaleMax] = useState(1000);
-  const [durationMin, setDurationMin] = useState(1);
   const [durationMax, setDurationMax] = useState(365);
-  const [currency, setCurrency] = useState("ALL");
-  const [minSpend, setMinSpend] = useState(0);
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const isFetchingRef = useRef(false);
@@ -143,12 +139,10 @@ export default function Minerador() {
       country: filters.country, 
       adType: "ALL",
       after: nextCursor,
-      scaleMin: scaleMin,
+      scaleMin: 1,
       scaleMax: scaleMax,
-      durationMin: durationMin,
+      durationMin: 1,
       durationMax: durationMax,
-      currency: currency !== "ALL" ? currency : undefined,
-      minSpend: minSpend > 0 ? minSpend : undefined,
       productTypes: filters.selectedType !== "all" ? [t(filters.selectedType)] : undefined,
       funnelTypes: filters.selectedFunnel !== "all" ? [filters.selectedFunnel] : undefined,
       excludePolitical: hidePolitical
@@ -244,7 +238,7 @@ export default function Minerador() {
   // Busca imediata para outros filtros
   useEffect(() => {
     if (hasSearched) executeSearch(true);
-  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMin, scaleMax, durationMin, durationMax, currency, minSpend]);
+  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -357,69 +351,23 @@ export default function Minerador() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pt-4 border-t border-white/10">
-              {/* Filtro de Gasto */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <MiniLabel>Gasto Mínimo (Investimento)</MiniLabel>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded-full">
-                    {currency === 'ALL' ? '' : currency} {minSpend}
-                  </span>
-                </div>
-                <div className="flex gap-2 items-center">
-                  <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger className="w-[80px] bg-white/[0.03] border-white/20 h-8 text-[10px] font-black">
-                      <SelectValue placeholder="Moeda" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0A0A0A] border-white/10">
-                      <SelectItem value="ALL" className="text-[10px] font-black">TODAS</SelectItem>
-                      <SelectItem value="BRL" className="text-[10px] font-black">BRL (R$)</SelectItem>
-                      <SelectItem value="USD" className="text-[10px] font-black">USD ($)</SelectItem>
-                      <SelectItem value="EUR" className="text-[10px] font-black">EUR (€)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="10000" 
-                    step="100"
-                    value={minSpend} 
-                    onChange={(e) => setMinSpend(parseInt(e.target.value))} 
-                    className="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-yellow-500" 
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <MiniLabel>{t('scale_label')}</MiniLabel>
                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
-                    {scaleMin}-{scaleMax} {t('copies').toLowerCase()}
+                    {scaleMax} {t('copies').toLowerCase()}
                   </span>
                 </div>
-                <div className="flex gap-4 items-center">
-                  <div className="flex-1 space-y-2">
-                    <MiniLabel>Min: {scaleMin}</MiniLabel>
-                    <input 
-                      type="range" 
-                      min="1" 
-                      max="1000" 
-                      value={scaleMin} 
-                      onChange={(e) => setScaleMin(Math.min(parseInt(e.target.value), scaleMax))} 
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
-                    />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <MiniLabel>Max: {scaleMax}</MiniLabel>
-                    <input 
-                      type="range" 
-                      min="1" 
-                      max="1000" 
-                      value={scaleMax} 
-                      onChange={(e) => setScaleMax(Math.max(parseInt(e.target.value), scaleMin))} 
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="1000" 
+                    value={scaleMax} 
+                    onChange={(e) => setScaleMax(parseInt(e.target.value))} 
+                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                  />
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {SCALE_LEVELS.map((level) => (
@@ -429,11 +377,11 @@ export default function Minerador() {
                       size="sm" 
                       className={cn(
                         "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                        scaleMin >= level.min && scaleMax <= level.max
+                        scaleMax === level.max
                           ? level.color.replace("text-", "border-").replace("bg-", "bg-opacity-20 ") + " text-white"
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => { setScaleMin(level.min); setScaleMax(level.max); }}
+                      onClick={() => setScaleMax(level.max)}
                     >
                       {level.icon} {t(level.key)}
                     </Button>
@@ -445,39 +393,25 @@ export default function Minerador() {
                 <div className="flex items-center justify-between">
                   <MiniLabel>{t('duration_label')}</MiniLabel>
                   <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
-                    {durationMin}-{durationMax} {t('active_days').split(' ')[1]}
+                    {durationMax} {t('active_days').split(' ')[1]}
                   </span>
                 </div>
-                <div className="flex gap-4 items-center">
-                  <div className="flex-1 space-y-2">
-                    <MiniLabel>Min: {durationMin}</MiniLabel>
-                    <input 
-                      type="range" 
-                      min="1" 
-                      max="365" 
-                      value={durationMin} 
-                      onChange={(e) => setDurationMin(Math.min(parseInt(e.target.value), durationMax))} 
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
-                    />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <MiniLabel>Max: {durationMax}</MiniLabel>
-                    <input 
-                      type="range" 
-                      min="1" 
-                      max="365" 
-                      value={durationMax} 
-                      onChange={(e) => setDurationMax(Math.max(parseInt(e.target.value), durationMin))} 
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="365" 
+                    value={durationMax} 
+                    onChange={(e) => setDurationMax(parseInt(e.target.value))} 
+                    className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
+                  />
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {[
-                    { min: 1, max: 7, label: "1-7 " + t('active_days').split(' ')[1] },
-                    { min: 7, max: 30, label: "7-30 " + t('active_days').split(' ')[1] },
-                    { min: 30, max: 90, label: "30-90 " + t('active_days').split(' ')[1] },
-                    { min: 90, max: 365, label: "90+ " + t('active_days').split(' ')[1] }
+                    { max: 7, label: "1-7 " + t('active_days').split(' ')[1] },
+                    { max: 30, label: "7-30 " + t('active_days').split(' ')[1] },
+                    { max: 90, label: "30-90 " + t('active_days').split(' ')[1] },
+                    { max: 365, label: "90+ " + t('active_days').split(' ')[1] }
                   ].map((p) => (
                     <Button 
                       key={p.label}
@@ -485,11 +419,11 @@ export default function Minerador() {
                       size="sm" 
                       className={cn(
                         "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                        durationMin >= p.min && durationMax <= p.max
+                        durationMax === p.max
                           ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => { setDurationMin(p.min); setDurationMax(p.max); }}
+                      onClick={() => setDurationMax(p.max)}
                     >
                       {p.label}
                     </Button>
