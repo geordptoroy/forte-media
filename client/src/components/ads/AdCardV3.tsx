@@ -88,19 +88,20 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
   // Memoização de URLs e Textos para evitar re-cálculos
   const urls = useMemo(() => {
     const official = `https://www.facebook.com/ads/library/?id=${ad.id}`;
-    // Prioridade: destination_url (vem do backend com ad_creative_link_captions) > official
-    const destination = ad.destination_url && ad.destination_url !== official ? ad.destination_url : official;
+    // Prioridade: link extraído via Puppeteer > destination_url (vem do backend) > official
+    const destination = media?.ctaLink || (ad.destination_url && ad.destination_url !== official ? ad.destination_url : official);
     return {
       official,
       destination
     };
-  }, [ad.id, ad.destination_url]);
+  }, [ad.id, ad.destination_url, media?.ctaLink]);
 
   const ctaText = useMemo(() => {
     const funnels = ad.detectedFunnels || [];
     if (funnels.includes("X1") || funnels.includes("Type Bot")) return "Saiba Mais";
-    return ad.ad_creative_link_titles?.[0] || "Saiba Mais";
-  }, [ad.detectedFunnels, ad.ad_creative_link_titles]);
+    // Prioridade: Título extraído via Puppeteer > Título da API > "Saiba Mais"
+    return media?.title || ad.ad_creative_link_titles?.[0] || "Saiba Mais";
+  }, [ad.detectedFunnels, ad.ad_creative_link_titles, media?.title]);
 
   const activeTimeLabel = useMemo(() => {
     if (!ad.ad_delivery_start_time) return "N/A";

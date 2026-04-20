@@ -9,6 +9,8 @@ export interface ExtractionResult {
   type: 'video' | 'image' | 'carousel' | 'unknown';
   url: string | string[];
   thumbnail?: string;
+  title?: string;
+  ctaLink?: string;
 }
 
 // Cache simples em memória para evitar re-extrações na mesma sessão do servidor
@@ -32,41 +34,7 @@ export class StealthExtractorService {
 
     console.log(`[StealthExtractor] Iniciando extração otimizada para: ${snapshotUrl}`);
     
-    // 2. Tentar Extração Ultra-Rápida via Request Simples (Regex no HTML bruto)
-    // Isso resolve ~70% dos casos de imagem sem abrir o navegador
-    try {
-      const response = await axios.get(snapshotUrl, { 
-        timeout: 5000,
-        headers: { 'User-Agent': this.userAgents[2] }
-      });
-      const html = response.data;
-      
-      // Tentar encontrar vídeo no HTML bruto
-      const videoMatch = html.match(/https:\/\/video[^"']+\.mp4[^"']*/);
-      if (videoMatch) {
-        const result: ExtractionResult = {
-          type: 'video',
-          url: videoMatch[0].replace(/\\/g, '')
-        };
-        extractionCache.set(snapshotUrl, { result, timestamp: Date.now() });
-        return result;
-      }
-
-      // Tentar encontrar imagem no HTML bruto
-      const imageMatch = html.match(/https:\/\/[^"']+\.fbcdn\.net\/v\/[^"']+\.(?:jpg|png|webp)[^"']*/);
-      if (imageMatch && !html.includes('carousel')) { // Evita pegar imagem errada se for carrossel
-        const result: ExtractionResult = {
-          type: 'image',
-          url: imageMatch[0].replace(/\\/g, '')
-        };
-        extractionCache.set(snapshotUrl, { result, timestamp: Date.now() });
-        return result;
-      }
-    } catch (e) {
-      console.log(`[StealthExtractor] Extração rápida falhou, tentando Puppeteer...`);
-    }
-
-    // 3. Extração Profunda via Puppeteer (Fallback para Vídeos complexos e Carrosséis)
+    // 2. Extração via Puppeteer (Obrigatória agora para pegar Título e CTA com precisão)
     let browser;
     try {
       browser = await puppeteer.launch({
@@ -88,51 +56,83 @@ export class StealthExtractorService {
       await page.setUserAgent(mobileUA);
       await page.setViewport({ width: 390, height: 844, isMobile: true });
 
-      // Otimização: Bloquear recursos desnecessários
+      // Otimização: Bloquear recursos pesados mas manter scripts para renderização do anúncio
       await page.setRequestInterception(true);
       page.on('request', (req) => {
-        if (['font', 'stylesheet'].includes(req.resourceType())) {
+        if (['font'].includes(req.resourceType())) {
           req.abort();
         } else {
           req.continue();
         }
       });
 
-      await page.goto(snapshotUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.goto(snapshotUrl, { waitUntil: 'networkidle2', timeout: 20000 });
 
-      // Aguardar um tempo mínimo para scripts de vídeo
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      // Aguardar um tempo para scripts de renderização do anúncio e botões
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       const result = await page.evaluate(() => {
+        // --- EXTRAÇÃO DE MÍDIA ---
+        let mediaType: 'video' | 'image' | 'carousel' | 'unknown' = 'unknown';
+        let mediaUrl: string | string[] = '';
+        let thumbnail: string | undefined = undefined;
+
         const video = document.querySelector('video');
         if (video && video.getAttribute('src')) {
-          return {
-            type: 'video',
-            url: video.getAttribute('src'),
-            thumbnail: video.getAttribute('poster') || undefined
-          };
+          mediaType = 'video';
+          mediaUrl = video.getAttribute('src') || '';
+          thumbnail = video.getAttribute('poster') || undefined;
+        } else {
+          const images = Array.from(document.querySelectorAll('img')).filter(img => {
+            const src = img.getAttribute('src') || '';
+            return src.includes('fbcdn.net') && !src.includes('s60x60') && !src.includes('s32x32');
+          });
+
+          if (images.length > 1) {
+            mediaType = 'carousel';
+            mediaUrl = images.map(img => img.getAttribute('src') || '').filter(src => src !== '');
+          } else if (images[0]) {
+            mediaType = 'image';
+            mediaUrl = images[0].getAttribute('src') || '';
+          }
         }
 
-        const images = Array.from(document.querySelectorAll('img')).filter(img => {
-          const src = img.getAttribute('src') || '';
-          return src.includes('fbcdn.net') && !src.includes('s60x60') && !src.includes('s32x32');
+        // --- EXTRAÇÃO DE TÍTULO E CTA ---
+        // O título do anúncio geralmente está em um elemento com classe específica ou dentro de uma estrutura de card
+        // Tentamos seletores comuns da Biblioteca de Anúncios da Meta
+        const titleElement = document.querySelector('div[role="button"] div > span, h1, h2, h3');
+        const title = titleElement?.textContent?.trim() || "";
+
+        // O link de destino (CTA) geralmente está em um link que envolve o botão ou o card
+        // A Meta usa redirecionamentos, então buscamos por links que não sejam internos da Meta
+        const allLinks = Array.from(document.querySelectorAll('a'));
+        const externalLink = allLinks.find(a => {
+          const href = a.getAttribute('href') || '';
+          return href.startsWith('http') && 
+                 !href.includes('facebook.com') && 
+                 !href.includes('fb.me') && 
+                 !href.includes('instagram.com') &&
+                 !href.includes('messenger.com') &&
+                 !href.includes('whatsapp.com'); // WhatsApp é externo mas muitas vezes queremos o link direto
         });
 
-        if (images.length > 1) {
-          return {
-            type: 'carousel',
-            url: images.map(img => img.getAttribute('src') || '').filter(src => src !== '')
-          };
+        // Se não achar link externo puro, procura por links de redirecionamento do FB que contenham 'u=' ou 'l.php'
+        let ctaLink = externalLink?.getAttribute('href') || "";
+        if (!ctaLink) {
+          const fbRedirect = allLinks.find(a => a.getAttribute('href')?.includes('l.php?u='));
+          if (fbRedirect) {
+            const urlObj = new URL(fbRedirect.getAttribute('href') || '');
+            ctaLink = urlObj.searchParams.get('u') || "";
+          }
         }
 
-        if (images[0]) {
-          return {
-            type: 'image',
-            url: images[0].getAttribute('src') || ''
-          };
-        }
-
-        return null;
+        return {
+          type: mediaType,
+          url: mediaUrl,
+          thumbnail,
+          title,
+          ctaLink
+        };
       });
 
       if (result) {
