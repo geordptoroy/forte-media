@@ -420,20 +420,20 @@ export default function Minerador() {
                   />
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {SCALE_RANGES.map((range) => (
+                  {SCALE_LEVELS.map((level) => (
                     <Button 
-                      key={range.label} 
+                      key={level.label} 
                       variant="outline" 
                       size="sm" 
                       className={cn(
                         "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
-                        scaleMax === range.max 
-                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" 
+                        scaleMax === level.max 
+                          ? level.color.replace("text-", "border-").replace("bg-", "bg-opacity-20 ") + " text-white"
                           : "border-white/10 text-white/60 hover:border-white/20"
                       )} 
-                      onClick={() => setScaleMax(range.max)}
+                      onClick={() => setScaleMax(level.max)}
                     >
-                      {range.label}
+                      {level.icon} {level.label}
                     </Button>
                   ))}
                 </div>
