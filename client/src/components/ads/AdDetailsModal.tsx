@@ -12,7 +12,7 @@ import {
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { type ExtractionResult } from "../../../../shared/adTypes";
+import { type ExtractionResult } from "../../types/adTypes";
 
 // --- TIPAGEM ---
 interface AdDetailsModalProps {

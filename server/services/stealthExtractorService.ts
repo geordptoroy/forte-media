@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { type ExtractionResult } from '../../../shared/adTypes';
+import { type ExtractionResult } from "../types/adTypes";
 
 // Configurar o plugin stealth
 puppeteer.use(StealthPlugin());

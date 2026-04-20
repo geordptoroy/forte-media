@@ -12,7 +12,7 @@ import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-import { type ExtractionResult } from "../../../shared/adTypes";
+import { type ExtractionResult } from "../types/adTypes";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
 const SCALE_LEVELS = [

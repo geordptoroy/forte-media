@@ -11,7 +11,7 @@ import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-import { type ExtractionResult } from "../../../../shared/adTypes";
+import { type ExtractionResult } from "../../types/adTypes";
 
 interface AdCardProps {
   ad: any;
