@@ -25,11 +25,13 @@ let lastRateLimitWarning = 0;
 
 /**
  * Gera um hash único para o criativo do anúncio para agrupar duplicatas
+ * Melhora a normalização para ignorar emojis e espaços extras
  */
 function generateCreativeHash(ad: any): string {
-  const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase().trim();
-  const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase().trim();
-  const caption = (ad.ad_creative_link_captions?.[0] || "").toLowerCase().trim();
+  const normalize = (text: string) => text.toLowerCase().replace(/[\s\W_]+/g, "").trim();
+  const body = normalize(ad.ad_creative_bodies?.[0] || "");
+  const title = normalize(ad.ad_creative_link_titles?.[0] || "");
+  const caption = normalize(ad.ad_creative_link_captions?.[0] || "");
   const normalized = `${body}|${title}|${caption}`;
   return crypto.createHash('md5').update(normalized).digest('hex');
 }
@@ -58,37 +60,25 @@ async function getPageDetails(pageId: string, accessToken: string) {
   }
 }
 
-// --- MOTOR DE CLASSIFICAÇÃO ---
+// --- MOTOR DE CLASSIFICAÇÃO AVANÇADO ---
 
 const CLASSIFICATION_ENGINE = {
   PRODUCT_TYPES: {
     "Infoproduto": {
-      high: ["curso", "treinamento", "método", "fórmula", "mentoria", "workshop", "e-book", "aula gratuita", "vagas abertas", "inscrição"],
-      medium: ["digital", "online", "aprenda", "conteúdo", "acesso", "vitalício", "baixe agora", "módulo"]
+      high: ["curso", "treinamento", "método", "fórmula", "mentoria", "workshop", "e-book", "aula gratuita", "vagas abertas", "inscrição", "hotmart", "kiwify", "eduzz", "página de vendas", "membro", "plataforma de alunos"],
+      medium: ["digital", "online", "aprenda", "conteúdo", "acesso", "vitalício", "baixe agora", "módulo", "venda", "marketing"]
     },
     "Suplementos/Nutra": {
-      high: ["cápsula", "comprimido", "emagrecedor", "vitamina", "probiótico", "detox", "encapsulado", "nutra", "frasco", "pote"],
-      medium: ["natural", "saúde", "suplemento", "queima", "gordura", "fórmula", "corpo", "resultado"]
+      high: ["cápsula", "comprimido", "emagrecedor", "vitamina", "probiótico", "detox", "encapsulado", "nutra", "frasco", "pote", "kit", "tratamento"],
+      medium: ["natural", "saúde", "suplemento", "queima", "gordura", "fórmula", "corpo", "resultado", "anvisa"]
     },
     "Dropshipping": {
-      high: ["frete grátis", "estoque limitado", "pronta entrega", "importado", "loja virtual", "comprar agora", "oferta exclusiva", "unidades"],
+      high: ["frete grátis", "estoque limitado", "pronta entrega", "importado", "loja virtual", "comprar agora", "oferta exclusiva", "unidades", "rastreio", "enviamos para todo", "shopify"],
       medium: ["promoção", "desconto", "oferta", "envio", "entrega", "produto", "site", "garantia"]
     },
     "Comércio Local": {
-      high: ["pizzaria", "clínica", "restaurante", "agende seu horário", "visite nossa", "endereço", "bairro", "cidade", "unidade"],
+      high: ["pizzaria", "clínica", "restaurante", "agende seu horário", "visite nossa", "endereço", "bairro", "cidade", "unidade", "agendamento", "horário de funcionamento"],
       medium: ["aqui perto", "na sua região", "retire na loja", "local", "atendimento", "serviço"]
-    },
-    "Moda": {
-      high: ["roupa", "vestido", "calçado", "sapato", "look", "coleção", "vestuário", "peças", "estilo"],
-      medium: ["moda", "acessório", "feminino", "masculino", "tamanho", "cor", "tecido"]
-    },
-    "Eletrônicos": {
-      high: ["smartphone", "celular", "gadget", "iphone", "android", "notebook", "computador", "fone de ouvido"],
-      medium: ["tecnologia", "tech", "eletrônico", "dispositivo", "carregador", "bluetooth"]
-    },
-    "Serviços": {
-      high: ["consultoria", "seguro", "plano de saúde", "advogado", "contabilidade", "atendimento profissional", "suporte"],
-      medium: ["serviço", "solução", "especialista", "ajuda", "empresa", "negócio"]
     }
   },
   FUNNELS: {
@@ -97,43 +87,47 @@ const CLASSIFICATION_ENGINE = {
       medium: ["comprar", "desconto", "promoção", "oferta", "depoimento", "venda", "cliente satisfeito", "resultado comprovado", "investimento"]
     },
     "VSL": {
-      high: ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas", "reproduzir vídeo", "clique para assistir", "vídeo completo"],
+      high: ["assista ao vídeo", "aperte o play", "vídeo explicativo", "veja o vídeo", "assista agora", "vsl", "vídeo de vendas", "reproduzir vídeo", "clique para assistir", "vídeo completo", "aula exclusiva"],
       medium: ["explicativo", "apresentação", "vídeo", "play", "veja", "visualize", "confira", "demonstração"]
     },
     "X1": {
-      high: ["whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado", "fale conosco", "clique para conversar", "chat agora", "envie mensagem", "contate-nos"],
+      high: ["whatsapp", "conversa", "falar com", "chamar no", "direct", "messenger", "atendimento personalizado", "fale conosco", "clique para conversar", "chat agora", "envie mensagem", "contate-nos", "bit.ly/wa", "wa.me"],
       medium: ["chat", "mensagem", "contato", "dúvida", "suporte", "equipe", "especialista", "consultor"]
     },
-    "Landing Page": {
-      high: ["baixe grátis", "cadastre-se", "receba o material", "e-book gratuito", "lista de espera", "saiba mais", "página oficial", "acesso exclusivo", "inscrição gratuita", "receba agora"],
-      medium: ["site", "link", "acesso", "informação", "detalhes", "formulário", "dados", "email"]
-    },
     "Quiz": {
-      high: ["quiz", "teste", "descubra seu", "perguntas", "resultado personalizado", "perfil", "responda", "faça o teste", "descubra agora", "resultado do quiz"],
-      medium: ["escolha", "descubra", "veja seu", "análise", "diagnóstico", "avaliação", "questionário"]
+      high: ["quiz", "teste", "descubra seu", "perguntas", "resultado personalizado", "perfil", "responda", "faça o teste", "descubra agora", "resultado do quiz", "/quiz", "/teste", "questionário"],
+      medium: ["escolha", "descubra", "veja seu", "análise", "diagnóstico", "avaliação"]
     },
     "Type Bot": {
-      high: ["converse comigo", "bot", "assistente virtual", "automático", "chat inteligente", "falar com consultor", "conversa automática", "bot de atendimento", "ia assistente"],
+      high: ["converse comigo", "bot", "assistente virtual", "automático", "chat inteligente", "falar com consultor", "conversa automática", "bot de atendimento", "ia assistente", "typebot"],
       medium: ["conversa", "interativo", "mensagem", "digital", "automação", "inteligência artificial"]
     }
-  }
+  },
+  NEGATIVE_KEYWORDS: [
+    "novela", "capítulo", "episódio", "assistir online", "política", "eleição", "voto", "candidato", "prefeito", "vereador", "partido", "senado", "deputado", "notícia", "jornal", "urgente", "fofoca", "reality show", "bbb", "fazenda"
+  ]
 };
 
 /**
- * Classifica o anúncio com base em pesos de palavras-chave
+ * Classifica o anúncio com base em pesos de palavras-chave e filtros negativos
  */
 function classifyAd(ad: any) {
   const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase();
   const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase();
   const desc = (ad.ad_creative_link_descriptions?.[0] || "").toLowerCase();
-  const combinedText = `${body} ${title} ${desc}`;
+  const caption = (ad.ad_creative_link_captions?.[0] || "").toLowerCase();
+  const combinedText = `${body} ${title} ${desc} ${caption}`;
+
+  // Verificar filtros negativos (Filtro Anti-Novela/Política)
+  const isNegative = CLASSIFICATION_ENGINE.NEGATIVE_KEYWORDS.some(k => combinedText.includes(k));
+  if (isNegative) return { types: ["Excluído"], funnels: ["Excluído"], isNegative: true };
 
   const getScore = (rules: any) => {
     const scores: Record<string, number> = {};
     for (const [category, keywords] of Object.entries(rules)) {
       let score = 0;
-      (keywords as any).high.forEach((k: string) => { if (combinedText.includes(k)) score += 3; });
-      (keywords as any).medium.forEach((k: string) => { if (combinedText.includes(k)) score += 1; });
+      (keywords as any).high.forEach((k: string) => { if (combinedText.includes(k)) score += 5; });
+      (keywords as any).medium.forEach((k: string) => { if (combinedText.includes(k)) score += 2; });
       if (score > 0) scores[category] = score;
     }
     return scores;
@@ -147,7 +141,8 @@ function classifyAd(ad: any) {
 
   return { 
     types: types.length > 0 ? types : ["Outros"], 
-    funnels: funnels.length > 0 ? funnels : ["Indefinido"] 
+    funnels: funnels.length > 0 ? funnels : ["Indefinido"],
+    isNegative: false
   };
 }
 
@@ -180,9 +175,9 @@ export async function searchAds(params: SearchAdsParams) {
     limit = 100, 
     after,
     scaleMin = 1,
-    scaleMax = 50,
+    scaleMax = 1000,
     durationMin = 1,
-    durationMax = 300,
+    durationMax = 365,
     productTypes,
     funnelTypes,
     excludePolitical = true
@@ -220,18 +215,23 @@ export async function searchAds(params: SearchAdsParams) {
     const rawAds = response.data.data || [];
     const paging = response.data.paging;
     
-    // Agrupamento por criativo para cálculo de frequência
-    const creativeGroups = new Map<string, number>();
+    // Agrupamento por criativo para cálculo de frequência real
+    const creativeGroups = new Map<string, any[]>();
     rawAds.forEach((ad: any) => {
       const hash = generateCreativeHash(ad);
-      creativeGroups.set(hash, (creativeGroups.get(hash) || 0) + 1);
+      if (!creativeGroups.has(hash)) creativeGroups.set(hash, []);
+      creativeGroups.get(hash)?.push(ad);
     });
 
     // Processamento paralelo dos anúncios
     const processed = await Promise.all(rawAds.map(async (ad: any) => {
       const classification = classifyAd(ad);
       const hash = generateCreativeHash(ad);
-      const pageDetails = await getPageDetails(ad.page_id, accessToken);
+      const group = creativeGroups.get(hash) || [];
+      const frequency = group.length;
+      
+      // Detecção de página (opcional, com cache)
+      // const pageDetails = await getPageDetails(ad.page_id, accessToken);
 
       // Extração de URL de destino (Prioridade: ad_creative_link_captions)
       const captions = ad.ad_creative_link_captions || [];
@@ -253,9 +253,10 @@ export async function searchAds(params: SearchAdsParams) {
         ...ad,
         detectedTypes: classification.types,
         detectedFunnels: classification.funnels,
-        frequency: creativeGroups.get(hash) || 1,
+        isNegative: classification.isNegative,
+        frequency: frequency,
         creativeHash: hash,
-        pageDetails: pageDetails,
+        isFirstInGroup: group[0].id === ad.id,
         destination_url: destinationUrl || ad.ad_snapshot_url,
         daysActive: daysActive
       };
@@ -263,32 +264,38 @@ export async function searchAds(params: SearchAdsParams) {
 
     // Aplicar filtros server-side
     const filtered = processed.filter(ad => {
-      // Filtro de frequência (Escala)
+      // 1. Filtro Negativo (Anti-Spam/Novela)
+      if (ad.isNegative) return false;
+
+      // 2. Filtro de frequência (Escala)
       if (ad.frequency < scaleMin || ad.frequency > scaleMax) return false;
       
-      // Filtro de duração
+      // 3. Filtro de duração
       if (ad.daysActive < durationMin || ad.daysActive > durationMax) return false;
       
-      // Filtro de tipos de produto
-      if (productTypes && productTypes.length > 0) {
+      // 4. Filtro de tipos de produto
+      if (productTypes && productTypes.length > 0 && !productTypes.includes("Todos")) {
         const hasMatchingType = ad.detectedTypes.some((t: string) => productTypes.includes(t));
         if (!hasMatchingType) return false;
       }
       
-      // Filtro de tipos de funil
-      if (funnelTypes && funnelTypes.length > 0) {
+      // 5. Filtro de tipos de funil
+      if (funnelTypes && funnelTypes.length > 0 && !funnelTypes.includes("Todos")) {
         const hasMatchingFunnel = ad.detectedFunnels.some((f: string) => funnelTypes.includes(f));
         if (!hasMatchingFunnel) return false;
       }
       
-      // Filtro de anúncios políticos
+      // 6. Filtro de anúncios políticos
       if (excludePolitical && ad.bylines) return false;
       
       return true;
     });
 
+    // Ordenar por escala (frequência)
+    const sorted = filtered.sort((a, b) => (b.frequency || 0) - (a.frequency || 0));
+
     return {
-      data: filtered,
+      data: sorted,
       paging: {
         next_cursor: paging?.cursors?.after
       }

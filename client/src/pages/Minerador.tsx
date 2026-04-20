@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, Globe, Package, Layers, X } from "lucide-react";
+import { Search, Filter, Loader2, Globe, Package, Layers, X, Languages } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -11,36 +11,27 @@ import { AdCardV3 } from "../components/ads/AdCardV3";
 import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
 const SCALE_LEVELS = [
-  { min: 1, max: 9, label: "Baixa Escala", color: "text-emerald-400 bg-emerald-400/10", icon: null },
-  { min: 10, max: 19, label: "Média Escala", color: "text-emerald-300 bg-emerald-300/10", icon: null },
-  { min: 20, max: 39, label: "Alta Escala", color: "text-orange-400 bg-orange-400/10", icon: null },
-  { min: 40, max: 999, label: "Escala Viral", color: "text-red-500 bg-red-500/10", icon: "🔥" }
+  { min: 1, max: 9, key: "low_scale", color: "text-emerald-400 bg-emerald-400/10", icon: null },
+  { min: 10, max: 19, key: "medium_scale", color: "text-emerald-300 bg-emerald-300/10", icon: null },
+  { min: 20, max: 39, key: "high_scale", color: "text-orange-400 bg-orange-400/10", icon: null },
+  { min: 40, max: 1000, key: "viral_scale", color: "text-red-500 bg-red-500/10", icon: "🔥" }
 ];
 
 const COUNTRIES = [
-  { code: "ALL", name: "Todos" },
+  { code: "ALL", name: "all" },
   { code: "BR", name: "Brasil" },
   { code: "US", name: "EUA" },
   { code: "PT", name: "Portugal" },
-  { code: "ES", name: "Espanha" },
-  { code: "GB", name: "Reino Unido" },
-  { code: "FR", name: "França" },
-  { code: "DE", name: "Alemanha" },
-  { code: "IT", name: "Itália" },
-  { code: "CA", name: "Canadá" },
-  { code: "AU", name: "Austrália" },
-  { code: "MX", name: "México" },
-  { code: "AR", name: "Argentina" },
-  { code: "CO", name: "Colômbia" },
-  { code: "CL", name: "Chile" },
+  { code: "ES", name: "Espanha" }
 ];
 
-const PRODUCT_TYPES = ["Todos", "Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"];
-const FUNNEL_STRUCTURES = ["Todos", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
-const AUTO_LOAD_LIMIT = 20;
+const PRODUCT_TYPES = ["all", "infoproduct", "nutra", "dropshipping", "local_business", "fashion", "electronics", "services", "others"];
+const FUNNEL_STRUCTURES = ["all", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
+const AUTO_LOAD_LIMIT = 40;
 
 // --- SUB-COMPONENTES AUXILIARES ---
 const MiniLabel = memo(({ children }: { children: React.ReactNode }) => (
@@ -49,47 +40,63 @@ const MiniLabel = memo(({ children }: { children: React.ReactNode }) => (
   </label>
 ));
 
-const PageHeader = memo(({ resultsCount, hidePolitical, onTogglePolitical }: { 
+const PageHeader = memo(({ resultsCount, hidePolitical, onTogglePolitical, currentLang, onToggleLang }: { 
   resultsCount: number, 
   hidePolitical: boolean, 
-  onTogglePolitical: (val: boolean) => void 
-}) => (
-  <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
-    <div className="flex items-center gap-3">
-      <div className="w-7 h-7 bg-transparent flex items-center justify-center overflow-hidden">
-        <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" alt="Minerador" className="w-6 h-6 object-contain" />
+  onTogglePolitical: (val: boolean) => void,
+  currentLang: string,
+  onToggleLang: () => void
+}) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+      <div className="flex items-center gap-3">
+        <div className="w-7 h-7 bg-transparent flex items-center justify-center overflow-hidden">
+          <img src="https://img.icons8.com/external-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto/64/external-pickaxe-construction-yogi-aprelliyanto-detailed-outline-yogi-aprelliyanto.png" alt="Minerador" className="w-6 h-6 object-contain" />
+        </div>
+        {resultsCount > 0 && (
+          <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
+            {t('results_count', { count: resultsCount })}
+          </Badge>
+        )}
       </div>
-      {resultsCount > 0 && (
-        <Badge variant="outline" className="bg-white/5 border-white/10 text-[10px] font-black px-2 py-0">
-          {resultsCount} RESULTADOS
-        </Badge>
-      )}
-    </div>
 
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
-        <Filter className="w-3.5 h-3.5 text-white/80" />
-        <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
-          {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
-        </span>
-        <Switch 
-          checked={hidePolitical} 
-          onCheckedChange={onTogglePolitical}
-          className="scale-90 data-[state=checked]:bg-emerald-500"
-        />
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onToggleLang}
+          className="bg-white/[0.03] border border-white/10 text-[10px] font-black uppercase flex items-center gap-2 hover:bg-white/10"
+        >
+          <Languages className="w-3.5 h-3.5" />
+          {currentLang.toUpperCase()}
+        </Button>
+        <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
+          <Filter className="w-3.5 h-3.5 text-white/80" />
+          <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
+            {hidePolitical ? "Ocultar Ads Políticos" : "Exibir Ads Políticos"}
+          </span>
+          <Switch 
+            checked={hidePolitical} 
+            onCheckedChange={onTogglePolitical}
+            className="scale-90 data-[state=checked]:bg-emerald-500"
+          />
+        </div>
       </div>
     </div>
-  </div>
-));
+  );
+});
 
 // --- COMPONENTE PRINCIPAL ---
 export default function Minerador() {
+  const { t, i18n } = useTranslation();
+  
   // --- ESTADO ---
   const [filters, setFilters] = useState({
     searchTerms: "",
     country: "BR",
-    selectedType: "Todos",
-    selectedFunnel: "Todos",
+    selectedType: "all",
+    selectedFunnel: "all",
   });
 
   const [hidePolitical, setHidePolitical] = useState(() => {
@@ -102,16 +109,14 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
-  const [scaleMax, setScaleMax] = useState(50);
-  const [durationMax, setDurationMax] = useState(300);
+  const [scaleMax, setScaleMax] = useState(1000);
+  const [durationMax, setDurationMax] = useState(365);
   
-  // Refs para controle de fluxo e prevenção de loops
   const abortControllerRef = useRef<AbortController | null>(null);
   const isFetchingRef = useRef(false);
   const adsCountRef = useRef(0);
   const nextCursorRef = useRef<string | undefined>(undefined);
 
-  // Sincronizar refs
   useEffect(() => {
     adsCountRef.current = allAds.length;
   }, [allAds.length]);
@@ -120,7 +125,6 @@ export default function Minerador() {
     nextCursorRef.current = nextCursor;
   }, [nextCursor]);
 
-  // --- PERSISTÊNCIA ---
   useEffect(() => {
     localStorage.setItem("hidePolitical", JSON.stringify(hidePolitical));
   }, [hidePolitical]);
@@ -131,7 +135,12 @@ export default function Minerador() {
       searchTerms: filters.searchTerms, 
       country: filters.country, 
       adType: "ALL",
-      after: nextCursor
+      after: nextCursor,
+      scaleMax: scaleMax,
+      durationMax: durationMax,
+      productTypes: filters.selectedType !== "all" ? [t(filters.selectedType)] : undefined,
+      funnelTypes: filters.selectedFunnel !== "all" ? [filters.selectedFunnel] : undefined,
+      excludePolitical: hidePolitical
     },
     { enabled: false, retry: false }
   );
@@ -165,7 +174,6 @@ export default function Minerador() {
         setNextCursor(cursor);
         nextCursorRef.current = cursor;
         
-        // Gatilho manual para auto-load se necessário
         if (adsCountRef.current + ads.length < AUTO_LOAD_LIMIT && cursor) {
           setTimeout(() => {
             isFetchingRef.current = false;
@@ -204,7 +212,7 @@ export default function Minerador() {
         nextCursorRef.current = cursor;
         
         if (!cursor) break;
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
     } catch (error) {
       console.error("Erro no auto-carregamento:", error);
@@ -215,85 +223,26 @@ export default function Minerador() {
     }
   }, [searchMutation, isAutoLoading]);
 
-  // --- REATIVIDADE CONTROLADA (SEM LOOPS) ---
-  
-  // 1. Busca por texto (Debounce)
+  // Debounce para busca por texto
   useEffect(() => {
     if (!filters.searchTerms && !hasSearched) return;
     const timer = setTimeout(() => executeSearch(true), 800);
     return () => clearTimeout(timer);
   }, [filters.searchTerms]);
 
-  // 2. Busca por país e política (Imediato)
+  // Busca imediata para outros filtros
   useEffect(() => {
     if (hasSearched) executeSearch(true);
-  }, [filters.country, hidePolitical]);
-
-  // --- FILTRAGEM LOCAL E AGRUPAMENTO ---
-  const processedAds = useMemo(() => {
-    // 1. Gerar Chave Única para Agrupamento (Baseado no conteúdo real)
-    const getCreativeKey = (ad: any) => {
-      const body = (ad.ad_creative_bodies?.[0] || "").toLowerCase().trim();
-      const title = (ad.ad_creative_link_titles?.[0] || "").toLowerCase().trim();
-      const caption = (ad.ad_creative_link_captions?.[0] || "").toLowerCase().trim();
-      return `${body}|${title}|${caption}`;
-    };
-
-    // 2. Agrupar e Calcular collationCount (Escala Real por Conteúdo)
-    const groups = new Map<string, any[]>();
-    allAds.forEach(ad => {
-      const key = getCreativeKey(ad);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)?.push(ad);
-    });
-
-    // 3. Mapear anúncios com a nova contagem de escala
-    const adsWithCollation = allAds.map(ad => {
-      const key = getCreativeKey(ad);
-      const group = groups.get(key) || [];
-      return {
-        ...ad,
-        collationCount: group.length,
-        isFirstInGroup: group[0].id === ad.id
-      };
-    });
-
-    // 4. Filtrar
-    let filtered = adsWithCollation.filter(ad => {
-      const isPolitical = !!ad.bylines;
-      const matchesPolitical = hidePolitical ? !isPolitical : isPolitical;
-      
-      const matchesType = filters.selectedType === "Todos" || 
-        ad.detectedTypes?.some((t: string) => t === filters.selectedType);
-        
-      const matchesFunnel = filters.selectedFunnel === "Todos" || 
-        ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel);
-
-      const scale = ad.collationCount || 1;
-      const matchesScale = scale <= scaleMax;
-      
-      const startDate = new Date(ad.ad_delivery_start_time);
-      const now = new Date();
-      const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const matchesDuration = daysActive <= durationMax;
-
-      return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
-    });
-
-    // 5. Agrupar Visualmente: Manter apenas o primeiro de cada grupo para exibição
-    const uniqueAds = filtered.filter(ad => ad.isFirstInGroup);
-
-    // 6. Ordenar por Escala (collationCount) e Data
-    return uniqueAds.sort((a, b) => {
-      const scaleDiff = (b.collationCount || 0) - (a.collationCount || 0);
-      if (scaleDiff !== 0) return scaleDiff;
-      return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
-    });
-  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
+  }, [filters.country, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMax, durationMax]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
+
+  const toggleLanguage = () => {
+    const nextLang = i18n.language === 'pt' ? 'en' : 'pt';
+    i18n.changeLanguage(nextLang);
+  };
 
   return (
     <DashboardLayout>
@@ -301,90 +250,83 @@ export default function Minerador() {
         
         <div className="mb-6">
           <h1 className="text-5xl font-black uppercase tracking-tighter text-white flex items-center gap-4">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">Minerador</span>
-            <span className="text-white/20 font-light text-xl">Pro</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">{t('minerador_title')}</span>
+            <span className="text-white/20 font-light text-xl">{t('minerador_pro')}</span>
           </h1>
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">{t('minerador_subtitle')}</p>
         </div>
         
         <PageHeader 
-          resultsCount={processedAds.length} 
+          resultsCount={allAds.length} 
           hidePolitical={hidePolitical} 
-          onTogglePolitical={setHidePolitical} 
+          onTogglePolitical={setHidePolitical}
+          currentLang={i18n.language}
+          onToggleLang={toggleLanguage}
         />
 
         <Card className="p-4 bg-[#0A0A0A] border-white/20 rounded-xl shadow-xl">
           <form onSubmit={(e) => { e.preventDefault(); executeSearch(true); }} className="flex flex-col space-y-4">
             <div className="flex flex-col lg:flex-row items-end gap-3">
               <div className="w-full lg:w-[25%] space-y-0">
-                <MiniLabel>Palavra-chave</MiniLabel>
+                <MiniLabel>{t('search_placeholder').split(':')[0]}</MiniLabel>
                 <div className="relative group">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60 group-focus-within:text-white transition-colors" />
                   <Input
-                    placeholder="Ex: Emagrecimento..."
+                    placeholder={t('search_placeholder')}
                     value={filters.searchTerms}
                     onChange={(e) => updateFilter("searchTerms", e.target.value)}
                     className="pl-9 bg-white/[0.03] border-white/20 rounded-lg h-10 text-[13px] font-medium focus:border-white/40 focus:ring-0 transition-all placeholder:text-white/40"
                   />
-                  {filters.searchTerms && (
-                    <button 
-                      type="button"
-                      onClick={() => updateFilter("searchTerms", "")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
                 </div>
               </div>
 
               <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:flex items-end gap-2 w-full lg:w-auto">
                 <div className="flex-1 space-y-0">
-                  <MiniLabel>País</MiniLabel>
+                  <MiniLabel>{t('country')}</MiniLabel>
                   <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
                     <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                       <div className="flex items-center gap-2 truncate">
                         <Globe className="w-3 h-3 text-white/60 shrink-0" />
-                        <SelectValue placeholder="País" />
+                        <SelectValue placeholder={t('country')} />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                       {COUNTRIES.map((c) => (
-                        <SelectItem key={c.code} value={c.code} className="text-[11px] font-black uppercase py-2">{c.name}</SelectItem>
+                        <SelectItem key={c.code} value={c.code} className="text-[11px] font-black uppercase py-2">{c.code === 'ALL' ? t('all') : c.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="flex-1 space-y-0">
-                  <MiniLabel>Tipo Produto</MiniLabel>
+                  <MiniLabel>{t('product_type')}</MiniLabel>
                   <Select value={filters.selectedType} onValueChange={(v) => updateFilter("selectedType", v)}>
                     <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                       <div className="flex items-center gap-2 truncate">
                         <Package className="w-3 h-3 text-white/60 shrink-0" />
-                        <SelectValue placeholder="Tipo" />
+                        <SelectValue placeholder={t('product_type')} />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                      {PRODUCT_TYPES.map((t) => (
-                        <SelectItem key={t} value={t} className="text-[11px] font-black uppercase py-2">{t}</SelectItem>
+                      {PRODUCT_TYPES.map((t_key) => (
+                        <SelectItem key={t_key} value={t_key} className="text-[11px] font-black uppercase py-2">{t(t_key)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="flex-1 space-y-0">
-                  <MiniLabel>Funil</MiniLabel>
+                  <MiniLabel>{t('funnel')}</MiniLabel>
                   <Select value={filters.selectedFunnel} onValueChange={(v) => updateFilter("selectedFunnel", v)}>
                     <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05]">
                       <div className="flex items-center gap-2 truncate">
                         <Layers className="w-3 h-3 text-white/60 shrink-0" />
-                        <SelectValue placeholder="Funil" />
+                        <SelectValue placeholder={t('funnel')} />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                       {FUNNEL_STRUCTURES.map((f) => (
-                        <SelectItem key={f} value={f} className="text-[11px] font-black uppercase py-2">{f}</SelectItem>
+                        <SelectItem key={f} value={f} className="text-[11px] font-black uppercase py-2">{f === 'all' ? t('all') : f}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -399,7 +341,7 @@ export default function Minerador() {
                 {searchMutation.isFetching || isAutoLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  "Minerar"
+                  t('minerar_btn')
                 )}
               </Button>
             </div>
@@ -407,16 +349,16 @@ export default function Minerador() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-white/10">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <MiniLabel>Escala de Anúncios Repetidos</MiniLabel>
+                  <MiniLabel>{t('scale_label')}</MiniLabel>
                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
-                    {scaleMax} anúncios
+                    {scaleMax} {t('copies').toLowerCase()}
                   </span>
                 </div>
                 <div className="space-y-2">
                   <input 
                     type="range" 
                     min="1" 
-                    max="50" 
+                    max="1000" 
                     value={scaleMax} 
                     onChange={(e) => setScaleMax(parseInt(e.target.value))} 
                     className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
@@ -425,7 +367,7 @@ export default function Minerador() {
                 <div className="flex gap-2 flex-wrap">
                   {SCALE_LEVELS.map((level) => (
                     <Button 
-                      key={level.label} 
+                      key={level.key} 
                       variant="outline" 
                       size="sm" 
                       className={cn(
@@ -436,7 +378,7 @@ export default function Minerador() {
                       )} 
                       onClick={() => setScaleMax(level.max)}
                     >
-                      {level.icon} {level.label}
+                      {level.icon} {t(level.key)}
                     </Button>
                   ))}
                 </div>
@@ -444,16 +386,16 @@ export default function Minerador() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <MiniLabel>Duração da Veiculação</MiniLabel>
+                  <MiniLabel>{t('duration_label')}</MiniLabel>
                   <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
-                    {durationMax} dias
+                    {durationMax} {t('active_days').split(' ')[1]}
                   </span>
                 </div>
                 <div className="space-y-2">
                   <input 
                     type="range" 
                     min="1" 
-                    max="300" 
+                    max="365" 
                     value={durationMax} 
                     onChange={(e) => setDurationMax(parseInt(e.target.value))} 
                     className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
@@ -461,10 +403,10 @@ export default function Minerador() {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   {[
-                    { max: 7, label: "1-7 dias" },
-                    { max: 30, label: "7-30 dias" },
-                    { max: 90, label: "30-90 dias" },
-                    { max: 300, label: "90+ dias" }
+                    { max: 7, label: "1-7 " + t('active_days').split(' ')[1] },
+                    { max: 30, label: "7-30 " + t('active_days').split(' ')[1] },
+                    { max: 90, label: "30-90 " + t('active_days').split(' ')[1] },
+                    { max: 365, label: "90+ " + t('active_days').split(' ')[1] }
                   ].map((p) => (
                     <Button 
                       key={p.label}
@@ -493,9 +435,9 @@ export default function Minerador() {
               <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Iniciando Mineração...</p>
             </div>
-          ) : processedAds.length > 0 ? (
+          ) : allAds.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-              {processedAds.map((ad) => (
+              {allAds.map((ad) => (
                 <AdCardV3 
                   key={ad.id} 
                   ad={ad} 
@@ -509,8 +451,8 @@ export default function Minerador() {
                 <Search className="w-6 h-6 text-white/20" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-black text-white uppercase tracking-tight">Nenhum anúncio encontrado</p>
-                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">Tente mudar as palavras-chave ou filtros</p>
+                <p className="text-sm font-black text-white uppercase tracking-tight">{t('no_ads_found')}</p>
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-1">{t('try_different_filters')}</p>
               </div>
             </div>
           ) : (
@@ -532,7 +474,7 @@ export default function Minerador() {
             <div className="bg-black/80 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-full shadow-2xl flex items-center gap-4">
               <Loader2 className="w-4 h-4 text-emerald-500 animate-spin" />
               <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                Auto-carregando: {allAds.length} de {AUTO_LOAD_LIMIT} anúncios...
+                {t('auto_loading', { current: allAds.length, total: AUTO_LOAD_LIMIT })}
               </span>
               <Button 
                 variant="ghost" 
@@ -543,7 +485,7 @@ export default function Minerador() {
                   setIsAutoLoading(false);
                 }}
               >
-                Parar
+                {t('stop')}
               </Button>
             </div>
           </div>
