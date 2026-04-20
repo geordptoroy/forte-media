@@ -13,6 +13,7 @@ import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { type ExtractionResult } from "../types/adTypes";
+import { useFilteredAndGroupedAds } from "../hooks/useAdFiltering";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
 const SCALE_LEVELS = [
@@ -33,40 +34,6 @@ const COUNTRIES = [
 const PRODUCT_TYPES = ["all", "infoproduct", "nutra", "dropshipping", "local_business", "fashion", "electronics", "services", "others"];
 const FUNNEL_STRUCTURES = ["all", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
 const AUTO_LOAD_LIMIT = 40;
-
-// --- FUNÇÕES DE AGRUPAMENTO (Lógica do .txt) ---
-const normalize = (str?: string) => str?.toLowerCase().trim() || '';
-const normalizeUrl = (url?: string) => {
-  if (!url) return '';
-  return url.split('?')[0].toLowerCase().trim();
-};
-
-const getCreativeKey = (ad: any) => {
-  const body = normalize(ad.ad_creative_bodies?.[0]);
-  const title = normalize(ad.ad_creative_link_titles?.[0]);
-  const desc = normalize(ad.ad_creative_link_descriptions?.[0]);
-  const url = normalizeUrl(ad.ad_creative_link_urls?.[0]);
-  // Usamos o snapshot_url como fallback para mídia se não houver media_urls
-  const media = normalize(ad.ad_creative_media_urls?.[0] || ad.ad_snapshot_url);
-  const cta = normalize(ad.ad_creative_call_to_action_type);
-  return `${body}|${title}|${desc}|${url}|${media}|${cta}`;
-};
-
-const groupAdsAndAddCount = (ads: any[]) => {
-  const groups = new Map<string, any[]>();
-  for (const ad of ads) {
-    const key = getCreativeKey(ad);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(ad);
-  }
-  for (const group of groups.values()) {
-    const count = group.length;
-    for (const ad of group) {
-      ad.collationCount = count;
-    }
-  }
-  return ads;
-};
 
 // --- SUB-COMPONENTES AUXILIARES ---
 const MiniLabel = memo(({ children }: { children: React.ReactNode }) => (
@@ -145,6 +112,9 @@ export default function Minerador() {
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: ExtractionResult | null } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   
+  // Usar hook de filtragem para aplicar filtros no cliente
+  const filteredAds = useFilteredAndGroupedAds(allAds, filters);
+  
   // Sliders Simples (Apenas Max)
   const [scaleMax, setScaleMax] = useState(100);
   const [durationMax, setDurationMax] = useState(365);
@@ -200,14 +170,14 @@ export default function Minerador() {
     try {
       const result = await searchMutation.refetch();
       if (result.data) {
-        const ads = groupAdsAndAddCount(result.data.data);
+        const ads = result.data.data; // Backend já agrupa e filtra
         const cursor = result.data.paging?.next_cursor;
         
         if (isNewSearch) {
           setAllAds(ads);
           setHasSearched(true);
         } else {
-          setAllAds(prev => groupAdsAndAddCount([...prev, ...ads]));
+          setAllAds(prev => [...prev, ...ads]);
         }
         
         setNextCursor(cursor);
@@ -243,10 +213,10 @@ export default function Minerador() {
         
         if (!result.data || controller.signal.aborted) break;
 
-        const newAds = groupAdsAndAddCount(result.data.data);
+        const newAds = result.data.data; // Backend já agrupa e filtra
         const cursor = result.data.paging?.next_cursor;
         
-        setAllAds(prev => groupAdsAndAddCount([...prev, ...newAds]));
+        setAllAds(prev => [...prev, ...newAds]);
         setNextCursor(cursor);
         nextCursorRef.current = cursor;
         
@@ -296,7 +266,7 @@ export default function Minerador() {
         </div>
         
         <PageHeader 
-          resultsCount={allAds.length} 
+          resultsCount={filteredAds.length} 
           hidePolitical={hidePolitical} 
           onTogglePolitical={setHidePolitical}
           currentLang={i18n.language}
@@ -484,7 +454,7 @@ export default function Minerador() {
             </div>
           ) : allAds.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-              {allAds.map((ad) => (
+              {filteredAds.map((ad) => (
                 <AdCardV3 
                   key={ad.id} 
                   ad={ad} 

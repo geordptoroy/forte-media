@@ -1,6 +1,16 @@
 import axios from 'axios';
 import { logger } from '../_core/logger';
 import crypto from 'crypto';
+import {
+  generateCreativeHash,
+  calculateDaysActive,
+  groupAdsByCreative,
+  enrichAdsWithGroupMetadata,
+  processAndFilterAds,
+  validateFilterParams,
+  type FilterParams,
+  type ProcessedAd,
+} from './filteringService';
 
 // --- CONFIGURAÇÕES E CONSTANTES ---
 const FALLBACK_TOKEN = 'EAAMuA4Ly8N0BRDKepZCBlJHotAvkItUfEP9TCXte3TnxTCGqHOEYiNGL23vg41TyXBdwgEDKy24TKLxRuOsDlZBSqWAzFwO1fBmZA0Al6IkwPCOHZCvG52BFD7aR84bao78XIDdpDJwK46Gf40ays9aZAONQvHLTSonUp2yYdRnTcwkJhIjvG5BtwjZBR3SPGoKF4zGGIBvLAGpm68Du44hubWZCAZC3zcKqbjZC6s5IOOUUmfNNYaBiMMUOCKPCZCwLXLLxGTBAdsBIZAcbIABwFZCVSzZAiZBzj8HlWiGwZDZD';
@@ -23,18 +33,7 @@ let lastRateLimitWarning = 0;
 
 // --- UTILITÁRIOS ---
 
-/**
- * Gera um hash único para o criativo do anúncio para agrupar duplicatas
- * Melhora a normalização para ignorar emojis e espaços extras
- */
-function generateCreativeHash(ad: any): string {
-  const normalize = (text: string) => text.toLowerCase().replace(/[\s\W_]+/g, "").trim();
-  const body = normalize(ad.ad_creative_bodies?.[0] || "");
-  const title = normalize(ad.ad_creative_link_titles?.[0] || "");
-  const caption = normalize(ad.ad_creative_link_captions?.[0] || "");
-  const normalized = `${body}|${title}|${caption}`;
-  return crypto.createHash('md5').update(normalized).digest('hex');
-}
+// generateCreativeHash agora importado de filteringService
 
 /**
  * Busca detalhes da página com cache inteligente
@@ -187,6 +186,25 @@ export async function searchAds(params: SearchAdsParams) {
     minSpend = 0
   } = params;
 
+  // Validar parâmetros de filtro
+  const validation = validateFilterParams({
+    scaleMin,
+    scaleMax,
+    durationMin,
+    durationMax,
+    productTypes,
+    funnelTypes,
+    excludePolitical,
+    country,
+    currency,
+    minSpend,
+  });
+
+  if (!validation.valid) {
+    logger.error(`[MetaAds] Parâmetros de filtro inválidos:`, validation.errors);
+    throw new Error(`Parâmetros inválidos: ${validation.errors.join(', ')}`);
+  }
+
   const url = `https://graph.facebook.com/v22.0/ads_archive`;
   
   try {
@@ -219,93 +237,53 @@ export async function searchAds(params: SearchAdsParams) {
     const rawAds = response.data.data || [];
     const paging = response.data.paging;
     
-    // Agrupamento por criativo para cálculo de frequência real
-    const creativeGroups = new Map<string, any[]>();
-    rawAds.forEach((ad: any) => {
-      const hash = generateCreativeHash(ad);
-      if (!creativeGroups.has(hash)) creativeGroups.set(hash, []);
-      creativeGroups.get(hash)?.push(ad);
-    });
+    logger.info(`[MetaAds] Recebidos ${rawAds.length} anúncios da API da Meta`);
 
-    // Processamento paralelo dos anúncios
-    const processed = await Promise.all(rawAds.map(async (ad: any) => {
-      const classification = classifyAd(ad);
-      const hash = generateCreativeHash(ad);
-      const group = creativeGroups.get(hash) || [];
-      const frequency = group.length;
-      
-      // Detecção de página (opcional, com cache)
-      // const pageDetails = await getPageDetails(ad.page_id, accessToken);
+    // Classificar anúncios
+    const classifiedAds = rawAds.map((ad: any) => ({
+      ...ad,
+      detectedTypes: classifyAd(ad).types,
+      detectedFunnels: classifyAd(ad).funnels,
+      isNegative: classifyAd(ad).isNegative,
+    }));
 
-      // Extração de URL de destino (Prioridade: ad_creative_link_captions)
+    // Extrair URLs de destino
+    const adsWithDestination = classifiedAds.map((ad: any) => {
       const captions = ad.ad_creative_link_captions || [];
-      const allTexts = [...(ad.ad_creative_bodies || []), ...(ad.ad_creative_link_titles || []), ...(ad.ad_creative_link_descriptions || [])].join(" ");
+      const allTexts = [
+        ...(ad.ad_creative_bodies || []),
+        ...(ad.ad_creative_link_titles || []),
+        ...(ad.ad_creative_link_descriptions || []),
+      ].join(' ');
       const urlRegex = /(https?:\/\/[^\s"'<>]+)/g;
-      
+
       let destinationUrl = captions.find((c: string) => c.match(urlRegex));
       if (!destinationUrl) {
         const foundUrls = allTexts.match(urlRegex);
-        destinationUrl = foundUrls?.find(u => !u.includes('facebook.com') && !u.includes('fb.me')) || foundUrls?.[0];
+        destinationUrl =
+          foundUrls?.find((u) => !u.includes('facebook.com') && !u.includes('fb.me')) ||
+          foundUrls?.[0];
       }
-
-      // Cálculo de dias ativos
-      const startDate = new Date(ad.ad_delivery_start_time);
-      const now = new Date();
-      const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
       return {
         ...ad,
-        detectedTypes: classification.types,
-        detectedFunnels: classification.funnels,
-        isNegative: classification.isNegative,
-        frequency: frequency,
-        creativeHash: hash,
-        isFirstInGroup: group[0].id === ad.id,
         destination_url: destinationUrl || ad.ad_snapshot_url,
-        daysActive: daysActive
       };
-    }));
-
-    // Aplicar filtros server-side
-    const filtered = processed.filter(ad => {
-      // 1. Filtro Negativo (Anti-Spam/Novela)
-      if (ad.isNegative) return false;
-
-      // 2. Filtro de frequência (Escala)
-      if (ad.frequency < scaleMin || ad.frequency > scaleMax) return false;
-      
-      // 3. Filtro de duração
-      if (ad.daysActive < durationMin || ad.daysActive > durationMax) return false;
-      
-      // 4. Filtro de tipos de produto
-      if (productTypes && productTypes.length > 0 && !productTypes.includes("Todos")) {
-        const hasMatchingType = ad.detectedTypes.some((t: string) => productTypes.includes(t));
-        if (!hasMatchingType) return false;
-      }
-      
-      // 5. Filtro de tipos de funil
-      if (funnelTypes && funnelTypes.length > 0 && !funnelTypes.includes("Todos")) {
-        const hasMatchingFunnel = ad.detectedFunnels.some((f: string) => funnelTypes.includes(f));
-        if (!hasMatchingFunnel) return false;
-      }
-      
-      // 6. Filtro de anúncios políticos
-      if (excludePolitical && ad.bylines) return false;
-
-      // 7. Filtro de Moeda
-      if (currency && ad.currency !== currency) return false;
-
-      // 8. Filtro de Gasto Mínimo (baseado no lower_bound do spend)
-      if (minSpend > 0) {
-        const adSpend = ad.spend?.lower_bound || 0;
-        if (adSpend < minSpend) return false;
-      }
-      
-      return true;
     });
 
-    // Ordenar por escala (frequência)
-    const sorted = filtered.sort((a, b) => (b.frequency || 0) - (a.frequency || 0));
+    // Usar pipeline de processamento e filtragem
+    const sorted = processAndFilterAds(adsWithDestination, {
+      scaleMin,
+      scaleMax,
+      durationMin,
+      durationMax,
+      productTypes,
+      funnelTypes,
+      excludePolitical,
+      country,
+      currency,
+      minSpend,
+    }) as any[];
 
     return {
       data: sorted,
