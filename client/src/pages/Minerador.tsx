@@ -298,9 +298,9 @@ export default function Minerador() {
   // Auto-load quando há um cursor disponível
   useEffect(() => {
     if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
-      memoizedStartAutoLoad(allAds.length, nextCursor);
+      startAutoLoad(allAds.length, nextCursor);
     }
-  }, [nextCursor, isAutoLoading, hasSearched, allAds.length, memoizedStartAutoLoad]);
+  }, [nextCursor, isAutoLoading, hasSearched, allAds.length, startAutoLoad]);
 
   // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
   const processedAds = useMemo(() => {
