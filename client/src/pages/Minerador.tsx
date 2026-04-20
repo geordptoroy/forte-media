@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, Globe, Package, Layers, X, Languages } from "lucide-react";
+import { Search, Filter, Loader2, Globe, Package, Layers, Languages } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -12,6 +12,7 @@ import { AdDetailsModal } from "../components/ads/AdDetailsModal";
 import { Badge } from "../components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { type ExtractionResult } from "../../../shared/adTypes";
 
 // --- CONSTANTES E CONFIGURAÇÕES ---
 const SCALE_LEVELS = [
@@ -107,7 +108,7 @@ export default function Minerador() {
   const [allAds, setAllAds] = useState<any[]>([]);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
   const [hasSearched, setHasSearched] = useState(false);
-  const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
+  const [selectedAd, setSelectedAd] = useState<{ ad: any, media: ExtractionResult | null } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
   
   // Sliders com Range (Min/Max)

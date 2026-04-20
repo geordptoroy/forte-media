@@ -12,11 +12,12 @@ import {
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { type ExtractionResult } from "../../../../shared/adTypes";
 
 // --- TIPAGEM ---
 interface AdDetailsModalProps {
   ad: any;
-  media: any;
+  media: ExtractionResult | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -225,7 +226,7 @@ export const AdDetailsModal = memo(({ ad, media, isOpen, onClose }: AdDetailsMod
                   <InfoSection 
                     icon={Repeat} 
                     label="Escala (Criativos)" 
-                    value={`${ad.frequency || 1} anúncios iguais`} 
+                    value={`${ad.collationCount || 1} anúncios iguais`} 
                     colorClass="text-emerald-500"
                   />
                 </div>
