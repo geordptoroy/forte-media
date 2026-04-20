@@ -34,6 +34,40 @@ const PRODUCT_TYPES = ["all", "infoproduct", "nutra", "dropshipping", "local_bus
 const FUNNEL_STRUCTURES = ["all", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
 const AUTO_LOAD_LIMIT = 40;
 
+// --- FUNÇÕES DE AGRUPAMENTO (Lógica do .txt) ---
+const normalize = (str?: string) => str?.toLowerCase().trim() || '';
+const normalizeUrl = (url?: string) => {
+  if (!url) return '';
+  return url.split('?')[0].toLowerCase().trim();
+};
+
+const getCreativeKey = (ad: any) => {
+  const body = normalize(ad.ad_creative_bodies?.[0]);
+  const title = normalize(ad.ad_creative_link_titles?.[0]);
+  const desc = normalize(ad.ad_creative_link_descriptions?.[0]);
+  const url = normalizeUrl(ad.ad_creative_link_urls?.[0]);
+  // Usamos o snapshot_url como fallback para mídia se não houver media_urls
+  const media = normalize(ad.ad_creative_media_urls?.[0] || ad.ad_snapshot_url);
+  const cta = normalize(ad.ad_creative_call_to_action_type);
+  return `${body}|${title}|${desc}|${url}|${media}|${cta}`;
+};
+
+const groupAdsAndAddCount = (ads: any[]) => {
+  const groups = new Map<string, any[]>();
+  for (const ad of ads) {
+    const key = getCreativeKey(ad);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(ad);
+  }
+  for (const group of groups.values()) {
+    const count = group.length;
+    for (const ad of group) {
+      ad.collationCount = count;
+    }
+  }
+  return ads;
+};
+
 // --- SUB-COMPONENTES AUXILIARES ---
 const MiniLabel = memo(({ children }: { children: React.ReactNode }) => (
   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90 mb-1.5 ml-1 block font-mono">
@@ -166,14 +200,14 @@ export default function Minerador() {
     try {
       const result = await searchMutation.refetch();
       if (result.data) {
-        const ads = result.data.data;
+        const ads = groupAdsAndAddCount(result.data.data);
         const cursor = result.data.paging?.next_cursor;
         
         if (isNewSearch) {
           setAllAds(ads);
           setHasSearched(true);
         } else {
-          setAllAds(prev => [...prev, ...ads]);
+          setAllAds(prev => groupAdsAndAddCount([...prev, ...ads]));
         }
         
         setNextCursor(cursor);
@@ -209,10 +243,10 @@ export default function Minerador() {
         
         if (!result.data || controller.signal.aborted) break;
 
-        const newAds = result.data.data;
+        const newAds = groupAdsAndAddCount(result.data.data);
         const cursor = result.data.paging?.next_cursor;
         
-        setAllAds(prev => [...prev, ...newAds]);
+        setAllAds(prev => groupAdsAndAddCount([...prev, ...newAds]));
         setNextCursor(cursor);
         nextCursorRef.current = cursor;
         

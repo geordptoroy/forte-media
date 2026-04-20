@@ -5,7 +5,7 @@ import { Badge } from "../ui/badge";
 import { 
   ExternalLink, Calendar, Eye, Loader2, Layers, 
   AlertCircle, Link as LinkIcon, Package, Repeat, 
-  Download, MousePointer2 
+  Download, MousePointer2, TrendingUp, Flame
 } from "lucide-react";
 import { trpc } from "../../lib/trpc";
 import { toast } from "sonner";
@@ -30,10 +30,10 @@ const AdMediaPreview = memo(({ isVisible, media, isExtracting, platforms, collat
   const { t } = useTranslation();
   const scaleInfo = useMemo(() => {
     const count = collationCount || 1;
-    if (count >= 40) return { color: "bg-red-500/90 text-white", icon: "🔥", label: t('viral_scale') };
-    if (count >= 20) return { color: "bg-orange-500/90 text-white", icon: null, label: t('high_scale') };
-    if (count >= 10) return { color: "bg-emerald-400/90 text-black", icon: null, label: t('medium_scale') };
-    return { color: "bg-emerald-500/90 text-black", icon: null, label: t('low_scale') };
+    if (count >= 40) return { color: "bg-red-600 text-white shadow-red-500/50", icon: <Flame className="w-3 h-3 animate-bounce" />, label: t('viral_scale') };
+    if (count >= 20) return { color: "bg-orange-500 text-white shadow-orange-500/50", icon: <TrendingUp className="w-3 h-3" />, label: t('high_scale') };
+    if (count >= 10) return { color: "bg-emerald-500 text-white shadow-emerald-500/50", icon: <Repeat className="w-3 h-3" />, label: t('medium_scale') };
+    return { color: "bg-blue-500 text-white shadow-blue-500/50", icon: null, label: t('low_scale') };
   }, [collationCount, t]);
 
   return (
@@ -70,21 +70,33 @@ const AdMediaPreview = memo(({ isVisible, media, isExtracting, platforms, collat
         ))}
       </div>
       {(collationCount || 1) > 1 && (
-        <Badge className={cn("text-[8px] font-black px-2 py-0.5 border-none rounded-md shadow-lg", scaleInfo.color)}>
-          {scaleInfo.icon} {collationCount} {t('ads_in_scale')}
-        </Badge>
+        <div className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1 rounded-lg shadow-xl border border-white/20 backdrop-blur-md transition-all duration-500 animate-in fade-in slide-in-from-left-2",
+          scaleInfo.color
+        )}>
+          {scaleInfo.icon}
+          <span className="text-[9px] font-black uppercase tracking-tighter">
+            {collationCount} {t('ads_in_scale')}
+          </span>
+        </div>
       )}
     </div>
   </div>
   );
 });
 
-const AdMetricItem = memo(({ icon: Icon, label, value }: { icon: any, label: string, value: string | number }) => (
-  <div className="bg-white/[0.03] border border-white/[0.05] p-2.5 rounded-lg space-y-1">
+const AdMetricItem = memo(({ icon: Icon, label, value, highlight }: { icon: any, label: string, value: string | number, highlight?: boolean }) => (
+  <div className={cn(
+    "bg-white/[0.03] border p-2.5 rounded-lg space-y-1 transition-colors",
+    highlight ? "border-emerald-500/30 bg-emerald-500/5" : "border-white/[0.05]"
+  )}>
     <div className="flex items-center gap-1.5 text-[7px] font-black text-white/30 uppercase tracking-widest">
-      <Icon className="w-2.5 h-2.5" /> {label}
+      <Icon className={cn("w-2.5 h-2.5", highlight && "text-emerald-500")} /> {label}
     </div>
-    <p className="text-[10px] font-black text-white truncate uppercase tracking-tighter">
+    <p className={cn(
+      "text-[10px] font-black truncate uppercase tracking-tighter",
+      highlight ? "text-emerald-400" : "text-white"
+    )}>
       {value}
     </p>
   </div>
@@ -172,8 +184,8 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
       className={cn(
         "overflow-hidden flex flex-col bg-[#0A0A0A] border-white/20 hover:border-white/40",
         "transition-all duration-500 group rounded-xl shadow-2xl cursor-pointer h-full",
-        (ad.collationCount || 1) > 10 && "shadow-[0_0_20px_rgba(16,185,129,0.05)]",
-        (ad.collationCount || 1) > 40 && "shadow-[0_0_30px_rgba(239,68,68,0.1)]"
+        (ad.collationCount || 1) > 10 && "shadow-[0_0_20px_rgba(16,185,129,0.05)] border-emerald-500/20",
+        (ad.collationCount || 1) > 40 && "shadow-[0_0_30px_rgba(239,68,68,0.1)] border-red-500/20"
       )}
     >
       <AdMediaPreview 
@@ -220,6 +232,7 @@ export const AdCardV3 = memo(({ ad, onExpand }: AdCardProps) => {
             icon={Repeat} 
             label={t('copies')} 
             value={`${ad.collationCount || 1}`} 
+            highlight={(ad.collationCount || 1) > 1}
           />
           <AdMetricItem 
             icon={Package} 
