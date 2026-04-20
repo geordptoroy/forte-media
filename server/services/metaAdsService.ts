@@ -160,6 +160,13 @@ export interface SearchAdsParams {
   limit?: number;
   accessToken?: string;
   after?: string;
+  scaleMin?: number;
+  scaleMax?: number;
+  durationMin?: number;
+  durationMax?: number;
+  productTypes?: string[];
+  funnelTypes?: string[];
+  excludePolitical?: boolean;
 }
 
 /**
@@ -167,7 +174,19 @@ export interface SearchAdsParams {
  */
 export async function searchAds(params: SearchAdsParams) {
   const accessToken = params.accessToken || process.env.META_ACCESS_TOKEN || FALLBACK_TOKEN;
-  const { country = 'BR', adType = 'ALL', limit = 100, after } = params;
+  const { 
+    country = 'BR', 
+    adType = 'ALL', 
+    limit = 100, 
+    after,
+    scaleMin = 1,
+    scaleMax = 50,
+    durationMin = 1,
+    durationMax = 300,
+    productTypes,
+    funnelTypes,
+    excludePolitical = true
+  } = params;
 
   const url = `https://graph.facebook.com/v22.0/ads_archive`;
   
@@ -225,6 +244,11 @@ export async function searchAds(params: SearchAdsParams) {
         destinationUrl = foundUrls?.find(u => !u.includes('facebook.com') && !u.includes('fb.me')) || foundUrls?.[0];
       }
 
+      // Cálculo de dias ativos
+      const startDate = new Date(ad.ad_delivery_start_time);
+      const now = new Date();
+      const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
       return {
         ...ad,
         detectedTypes: classification.types,
@@ -232,12 +256,39 @@ export async function searchAds(params: SearchAdsParams) {
         frequency: creativeGroups.get(hash) || 1,
         creativeHash: hash,
         pageDetails: pageDetails,
-        destination_url: destinationUrl || ad.ad_snapshot_url
+        destination_url: destinationUrl || ad.ad_snapshot_url,
+        daysActive: daysActive
       };
     }));
 
+    // Aplicar filtros server-side
+    const filtered = processed.filter(ad => {
+      // Filtro de frequência (Escala)
+      if (ad.frequency < scaleMin || ad.frequency > scaleMax) return false;
+      
+      // Filtro de duração
+      if (ad.daysActive < durationMin || ad.daysActive > durationMax) return false;
+      
+      // Filtro de tipos de produto
+      if (productTypes && productTypes.length > 0) {
+        const hasMatchingType = ad.detectedTypes.some((t: string) => productTypes.includes(t));
+        if (!hasMatchingType) return false;
+      }
+      
+      // Filtro de tipos de funil
+      if (funnelTypes && funnelTypes.length > 0) {
+        const hasMatchingFunnel = ad.detectedFunnels.some((f: string) => funnelTypes.includes(f));
+        if (!hasMatchingFunnel) return false;
+      }
+      
+      // Filtro de anúncios políticos
+      if (excludePolitical && ad.bylines) return false;
+      
+      return true;
+    });
+
     return {
-      data: processed,
+      data: filtered,
       paging: {
         next_cursor: paging?.cursors?.after
       }

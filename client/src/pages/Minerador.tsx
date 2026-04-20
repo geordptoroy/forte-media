@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo, memo } from "react";
 import { trpc } from "../lib/trpc";
-import { Search, Filter, Loader2, Globe, Package, Layers, X, ChevronDown } from "lucide-react";
+import { Search, Filter, Loader2, Globe, Package, Layers, X } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
@@ -45,20 +45,21 @@ const COUNTRIES = [
   { code: "CL", name: "Chile" },
 ];
 
-const PRODUCT_TYPES = ["Todos", "Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"];
-const FUNNEL_STRUCTURES = ["Todos", "TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
+const PRODUCT_TYPES = ["Infoproduto", "Suplementos/Nutra", "Dropshipping", "Comércio Local", "Moda", "Eletrônicos", "Serviços", "Outros"];
+const FUNNEL_STRUCTURES = ["TSL", "VSL", "X1", "Landing Page", "Quiz", "Type Bot"];
 const AUTO_LOAD_LIMIT = 20;
 
 // --- TIPOS ---
 interface FilterState {
   searchTerms: string;
   country: string;
-  productType: string;
-  funnelType: string;
   scaleMin: number;
   scaleMax: number;
   durationMin: number;
   durationMax: number;
+  productTypes: string[];
+  funnelTypes: string[];
+  excludePolitical: boolean;
 }
 
 interface RangeFilter {
@@ -94,7 +95,7 @@ const PageHeader = memo(({ resultsCount, hidePolitical, onTogglePolitical }: {
       <div className="flex items-center gap-3 bg-white/[0.03] border border-white/20 px-4 py-2 rounded-lg w-fit">
         <Filter className="w-3.5 h-3.5 text-white/80" />
         <span className="text-[11px] font-black uppercase text-white/90 whitespace-nowrap">
-          {hidePolitical ? "Ocultar Ads Políticos e Sociais" : "Apenas Ads Políticos e Sociais"}
+          {hidePolitical ? "Ocultar Ads Políticos" : "Mostrar Todos"}
         </span>
         <Switch 
           checked={hidePolitical} 
@@ -183,23 +184,61 @@ const RangeFilterComponent = memo(({
 
 RangeFilterComponent.displayName = "RangeFilterComponent";
 
+// Componente para seleção múltipla de categorias
+const MultiSelectFilter = memo(({ 
+  label, 
+  options, 
+  selected, 
+  onChange 
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}) => (
+  <div className="space-y-2">
+    <MiniLabel>{label}</MiniLabel>
+    <div className="flex gap-2 flex-wrap">
+      {options.map((option) => (
+        <Button
+          key={option}
+          variant="outline"
+          size="sm"
+          className={cn(
+            "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all",
+            selected.includes(option)
+              ? "bg-purple-500/20 border-purple-500/50 text-purple-500"
+              : "border-white/10 text-white/60 hover:border-white/20"
+          )}
+          onClick={() => {
+            const newSelected = selected.includes(option)
+              ? selected.filter(s => s !== option)
+              : [...selected, option];
+            onChange(newSelected);
+          }}
+        >
+          {option}
+        </Button>
+      ))}
+    </div>
+  </div>
+));
+
+MultiSelectFilter.displayName = "MultiSelectFilter";
+
 // --- COMPONENTE PRINCIPAL ---
 export default function Minerador() {
   // --- ESTADO UNIFICADO ---
   const [filters, setFilters] = useState<FilterState>({
     searchTerms: "",
     country: "BR",
-    productType: "Todos",
-    funnelType: "Todos",
     scaleMin: 1,
     scaleMax: 50,
     durationMin: 1,
     durationMax: 300,
-  });
-
-  const [hidePolitical, setHidePolitical] = useState(() => {
-    const saved = localStorage.getItem("hidePolitical");
-    return saved !== null ? JSON.parse(saved) : true;
+    productTypes: [],
+    funnelTypes: [],
+    excludePolitical: true,
   });
 
   const [allAds, setAllAds] = useState<any[]>([]);
@@ -212,7 +251,7 @@ export default function Minerador() {
   const adsCountRef = useRef(0);
   const nextCursorRef = useRef<string | undefined>(undefined);
 
-  // Sincronizar refs com estado para uso em callbacks estáveis
+  // Sincronizar refs com estado
   useEffect(() => {
     adsCountRef.current = allAds.length;
   }, [allAds.length]);
@@ -221,16 +260,18 @@ export default function Minerador() {
     nextCursorRef.current = nextCursor;
   }, [nextCursor]);
 
-  // --- PERSISTÊNCIA ---
-  useEffect(() => {
-    localStorage.setItem("hidePolitical", JSON.stringify(hidePolitical));
-  }, [hidePolitical]);
-
-  // --- BUSCA (API) ---
+  // --- BUSCA (API) COM FILTROS SERVER-SIDE ---
   const searchMutation = trpc.ads.search.useQuery(
     { 
       searchTerms: filters.searchTerms, 
-      country: filters.country, 
+      country: filters.country,
+      scaleMin: filters.scaleMin,
+      scaleMax: filters.scaleMax,
+      durationMin: filters.durationMin,
+      durationMax: filters.durationMax,
+      productTypes: filters.productTypes.length > 0 ? filters.productTypes : undefined,
+      funnelTypes: filters.funnelTypes.length > 0 ? filters.funnelTypes : undefined,
+      excludePolitical: filters.excludePolitical,
       adType: "ALL",
       after: nextCursor
     },
@@ -297,46 +338,14 @@ export default function Minerador() {
 
   useEffect(() => {
     if (hasSearched) handleSearch();
-  }, [filters.country, hidePolitical, hasSearched, handleSearch]);
+  }, [filters.country, filters.excludePolitical, hasSearched, handleSearch]);
 
-  // Gatilho de Auto-load estável
+  // Gatilho de Auto-load
   useEffect(() => {
     if (nextCursor && !isAutoLoading && hasSearched && allAds.length < AUTO_LOAD_LIMIT) {
       startAutoLoad();
     }
   }, [nextCursor, isAutoLoading, hasSearched, allAds.length, startAutoLoad]);
-
-  // --- FILTRAGEM LOCAL (ALTA PERFORMANCE) ---
-  const processedAds = useMemo(() => {
-    if (!allAds.length) return [];
-    
-    let filtered = allAds.filter(ad => {
-      const isPolitical = !!ad.bylines;
-      const matchesPolitical = hidePolitical ? !isPolitical : isPolitical;
-      
-      const matchesType = filters.productType === "Todos" || 
-        ad.detectedTypes?.some((t: string) => t === filters.productType);
-        
-      const matchesFunnel = filters.funnelType === "Todos" || 
-        ad.detectedFunnels?.some((f: string) => f === filters.funnelType);
-
-      const frequency = ad.frequency || 1;
-      const matchesScale = frequency >= filters.scaleMin && frequency <= filters.scaleMax;
-      
-      const startDate = new Date(ad.ad_delivery_start_time);
-      const now = new Date();
-      const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const matchesDuration = daysActive >= filters.durationMin && daysActive <= filters.durationMax;
-
-      return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
-    });
-
-    return filtered.sort((a, b) => {
-      const freqDiff = (b.frequency || 0) - (a.frequency || 0);
-      if (freqDiff !== 0) return freqDiff;
-      return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
-    });
-  }, [allAds, hidePolitical, filters.productType, filters.funnelType, filters.scaleMin, filters.scaleMax, filters.durationMin, filters.durationMax]);
 
   // --- HANDLERS DE FILTRO ---
   const updateFilter = useCallback((key: keyof FilterState, value: any) => {
@@ -361,13 +370,13 @@ export default function Minerador() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/60">Minerador</span>
             <span className="text-white/20 font-light text-xl">Pro</span>
           </h1>
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 mt-3">Busca Avançada de Anúncios Meta com Filtros Server-Side</p>
         </div>
         
         <PageHeader 
-          resultsCount={processedAds.length} 
-          hidePolitical={hidePolitical} 
-          onTogglePolitical={setHidePolitical} 
+          resultsCount={allAds.length} 
+          hidePolitical={filters.excludePolitical} 
+          onTogglePolitical={(val) => updateFilter("excludePolitical", val)} 
         />
 
         {/* Barra de Filtros Unificada */}
@@ -397,7 +406,7 @@ export default function Minerador() {
                 </div>
               </div>
 
-              <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:flex items-end gap-2 w-full lg:w-auto">
+              <div className="flex-1 grid grid-cols-2 md:grid-cols-2 lg:flex items-end gap-2 w-full lg:w-auto">
                 <div className="flex-1 space-y-0">
                   <MiniLabel>País</MiniLabel>
                   <Select value={filters.country} onValueChange={(v) => updateFilter("country", v)}>
@@ -410,40 +419,6 @@ export default function Minerador() {
                     <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
                       {COUNTRIES.map((c) => (
                         <SelectItem key={c.code} value={c.code} className="text-[11px] font-black uppercase py-2">{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex-1 space-y-0">
-                  <MiniLabel>Tipo Produto</MiniLabel>
-                  <Select value={filters.productType} onValueChange={(v) => updateFilter("productType", v)}>
-                    <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05] transition-colors">
-                      <div className="flex items-center gap-2 truncate">
-                        <Package className="w-3 h-3 text-white/60 shrink-0" />
-                        <SelectValue placeholder="Tipo" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                      {PRODUCT_TYPES.map((t) => (
-                        <SelectItem key={t} value={t} className="text-[11px] font-black uppercase py-2">{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex-1 space-y-0">
-                  <MiniLabel>Funil</MiniLabel>
-                  <Select value={filters.funnelType} onValueChange={(v) => updateFilter("funnelType", v)}>
-                    <SelectTrigger className="w-full bg-white/[0.03] border-white/20 rounded-lg h-10 text-[11px] font-black uppercase tracking-tighter focus:ring-0 hover:bg-white/[0.05] transition-colors">
-                      <div className="flex items-center gap-2 truncate">
-                        <Layers className="w-3 h-3 text-white/60 shrink-0" />
-                        <SelectValue placeholder="Funil" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0A0A0A] border-white/[0.1] rounded-lg">
-                      {FUNNEL_STRUCTURES.map((f) => (
-                        <SelectItem key={f} value={f} className="text-[11px] font-black uppercase py-2">{f}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -489,6 +464,25 @@ export default function Minerador() {
                 />
               </div>
             </div>
+
+            {/* Linha 3: Filtros de Categorias */}
+            <div className="border-t border-white/10 pt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <MultiSelectFilter
+                  label="Tipos de Produto"
+                  options={PRODUCT_TYPES}
+                  selected={filters.productTypes}
+                  onChange={(selected) => updateFilter("productTypes", selected)}
+                />
+
+                <MultiSelectFilter
+                  label="Tipos de Funil"
+                  options={FUNNEL_STRUCTURES}
+                  selected={filters.funnelTypes}
+                  onChange={(selected) => updateFilter("funnelTypes", selected)}
+                />
+              </div>
+            </div>
           </form>
         </Card>
 
@@ -499,9 +493,9 @@ export default function Minerador() {
               <Loader2 className="w-10 h-10 text-white/20 animate-spin" />
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Iniciando Mineração...</p>
             </div>
-          ) : processedAds.length > 0 ? (
+          ) : allAds.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-              {processedAds.map((ad) => (
+              {allAds.map((ad) => (
                 <AdCardV3 
                   key={ad.id} 
                   ad={ad} 

@@ -11,9 +11,14 @@ export const adsRouter = router({
         country: z.string().default("BR"),
         adType: z.enum(["ALL", "POLITICAL_AND_ISSUE_ADS"]).default("ALL"),
         limit: z.number().min(1).max(500).default(50),
-        niche: z.string().optional(),
-        productType: z.string().optional(),
-        activeSince: z.string().optional(),
+        // Filtros avançados (Server-side)
+        scaleMin: z.number().min(1).default(1).optional(),
+        scaleMax: z.number().max(1000).default(50).optional(),
+        durationMin: z.number().min(1).default(1).optional(),
+        durationMax: z.number().max(365).default(300).optional(),
+        productTypes: z.array(z.string()).optional(),
+        funnelTypes: z.array(z.string()).optional(),
+        excludePolitical: z.boolean().default(true).optional(),
         after: z.string().optional(), // Suporte a paginação
       })
     )
