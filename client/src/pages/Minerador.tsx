@@ -102,8 +102,10 @@ export default function Minerador() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedAd, setSelectedAd] = useState<{ ad: any, media: any } | null>(null);
   const [isAutoLoading, setIsAutoLoading] = useState(false);
-  const [scaleRange, setScaleRange] = useState([1, 50]);
-  const [durationRange, setDurationRange] = useState([1, 300]);
+  const [scaleMin, setScaleMin] = useState(1);
+  const [scaleMax, setScaleMax] = useState(50);
+  const [durationMin, setDurationMin] = useState(1);
+  const [durationMax, setDurationMax] = useState(300);
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -203,12 +205,12 @@ export default function Minerador() {
         ad.detectedFunnels?.some((f: string) => f === filters.selectedFunnel);
 
       const frequency = ad.frequency || 1;
-      const matchesScale = frequency >= scaleRange[0] && frequency <= scaleRange[1];
+      const matchesScale = frequency >= scaleMin && frequency <= scaleMax;
       
       const startDate = new Date(ad.ad_delivery_start_time);
       const now = new Date();
       const daysActive = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const matchesDuration = daysActive >= durationRange[0] && daysActive <= durationRange[1];
+      const matchesDuration = daysActive >= durationMin && daysActive <= durationMax;
 
       return matchesPolitical && matchesType && matchesFunnel && matchesScale && matchesDuration;
     });
@@ -218,7 +220,7 @@ export default function Minerador() {
       if (freqDiff !== 0) return freqDiff;
       return new Date(b.ad_delivery_start_time).getTime() - new Date(a.ad_delivery_start_time).getTime();
     });
-  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleRange, durationRange]);
+  }, [allAds, hidePolitical, filters.selectedType, filters.selectedFunnel, scaleMin, scaleMax, durationMin, durationMax]);
 
   const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -342,16 +344,58 @@ export default function Minerador() {
             <div className="flex items-center justify-between">
               <MiniLabel>Escala de Anúncios Repetidos</MiniLabel>
               <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">
-                {scaleRange[0]} - {scaleRange[1]} anúncios
+                {scaleMin} - {scaleMax} anúncios
               </span>
             </div>
             <div className="flex items-center gap-4">
-              <input type="range" min="1" max="50" value={scaleRange[0]} onChange={(e) => setScaleRange([Math.min(parseInt(e.target.value), scaleRange[1]), scaleRange[1]])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
-              <input type="range" min="1" max="50" value={scaleRange[1]} onChange={(e) => setScaleRange([scaleRange[0], Math.max(parseInt(e.target.value), scaleRange[0])])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" />
+              <div className="flex-1 space-y-2">
+                <label className="text-[9px] font-bold text-white/60">Mínimo: {scaleMin}</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="50" 
+                  value={scaleMin} 
+                  onChange={(e) => {
+                    const newMin = Math.min(parseInt(e.target.value), scaleMax);
+                    setScaleMin(newMin);
+                  }} 
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                <label className="text-[9px] font-bold text-white/60">Máximo: {scaleMax}</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="50" 
+                  value={scaleMax} 
+                  onChange={(e) => {
+                    const newMax = Math.max(parseInt(e.target.value), scaleMin);
+                    setScaleMax(newMax);
+                  }} 
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-emerald-500" 
+                />
+              </div>
             </div>
             <div className="flex gap-2 flex-wrap">
               {SCALE_RANGES.map((range) => (
-                <Button key={range.label} variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", scaleRange[0] === range.min && scaleRange[1] === range.max ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setScaleRange([range.min, range.max])}>{range.label}</Button>
+                <Button 
+                  key={range.label} 
+                  variant="outline" 
+                  size="sm" 
+                  className={cn(
+                    "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                    scaleMin === range.min && scaleMax === range.max 
+                      ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500" 
+                      : "border-white/10 text-white/60 hover:border-white/20"
+                  )} 
+                  onClick={() => {
+                    setScaleMin(range.min);
+                    setScaleMax(range.max);
+                  }}
+                >
+                  {range.label}
+                </Button>
               ))}
             </div>
           </div>
@@ -361,18 +405,104 @@ export default function Minerador() {
             <div className="flex items-center justify-between">
               <MiniLabel>Duração da Veiculação</MiniLabel>
               <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
-                {durationRange[0]} - {durationRange[1]} dias
+                {durationMin} - {durationMax} dias
               </span>
             </div>
             <div className="flex items-center gap-4">
-              <input type="range" min="1" max="300" value={durationRange[0]} onChange={(e) => setDurationRange([Math.min(parseInt(e.target.value), durationRange[1]), durationRange[1]])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
-              <input type="range" min="1" max="300" value={durationRange[1]} onChange={(e) => setDurationRange([durationRange[0], Math.max(parseInt(e.target.value), durationRange[0])])} className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
+              <div className="flex-1 space-y-2">
+                <label className="text-[9px] font-bold text-white/60">Mínimo: {durationMin}</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="300" 
+                  value={durationMin} 
+                  onChange={(e) => {
+                    const newMin = Math.min(parseInt(e.target.value), durationMax);
+                    setDurationMin(newMin);
+                  }} 
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                <label className="text-[9px] font-bold text-white/60">Máximo: {durationMax}</label>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="300" 
+                  value={durationMax} 
+                  onChange={(e) => {
+                    const newMax = Math.max(parseInt(e.target.value), durationMin);
+                    setDurationMax(newMax);
+                  }} 
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" 
+                />
+              </div>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 1 && durationRange[1] === 7 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([1, 7])}>1-7 dias</Button>
-              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 7 && durationRange[1] === 30 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([7, 30])}>7-30 dias</Button>
-              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 30 && durationRange[1] === 90 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([30, 90])}>30-90 dias</Button>
-              <Button variant="outline" size="sm" className={cn("text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", durationRange[0] === 90 && durationRange[1] === 300 ? "bg-blue-500/20 border-blue-500/50 text-blue-500" : "border-white/10 text-white/60 hover:border-white/20")} onClick={() => setDurationRange([90, 300])}>90+ dias</Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                  durationMin === 1 && durationMax === 7 
+                    ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                    : "border-white/10 text-white/60 hover:border-white/20"
+                )} 
+                onClick={() => {
+                  setDurationMin(1);
+                  setDurationMax(7);
+                }}
+              >
+                1-7 dias
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                  durationMin === 7 && durationMax === 30 
+                    ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                    : "border-white/10 text-white/60 hover:border-white/20"
+                )} 
+                onClick={() => {
+                  setDurationMin(7);
+                  setDurationMax(30);
+                }}
+              >
+                7-30 dias
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                  durationMin === 30 && durationMax === 90 
+                    ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                    : "border-white/10 text-white/60 hover:border-white/20"
+                )} 
+                onClick={() => {
+                  setDurationMin(30);
+                  setDurationMax(90);
+                }}
+              >
+                30-90 dias
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className={cn(
+                  "text-[9px] font-black uppercase px-3 py-1 rounded-full transition-all", 
+                  durationMin === 90 && durationMax === 300 
+                    ? "bg-blue-500/20 border-blue-500/50 text-blue-500" 
+                    : "border-white/10 text-white/60 hover:border-white/20"
+                )} 
+                onClick={() => {
+                  setDurationMin(90);
+                  setDurationMax(300);
+                }}
+              >
+                90+ dias
+              </Button>
             </div>
           </div>
         </Card>
